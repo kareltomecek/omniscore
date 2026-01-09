@@ -471,13 +471,11 @@
         .schedule-toolbar {
             display: flex;
             gap: 5px;
-            margin-bottom: 10px;
-            background: #333;
+            margin-bottom: 8px;
+            background: #2a2a2a;
             padding: 5px;
-            border-radius: var(--border-radius);
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            border-radius: 4px;
+            border: 1px solid #444;
         }
 
         .schedule-toolbar .small-btn {
@@ -1048,7 +1046,6 @@
         <!-- RIGHT PANEL: Administration -->
         <div id="admin-panel" class="panel">
             <h3>Turnajová Správa</h3>
-
             <!-- 1. Tournament Settings -->
             <div class="accordion">
                 <div class="accordion-header" onclick="toggleAccordion('acc-settings')">
@@ -1078,6 +1075,36 @@
                             <input type="number" id="time-setup" value="10" min="0" style="width: 100%;"
                                 oninput="admin.saveSettings(false)">
                         </div>
+                    </div>
+
+                    <h4 style="margin: 15px 0 10px 0; border: none; padding: 0;">Bodování</h4>
+                    <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label style="font-size: 0.85em;">Výhra</label>
+                            <input type="number" id="rule-win" value="3" min="0" style="width: 100%;"
+                                oninput="admin.saveSettings(false)">
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label style="font-size: 0.85em;">Remíza</label>
+                            <input type="number" id="rule-draw" value="1" min="0" style="width: 100%;"
+                                oninput="admin.saveSettings(false)">
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label style="font-size: 0.85em;">Prohra</label>
+                            <input type="number" id="rule-loss" value="0" min="0" style="width: 100%;"
+                                oninput="admin.saveSettings(false)">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 15px; text-align: left;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; cursor: pointer; justify-content: flex-start;">
+                            <input type="checkbox" id="rule-mini-tables" onchange="admin.saveSettings(false)"
+                                style="margin: 0; width: auto;">
+                            Vzájemné zápasy (Minitabulky)
+                        </label>
+                        <small style="color: #888; display: block; margin-top: 4px;">Při rovnosti bodů rozhodují
+                            vzájemné zápasy před celkovým skóre.</small>
                     </div>
 
                 </div>
@@ -1121,28 +1148,6 @@
                     Rozpis Zápasů <span>▼</span>
                 </div>
                 <div id="acc-schedule" class="accordion-content">
-
-                    <div class="mode-toggle">
-                        <button id="mode-sched-append" class="mode-toggle-btn mod-mode-btn active"
-                            onclick="admin.setModificationMode('append')">
-                            <span class="icon-sq">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                                </svg>
-                            </span>
-                            Přidat k existujícímu
-                        </button>
-                        <button id="mode-sched-replace" class="mode-toggle-btn mod-mode-btn"
-                            onclick="admin.setModificationMode('replace')">
-                            <span class="icon-sq">
-                                <svg viewBox="0 0 24 24">
-                                    <path
-                                        d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
-                                </svg>
-                            </span>
-                            Nahradit rozpis
-                        </button>
-                    </div>
 
                     <div class="mode-toggle" style="margin-top: 5px; background: #222;">
                         <button id="tab-sched-gen" class="mode-toggle-btn sched-tab-btn active"
@@ -1289,7 +1294,7 @@
                         </div>
                     </div>
 
-                    <!-- Match Queue Section -->
+                    <h4 id="sched-list-header" style="margin-top:5px; border:none;">Pořadí:</h4>
                     <div class="schedule-toolbar">
                         <button class="small-btn btn-green" onclick="admin.toggleAddMode()"
                             title="Přidat nový zápas nebo událost"><b>+</b></button>
@@ -1304,13 +1309,45 @@
                         <button class="small-btn btn-blue" onclick="admin.loadSelected()" title="Načíst vybraný"
                             style="background: var(--accent-blue);">Načíst</button>
                     </div>
-
-                    <h4 id="sched-list-header" style="margin-top:5px; border:none;">Pořadí:</h4>
                     <ul class="match-list" id="match-queue"></ul>
                 </div>
             </div>
 
-            <!-- 4. Music Player -->
+            <!-- 4. Export -->
+            <div class="accordion">
+                <div class="accordion-header" onclick="toggleAccordion('acc-export')">
+                    Exporty <span>▼</span>
+                </div>
+                <div id="acc-export" class="accordion-content">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <button class="btn-full" onclick="exporter.toXLSX()"
+                            style="background:#4caf50; margin-top:0;">📊 Excel</button>
+                        <button class="btn-full" onclick="exporter.toPrintable()"
+                            style="background:#2196f3; margin-top:0;">🖨️ Pro tisk</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Unified Tables -->
+            <div class="accordion">
+                <div class="accordion-header" onclick="toggleAccordion('acc-standings')">
+                    Tabulky <span>▼</span>
+                </div>
+                <div id="acc-standings" class="accordion-content">
+                    <div class="tab-switcher"
+                        style="display: flex; gap: 5px; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 8px;">
+                        <button id="tab-btn-standings" class="small-btn" style="flex: 1;"
+                            onclick="admin.setStandingsTab('standings')">Pořadí</button>
+                        <button id="tab-btn-cross" class="small-btn" style="flex: 1;"
+                            onclick="admin.setStandingsTab('cross')">Křížová</button>
+                    </div>
+                    <div id="standings-container">
+                        <!-- Standard standings or Cross table will be rendered here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. Music Player -->
             <div class="accordion">
                 <div class="accordion-header" onclick="toggleAccordion('acc-music')">
                     Hudba na pozadí <span>▼</span>
@@ -1726,7 +1763,13 @@
             tournamentStartTime: null, // Timestamp when first timer starts
             playTimeAccumulated: 0, // Seconds of actual play time (halves) completed
             showFooter: true,
-            scheduleModificationMode: 'append' // 'append' or 'replace'
+            rules: {
+                winPoints: 3,
+                drawPoints: 1,
+                lossPoints: 0,
+                useMiniTables: false
+            },
+            activeStandingsTab: 'standings' // 'standings' or 'cross'
         };
 
 
@@ -1970,6 +2013,7 @@
                             state.schedule[state.activeMatchIndex].homeScore = state.currentMatch.homeScore;
                             state.schedule[state.activeMatchIndex].guestScore = state.currentMatch.guestScore;
                             ui.renderSchedule();
+                            ui.renderStandings(); // UPDATE STANDINGS
                             admin.saveToStorage(); game.syncProjection();
                             alert("Konec turnaje (nebo poslední zápas). Výsledek uložen.");
                         }
@@ -2060,23 +2104,32 @@
 
             getTelemetry: () => {
                 const now = new Date();
-                const dateStr = now.getFullYear() + '-' + (now.getMonth() + 1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
                 const timeStr = now.toLocaleTimeString('cs-CZ');
+                const dateStr = now.getFullYear() + '-' + (now.getMonth() + 1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
                 const fullTimeStr = `${dateStr}\u00A0\u00A0\u00A0\u00A0${timeStr}`;
 
                 const currentIdx = state.activeMatchIndex;
                 const totalItems = (state.schedule || []).length;
                 const progressStr = `Právě se hraje: ${currentIdx + 1} z ${totalItems}`;
 
-                // Extrapolation logic
-                let learnedOverhead = 60; // Default seed
+                // Average "Planned" overhead per match (Setup + Break)
+                const s = state.times.setup || 0;
+                const b = state.times.break || 0;
+                const p = state.times.play || 0;
+                const plannedOverhead = s + b;
+
+                // Adjust based on real performance if tournament started
                 if (state.tournamentStartTime && state.activeMatchIndex > 0) {
                     const realElapsed = (Date.now() - state.tournamentStartTime) / 1000;
                     const playElapsed = state.playTimeAccumulated || 0;
                     const totalOverhead = Math.max(0, realElapsed - playElapsed);
                     learnedOverhead = totalOverhead / state.activeMatchIndex;
-                    // Clamp to reasonable range (10s to 10 mins)
-                    learnedOverhead = Math.max(10, Math.min(600, learnedOverhead));
+
+                    // Lag is the delay compared to theoretical plan
+                    avgLag = Math.max(0, learnedOverhead - plannedOverhead);
+
+                    // Clamp to reasonable range (max 10 mins extra per match)
+                    avgLag = Math.min(600, avgLag);
                 }
 
                 let remainingSeconds = state.timer.running
@@ -2084,25 +2137,27 @@
                     : state.timer.timeLeft;
 
                 // Current item progress
-                if (!state.currentMatch.isEvent) {
-                    const curPhase = state.currentMatch.phaseIndex;
-                    const playDur = state.times.play || 420;
-                    if (curPhase === 0) { // Setup
-                        remainingSeconds += (playDur * 2) + (learnedOverhead / 2); // 2 halves + break
-                    } else if (curPhase === 1) { // 1. Polocas
-                        remainingSeconds += playDur + (learnedOverhead / 2); // 2nd half + break
-                    } else if (curPhase === 2) { // Break
-                        remainingSeconds += playDur; // 2nd half
+                if (currentIdx !== -1 && state.schedule[currentIdx]) {
+                    const m = state.schedule[currentIdx];
+                    if (m.type === 'match') {
+                        const curPhase = state.currentMatch.phaseIndex;
+                        // Ph 0 (Setup): + P1, B, P2
+                        if (curPhase === 0) remainingSeconds += (p * 2) + b + (avgLag * 0.8);
+                        // Ph 1 (P1): + B, P2
+                        else if (curPhase === 1) remainingSeconds += p + b + (avgLag * 0.5);
+                        // Ph 2 (Break): + P2
+                        else if (curPhase === 2) remainingSeconds += p + (avgLag * 0.2);
+                        // Ph 3 (P2): already covered by timer
                     }
-                    // ph 3 (2. Polocas) is just timeLeft
                 }
 
                 // Upcoming items
                 (state.schedule || []).slice(currentIdx + 1).forEach(m => {
                     if (m.type === 'event') {
                         remainingSeconds += (m.duration || 600);
+                        remainingSeconds += (avgLag * 0.5); // Add partial lag for events too
                     } else {
-                        remainingSeconds += ((state.times.play || 420) * 2) + learnedOverhead;
+                        remainingSeconds += (p * 2) + plannedOverhead + avgLag;
                     }
                 });
 
@@ -2179,6 +2234,11 @@
                 state.times.setup = Math.max(0, parseInt(document.getElementById('time-setup').value || 10));
                 state.times.play = Math.max(0, parseInt(document.getElementById('time-play').value || 420));
                 state.times.break = Math.max(0, parseInt(document.getElementById('time-break').value || 105));
+
+                state.rules.winPoints = parseInt(document.getElementById('rule-win').value || 3);
+                state.rules.drawPoints = parseInt(document.getElementById('rule-draw').value || 1);
+                state.rules.lossPoints = parseInt(document.getElementById('rule-loss').value || 0);
+                state.rules.useMiniTables = document.getElementById('rule-mini-tables').checked;
 
                 // Save teams from dynamic list
                 state.teams = [];
@@ -2357,13 +2417,9 @@
                     return;
                 }
 
-                let appendMode = (state.scheduleModificationMode === 'append');
-
-                // Prepare
-                if (!appendMode) {
-                    state.schedule = [];
-                    state.activeMatchIndex = -1;
-                }
+                // Always replace
+                state.schedule = [];
+                state.activeMatchIndex = -1;
 
                 const startIdx = state.schedule.length;
                 const pairs = SCHEDULE_TEMPLATES[count];
@@ -2401,7 +2457,7 @@
                 admin.saveSettings(false); // Silent save
                 ui.renderSchedule();
                 game.syncProjection();
-                alert(`Rozpis pro ${count} družstev byl ${appendMode ? 'přidán' : 'vygenerován'}.`);
+                alert(`Rozpis pro ${count} družstev byl vygenerován.`);
             },
 
             addMatch: () => {
@@ -2417,7 +2473,9 @@
                     home: isEvent ? "" : document.getElementById('sched-home').value,
                     guest: isEvent ? "" : document.getElementById('sched-guest').value,
                     referee: isEvent ? "" : document.getElementById('sched-referee').value,
-                    duration: isEvent ? parseInt(document.getElementById('sched-duration').value || 600) : null
+                    duration: isEvent ? parseInt(document.getElementById('sched-duration').value || 600) : null,
+                    homeScore: null,
+                    guestScore: null
                 };
                 state.schedule.push(match);
                 admin.clearSchedInputs();
@@ -2526,8 +2584,9 @@
                     let gScore = document.getElementById('sched-guest-score').value;
 
                     // Validation: Ensure non-negative
-                    let parsedH = hScore !== "" ? parseInt(hScore) : null;
-                    let parsedG = gScore !== "" ? parseInt(gScore) : null;
+                    // Validation: Ensure valid numbers
+                    let parsedH = (hScore !== "" && !isNaN(hScore)) ? parseInt(hScore) : null;
+                    let parsedG = (gScore !== "" && !isNaN(gScore)) ? parseInt(gScore) : null;
 
                     if (parsedH !== null && parsedH < 0) parsedH = 0;
                     if (parsedG !== null && parsedG < 0) parsedG = 0;
@@ -2600,16 +2659,10 @@
                 document.getElementById(`tab-sched-${mode}`).classList.add('active');
             },
 
-            setModificationMode: (mode) => {
-                state.scheduleModificationMode = mode;
-                document.querySelectorAll('.mod-mode-btn').forEach(b => b.classList.remove('active'));
-                document.getElementById(`mode-sched-${mode}`).classList.add('active');
-            },
 
             handleScheduleImport: (input) => {
                 if (!input.files || !input.files[0]) return;
                 const file = input.files[0];
-                const mode = state.scheduleModificationMode === 'replace' ? 'overwrite' : 'append';
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -2665,12 +2718,9 @@
                             if (ref && admin.ensureIdentityExists(ref, 'ref')) addedRefs++;
                         }
 
-                        if (mode === 'overwrite') {
-                            state.schedule = newMatches;
-                            state.activeMatchIndex = -1;
-                        } else {
-                            state.schedule = [...state.schedule, ...newMatches];
-                        }
+                        // Always overwrite
+                        state.schedule = newMatches;
+                        state.activeMatchIndex = -1;
 
                         ui.renderSchedule();
                         admin.saveToStorage(); game.syncProjection();
@@ -2791,6 +2841,16 @@
             },
 
             loadMatch: (index, resetPhase = false, snapshot = null) => {
+                // Save current result if it was a real match before loading new one
+                if (state.activeMatchIndex !== -1 && !state.currentMatch.isEvent) {
+                    const currentMatchInSched = state.schedule[state.activeMatchIndex];
+                    if (currentMatchInSched && currentMatchInSched.type === 'match') {
+                        currentMatchInSched.homeScore = state.currentMatch.homeScore;
+                        currentMatchInSched.guestScore = state.currentMatch.guestScore;
+                        admin.saveToStorage(); // ENSURE STORAGE IS UPDATED
+                    }
+                }
+
                 // Handle PO transition
                 if (snapshot) {
                     game.triggerPoTransition(snapshot);
@@ -2812,14 +2872,15 @@
                     homeName: m.home || "",
                     guestName: m.guest || "",
                     referee: m.referee || "",
-                    homeScore: m.homeScore || 0,
-                    guestScore: m.guestScore || 0,
+                    homeScore: (m.homeScore !== null) ? m.homeScore : 0,
+                    guestScore: (m.guestScore !== null) ? m.guestScore : 0,
                     duration: m.duration || 600
                 };
 
                 ui.updateNames();
                 ui.updateScores();
                 ui.renderSchedule(); // update active highlight
+                ui.renderStandings(); // AUTOMATICALLY UPDATE TABLES
 
                 if (resetPhase) {
                     game.setPhase(0, true);
@@ -2984,6 +3045,138 @@
                 admin.saveToStorage(); game.syncProjection();
             },
 
+            calculateStandings: () => {
+                const teamsMap = {};
+                // Initialize map with all current teams
+                state.teams.forEach(t => {
+                    teamsMap[t.id] = { id: t.id, name: t.name, gp: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
+                });
+
+                // Process schedule
+                state.schedule.forEach(m => {
+                    const hs = parseInt(m.homeScore);
+                    const gs = parseInt(m.guestScore);
+
+                    if (m.type === 'match' && !isNaN(hs) && !isNaN(gs)) {
+                        const h = teamsMap[m.home];
+                        const g = teamsMap[m.guest];
+                        if (!h || !g) return;
+
+                        h.gp++; g.gp++;
+                        h.gf += hs; h.ga += gs;
+                        g.gf += gs; g.ga += hs;
+
+                        if (hs > gs) {
+                            h.w++; g.l++;
+                            h.pts += (state.rules ? state.rules.winPoints : 3);
+                            g.pts += (state.rules ? state.rules.lossPoints : 0);
+                        } else if (hs < gs) {
+                            g.w++; h.l++;
+                            g.pts += (state.rules ? state.rules.winPoints : 3);
+                            h.pts += (state.rules ? state.rules.lossPoints : 0);
+                        } else {
+                            h.d++; g.d++;
+                            h.pts += (state.rules ? state.rules.drawPoints : 1);
+                            g.pts += (state.rules ? state.rules.drawPoints : 1);
+                        }
+                        h.gd = h.gf - h.ga;
+                        g.gd = g.gf - g.ga;
+                    }
+                });
+
+                // Convert to array
+                let standingsList = Object.values(teamsMap);
+
+                // SORTING LOGIC
+                if (!state.rules || !state.rules.useMiniTables) {
+                    // Standard sorting: Points -> GD -> GF
+                    standingsList.sort((a, b) => {
+                        if (b.pts !== a.pts) return b.pts - a.pts;
+                        if (b.gd !== a.gd) return b.gd - a.gd;
+                        return b.gf - a.gf;
+                    });
+                    return standingsList;
+                }
+
+                // Advanced sorting: Mini-tables for ties
+                const groups = {};
+                standingsList.forEach(s => {
+                    if (!groups[s.pts]) groups[s.pts] = [];
+                    groups[s.pts].push(s);
+                });
+
+                const sortedPointsKeys = Object.keys(groups).map(Number).sort((a, b) => b - a);
+                let finalStandings = [];
+
+                sortedPointsKeys.forEach(p => {
+                    const subgroup = groups[p];
+                    if (subgroup.length === 1) {
+                        finalStandings.push(subgroup[0]);
+                    } else {
+                        // Tie! Create mini-table from mutual matches
+                        const teamIds = subgroup.map(t => t.id);
+                        const mini = admin.calculateMiniTable(teamIds);
+
+                        subgroup.sort((a, b) => {
+                            const ma = mini[a.id];
+                            const mb = mini[b.id];
+                            if (mb.pts !== ma.pts) return mb.pts - ma.pts;
+                            if (mb.gd !== ma.gd) return mb.gd - ma.gd;
+                            if (mb.gf !== ma.gf) return mb.gf - ma.gf;
+                            // Fallback to overall
+                            if (b.gd !== a.gd) return b.gd - a.gd;
+                            if (b.gf !== a.gf) return b.gf - a.gf;
+                            return 0;
+                        });
+                        finalStandings.push(...subgroup);
+                    }
+                });
+
+                return finalStandings;
+            },
+
+            calculateMiniTable: (teamIds) => {
+                const mini = {};
+                teamIds.forEach(id => {
+                    mini[id] = { pts: 0, gf: 0, ga: 0, gd: 0 };
+                });
+
+                state.schedule.forEach(m => {
+                    const hs = parseInt(m.homeScore);
+                    const gs = parseInt(m.guestScore);
+
+                    if (m.type === 'match' && !isNaN(hs) && !isNaN(gs)) {
+                        if (teamIds.includes(m.home) && teamIds.includes(m.guest)) {
+                            const h = mini[m.home];
+                            const g = mini[m.guest];
+
+                            h.gf += hs; h.ga += gs;
+                            g.gf += gs; g.ga += hs;
+
+                            if (hs > gs) {
+                                h.pts += (state.rules ? state.rules.winPoints : 3);
+                                g.pts += (state.rules ? state.rules.lossPoints : 0);
+                            } else if (hs < gs) {
+                                g.pts += (state.rules ? state.rules.winPoints : 3);
+                                h.pts += (state.rules ? state.rules.lossPoints : 0);
+                            } else {
+                                h.pts += (state.rules ? state.rules.drawPoints : 1);
+                                g.pts += (state.rules ? state.rules.drawPoints : 1);
+                            }
+                            h.gd = h.gf - h.ga;
+                            g.gd = g.gf - g.ga;
+                        }
+                    }
+                });
+                return mini;
+            },
+
+            setStandingsTab: (tab) => {
+                state.activeStandingsTab = tab;
+                ui.renderStandings(); // This will now delegate to cross table if needed
+                admin.saveToStorage();
+            },
+
             deselectAll: () => {
                 if (state.selectedIndices.length > 0) {
                     state.selectedIndices = [];
@@ -3121,6 +3314,13 @@
                 document.getElementById('input-theme').value = state.theme || "light";
                 document.getElementById('input-po-delay').value = state.poTransitionDelay || 10;
                 document.getElementById('input-show-footer').checked = (state.showFooter !== false);
+
+                if (state.rules) {
+                    document.getElementById('rule-win').value = state.rules.winPoints;
+                    document.getElementById('rule-draw').value = state.rules.drawPoints;
+                    document.getElementById('rule-loss').value = state.rules.lossPoints;
+                    document.getElementById('rule-mini-tables').checked = !!state.rules.useMiniTables;
+                }
                 ui.updateFooterVisibility();
 
                 // Music Settings
@@ -3453,6 +3653,163 @@
         };
 
 
+        const exporter = {
+            resolveName: (id, type) => {
+                if (!id) return "-";
+                const list = type === 'team' ? state.teams : state.referees;
+                const found = list.find(item => item.id === id);
+                return found ? found.name : id; // Fallback to ID if not found (legacy or manual)
+            },
+            toXLSX: () => {
+                const wb = XLSX.utils.book_new();
+                const data = state.schedule.map((m, i) => {
+                    const row = {
+                        "Pořadí": i + 1,
+                        "Název / Skupina": m.title || "Match",
+                        "Domácí": m.type === 'match' ? exporter.resolveName(m.home, 'team') : "-",
+                        "Hosté": m.type === 'match' ? exporter.resolveName(m.guest, 'team') : "-",
+                        "Skóre": m.type === 'match' ? (m.homeScore !== null ? `${m.homeScore}:${m.guestScore}` : "-") : "-",
+                        "Rozhodčí": m.type === 'match' ? exporter.resolveName(m.referee, 'ref') : "-",
+                        "Délka (s)": m.duration || (m.type === 'match' ? (state.times.play * 2 + state.times.break) : 600)
+                    };
+                    return row;
+                });
+
+                const ws = XLSX.utils.json_to_sheet(data);
+                XLSX.utils.book_append_sheet(wb, ws, "Rozpis");
+
+                const filename = (state.tournamentName || "Export") + "_Rozpis.xlsx";
+                XLSX.writeFile(wb, filename);
+            },
+            toPrintable: () => {
+                const win = window.open('', '_blank');
+                let html = `<html><head><title>Tisk rozpisu - ${state.tournamentName}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 30px; box-shadow: 0 2px 3px rgba(0,0,0,0.1); }
+                    th, td { border: 1px solid #ddd; padding: 12px 15px; text-align: left; }
+                    th { background-color: #f8f9fa; color: #333; font-weight: bold; text-transform: uppercase; font-size: 0.8em; letter-spacing: 1px; }
+                    tr:nth-child(even) { background-color: #fcfcfc; }
+                    h1 { color: #1a73e8; margin-bottom: 5px; }
+                    .meta { color: #666; font-size: 0.9em; margin-bottom: 30px; }
+                    .event-row { background-color: #fff9c4 !important; font-style: italic; color: #555; text-align: center; font-weight: 500; }
+                    @media print {
+                        body { padding: 0; }
+                        table { box-shadow: none; border-color: #000; }
+                        th { background-color: #eee !important; -webkit-print-color-adjust: exact; }
+                        .event-row { background-color: #ffffdd !important; -webkit-print-color-adjust: exact; }
+                    }
+                </style></head><body>`;
+
+                html += `<h1>${state.tournamentName || "Turnajový rozpis"}</h1>`;
+                html += `<div class="meta">Exportováno: ${new Date().toLocaleString('cs-CZ')}</div>`;
+                html += `<table><thead><tr>
+                    <th style="width:40px">#</th>
+                    <th style="width:120px">Skupina / Fáze</th>
+                    <th>Domácí</th>
+                    <th>Hosté</th>
+                    <th style="width:80px; text-align:center;">Výsledek</th>
+                    <th>Rozhodčí</th>
+                </tr></thead><tbody>`;
+
+                state.schedule.forEach((m, i) => {
+                    if (m.type === 'match') {
+                        html += `<tr>
+                            <td>${i + 1}</td>
+                            <td>${m.title}</td>
+                            <td style="font-weight:bold">${exporter.resolveName(m.home, 'team')}</td>
+                            <td style="font-weight:bold">${exporter.resolveName(m.guest, 'team')}</td>
+                            <td style="text-align:center; font-family:monospace; font-weight:bold; font-size:1.1em;">
+                                ${m.homeScore !== null ? `${m.homeScore}:${m.guestScore}` : "- : -"}
+                            </td>
+                            <td>${exporter.resolveName(m.referee, 'ref')}</td>
+                        </tr>`;
+                    } else {
+                        html += `<tr class="event-row">
+                            <td>${i + 1}</td>
+                            <td>${m.title}</td>
+                            <td colspan="4">UDÁLOST / PŘESTÁVKA (${Math.floor(m.duration / 60)} min)</td>
+                        </tr>`;
+                    }
+                });
+
+                html += `</tbody></table>`;
+
+                const standings = admin.calculateStandings();
+                if (standings.length > 0) {
+                    html += `<h2 style="margin-top:50px;">Konečné pořadí / Tabulka</h2>`;
+                    html += `<table><thead><tr>
+                        <th style="width:40px">#</th>
+                        <th>Tým</th>
+                        <th style="text-align:center; width:40px;">Z</th>
+                        <th style="text-align:center; width:40px;">V</th>
+                        <th style="text-align:center; width:40px;">R</th>
+                        <th style="text-align:center; width:40px;">P</th>
+                        <th style="text-align:center; width:60px;">Skóre</th>
+                        <th style="text-align:center; width:50px;">Body</th>
+                    </tr></thead><tbody>`;
+                    standings.forEach((s, idx) => {
+                        html += `<tr>
+                            <td>${idx + 1}.</td>
+                            <td style="font-weight:bold;">${s.name}</td>
+                            <td style="text-align:center;">${s.gp}</td>
+                            <td style="text-align:center;">${s.w}</td>
+                            <td style="text-align:center;">${s.d}</td>
+                            <td style="text-align:center;">${s.l}</td>
+                            <td style="text-align:center;">${s.gf}:${s.ga}</td>
+                            <td style="text-align:center; font-weight:bold;">${s.pts}</td>
+                        </tr>`;
+                    });
+                    html += `</tbody></table>`;
+                }
+
+                if (state.teams.length > 0) {
+                    html += `<h2 style="margin-top:50px; page-break-before:always;">Křížová tabulka výsledků</h2>`;
+                    html += `<table style="font-size:0.8em; text-align:center;"><thead style="background:#eee;"><tr>
+                        <th style="width:30px">#</th>
+                        <th style="text-align:left;">Tým</th>`;
+                    state.teams.forEach((_, i) => html += `<th style="width:30px;">${i + 1}</th>`);
+                    html += `<th style="width:40px;">Body</th><th style="width:70px;">Skóre</th></tr></thead><tbody>`;
+
+                    const standings = admin.calculateStandings();
+                    const statsMap = {};
+                    standings.forEach(s => statsMap[s.id] = s);
+
+                    state.teams.forEach((tRow, i) => {
+                        html += `<tr><td>${i + 1}.</td><td style="text-align:left; font-weight:bold;">${tRow.name}</td>`;
+                        state.teams.forEach((tCol, j) => {
+                            if (i === j) {
+                                html += `<td style="background:#ddd;"></td>`;
+                            } else {
+                                const match = state.schedule.find(m =>
+                                    m.type === 'match' &&
+                                    ((m.home === tRow.id && m.guest === tCol.id) || (m.home === tCol.id && m.guest === tRow.id)) &&
+                                    m.homeScore !== null && m.guestScore !== null
+                                );
+                                if (match) {
+                                    const score = (match.home === tRow.id) ? `${match.homeScore}:${match.guestScore}` : `${match.guestScore}:${match.homeScore}`;
+                                    html += `<td>${score}</td>`;
+                                } else {
+                                    html += `<td>-</td>`;
+                                }
+                            }
+                        });
+                        const s = statsMap[tRow.id] || { pts: 0, gf: 0, ga: 0 };
+                        html += `<td style="font-weight:bold;">${s.pts}</td><td>${s.gf}:${s.ga}</td></tr>`;
+                    });
+                    html += `</tbody></table>`;
+                }
+
+                html += `
+                <div style="margin-top:40px; text-align:right; font-size:0.8em; color:#999;">
+                    Generováno aplikací Antigravity Scoreboard
+                </div>
+                </body></html>`;
+                win.document.write(html);
+                win.document.close();
+            }
+        };
+
         // Event listeners for both audio elements
         musicAudioA.addEventListener('ended', () => {
             if (currentMusicAudio === musicAudioA) music.next();
@@ -3501,6 +3858,130 @@
                 ui.updateTimerBtn();
                 ui.renderSchedule();
                 ui.renderMusic();
+                ui.renderStandings();
+            },
+
+            renderStandings: () => {
+                const container = document.getElementById('standings-container');
+                if (!container) return;
+
+                // Update tab buttons style
+                const btnS = document.getElementById('tab-btn-standings');
+                const btnC = document.getElementById('tab-btn-cross');
+                if (btnS && btnC) {
+                    const activeStyle = "background: var(--accent-blue); color: #fff; transform: translateY(-1px); border: 1px solid #555;";
+                    const inactiveStyle = "background: #333; color: #aaa; border: 1px solid #444;";
+                    btnS.style = (state.activeStandingsTab !== 'cross') ? activeStyle : inactiveStyle;
+                    btnC.style = (state.activeStandingsTab === 'cross') ? activeStyle : inactiveStyle;
+                }
+
+                if (state.activeStandingsTab === 'cross') {
+                    ui.renderCrossTable(container);
+                    return;
+                }
+
+                const standings = admin.calculateStandings();
+                if (standings.length === 0) {
+                    container.innerHTML = `<p style="text-align:center; color:#666; font-size:0.9em; padding:10px;">Žádná data pro tabulku.</p>`;
+                    return;
+                }
+
+                let html = `<table style="width:100%; border-collapse:collapse; font-size:0.85em; margin-top:5px;">
+                    <thead><tr style="background:#222; color:#aaa; text-align:left;">
+                        <th style="padding:5px;">#</th>
+                        <th style="padding:5px;">Tým</th>
+                        <th style="padding:5px; text-align:center;">Z</th>
+                        <th style="padding:5px; text-align:center;">S</th>
+                        <th style="padding:5px; text-align:center;">B</th>
+                    </tr></thead><tbody>`;
+
+                standings.forEach((s, i) => {
+                    html += `<tr style="border-bottom:1px solid #444;">
+                        <td style="padding:5px;">${i + 1}.</td>
+                        <td style="padding:5px; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px;">${s.name}</td>
+                        <td style="padding:5px; text-align:center;">${s.gp}</td>
+                        <td style="padding:5px; text-align:center; color:#888;">${s.gf}:${s.ga}</td>
+                        <td style="padding:5px; text-align:center; font-weight:bold; color:var(--accent-green);">${s.pts}</td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+            },
+
+            renderCrossTable: (container) => {
+                const teams = state.teams;
+                if (teams.length === 0) {
+                    container.innerHTML = `<p style="text-align:center; color:#666; font-size:0.9em; padding:10px;">Žádná družstva pro zobrazení.</p>`;
+                    return;
+                }
+
+                const standings = admin.calculateStandings();
+                // Map of ranks for easy lookup
+                const ranks = {};
+                standings.forEach((s, i) => ranks[s.id] = i + 1);
+
+                // Map of points/goals for easy lookup
+                const stats = {};
+                standings.forEach(s => stats[s.id] = s);
+
+                let html = `<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:0.75em; text-align:center; table-layout:fixed;">
+                    <thead><tr style="background:#222; color:#aaa;">
+                        <th style="padding:4px; width:25px;">#</th>
+                        <th style="padding:4px; text-align:left; width:100px;">Tým</th>`;
+
+                teams.forEach((t, i) => {
+                    html += `<th style="padding:4px; border-left:1px solid #444;">${i + 1}</th>`;
+                });
+
+                html += `<th style="padding:4px; border-left:2px solid #555; width:30px;">B</th>
+                         <th style="padding:4px; border-left:1px solid #444; width:50px;">Skóre</th>
+                         <th style="padding:4px; border-left:1px solid #444; width:30px; background:#332;">M</th>
+                    </tr></thead><tbody>`;
+
+                teams.forEach((tRow, i) => {
+                    html += `<tr style="border-bottom:1px solid #444;">
+                        <td style="padding:4px; color:#666;">${i + 1}</td>
+                        <td style="padding:4px; text-align:left; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${tRow.name}</td>`;
+
+                    teams.forEach((tCol, j) => {
+                        let cellContent = "";
+                        let cellStyle = "border-left:1px solid #444; padding:4px;";
+
+                        if (i === j) {
+                            cellStyle += "background:#111;";
+                        } else {
+                            // Find match between tRow and tCol
+                            const match = state.schedule.find(m =>
+                                m.type === 'match' &&
+                                ((m.home === tRow.id && m.guest === tCol.id) || (m.home === tCol.id && m.guest === tRow.id)) &&
+                                m.homeScore !== null && m.guestScore !== null
+                            );
+
+                            if (match) {
+                                if (match.home === tRow.id) {
+                                    cellContent = `${match.homeScore}:${match.guestScore}`;
+                                } else {
+                                    cellContent = `${match.guestScore}:${match.homeScore}`;
+                                }
+                            } else {
+                                cellContent = "-";
+                            }
+                        }
+                        html += `<td style="${cellStyle}">${cellContent}</td>`;
+                    });
+
+                    const s = stats[tRow.id] || { pts: 0, gf: 0, ga: 0 };
+                    const rank = ranks[tRow.id] || "-";
+
+                    html += `<td style="padding:4px; border-left:2px solid #555; font-weight:bold; color:var(--accent-green);">${s.pts}</td>
+                             <td style="padding:4px; border-left:1px solid #444; color:#888;">${s.gf}:${s.ga}</td>
+                             <td style="padding:4px; border-left:1px solid #444; background:#332; font-weight:bold;">${rank}.</td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table></div>`;
+                container.innerHTML = html;
             },
 
             renderMusic: () => {
