@@ -1123,7 +1123,7 @@
                 <div id="acc-schedule" class="accordion-content">
 
                     <div class="mode-toggle">
-                        <button id="mode-sched-append" class="mode-toggle-btn active"
+                        <button id="mode-sched-append" class="mode-toggle-btn mod-mode-btn active"
                             onclick="admin.setModificationMode('append')">
                             <span class="icon-sq">
                                 <svg viewBox="0 0 24 24">
@@ -1132,7 +1132,7 @@
                             </span>
                             Přidat k existujícímu
                         </button>
-                        <button id="mode-sched-replace" class="mode-toggle-btn"
+                        <button id="mode-sched-replace" class="mode-toggle-btn mod-mode-btn"
                             onclick="admin.setModificationMode('replace')">
                             <span class="icon-sq">
                                 <svg viewBox="0 0 24 24">
@@ -1142,6 +1142,13 @@
                             </span>
                             Nahradit rozpis
                         </button>
+                    </div>
+
+                    <div class="mode-toggle" style="margin-top: 5px; background: #222;">
+                        <button id="tab-sched-gen" class="mode-toggle-btn sched-tab-btn active"
+                            onclick="admin.setScheduleMode('gen')">🛠️ Generátor</button>
+                        <button id="tab-sched-import" class="mode-toggle-btn sched-tab-btn"
+                            onclick="admin.setScheduleMode('import')">📊 Import</button>
                     </div>
 
 
@@ -1185,7 +1192,7 @@
                     </div>
 
                     <!-- Import Section -->
-                    <div id="sched-section-import" class="sched-section active">
+                    <div id="sched-section-import" class="sched-section">
                         <h4>📊 Import z Excelu</h4>
                         <div>
                             <label
@@ -1211,237 +1218,229 @@
                     </div>
 
                     <!-- Manual Add Section -->
-                    <div class="sched-section active">
-                        <h4>✏️ Přidat zápas nebo událost</h4>
-                        <p style="font-size:0.75em; color:#888; margin:0 0 12px 0;">
-                            Použijte pro přidání speciálních zápasů, událostí (pauza, oběd), nebo prodloužení.
-                        </p>
-
-                        <div id="sched-form-container"
-                            style="display:none; border:1px solid #444; padding:10px; border-radius:4px; margin-bottom:15px; background:#2a2a2a;">
-                            <div class="form-group">
-                                <label>Typ položky</label>
-                                <select id="sched-type" onchange="admin.onSchedTypeChange()">
-                                    <option value="match">Zápas</option>
-                                    <option value="event">Událost</option>
+                    <div id="sched-form-container"
+                        style="display:none; border:1px solid #444; padding:10px; border-radius:4px; margin-bottom:15px; background:#2a2a2a;">
+                        <div class="form-group">
+                            <label>Typ položky</label>
+                            <select id="sched-type" onchange="admin.onSchedTypeChange()">
+                                <option value="match">Zápas</option>
+                                <option value="event">Událost</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Název / Skupina</label>
+                            <div style="display:flex; gap:5px;">
+                                <select id="sched-title" style="flex:1">
+                                    <option value="Skupina A">Skupina A</option>
+                                    <option value="Skupina B">Skupina B</option>
+                                    <option value="Skupina C">Skupina C</option>
+                                    <option value="Skupina D">Skupina D</option>
+                                    <option value="Čtvrtfinále">Čtvrtfinále</option>
+                                    <option value="Semifinále">Semifinále</option>
+                                    <option value="Finále">Finále</option>
+                                    <option value="O umístění">O umístění</option>
                                 </select>
+                                <input type="text" id="sched-custom-title" placeholder="Vlastní název..."
+                                    style="flex:1; display:none;">
+                            </div>
+                        </div>
+                        <div id="sched-match-fields">
+                            <div class="form-group">
+                                <label>Domácí</label>
+                                <select id="sched-home"></select>
                             </div>
                             <div class="form-group">
-                                <label>Název / Skupina</label>
-                                <div style="display:flex; gap:5px;">
-                                    <select id="sched-title" style="flex:1">
-                                        <option value="Skupina A">Skupina A</option>
-                                        <option value="Skupina B">Skupina B</option>
-                                        <option value="Skupina C">Skupina C</option>
-                                        <option value="Skupina D">Skupina D</option>
-                                        <option value="Čtvrtfinále">Čtvrtfinále</option>
-                                        <option value="Semifinále">Semifinále</option>
-                                        <option value="Finále">Finále</option>
-                                        <option value="O umístění">O umístění</option>
-                                    </select>
-                                    <input type="text" id="sched-custom-title" placeholder="Vlastní název..."
-                                        style="flex:1; display:none;">
+                                <label>Hosté</label>
+                                <select id="sched-guest"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Rozhodčí</label>
+                                <select id="sched-referee"></select>
+                            </div>
+                            <div class="form-group" style="display:flex; gap:10px;">
+                                <div style="flex:1">
+                                    <label>Skóre Dom.</label>
+                                    <input type="number" id="sched-home-score" placeholder="-" style="width:100%"
+                                        min="0">
+                                </div>
+                                <div style="flex:1">
+                                    <label>Skóre Host.</label>
+                                    <input type="number" id="sched-guest-score" placeholder="-" style="width:100%"
+                                        min="0">
                                 </div>
                             </div>
-                            <div id="sched-match-fields">
-                                <div class="form-group">
-                                    <label>Domácí</label>
-                                    <select id="sched-home"></select>
-                                </div>
-                                <div class="form-group">
-                                    <label>Hosté</label>
-                                    <select id="sched-guest"></select>
-                                </div>
-                                <div class="form-group">
-                                    <label>Rozhodčí</label>
-                                    <select id="sched-referee"></select>
-                                </div>
-                                <div class="form-group" style="display:flex; gap:10px;">
-                                    <div style="flex:1">
-                                        <label>Skóre Dom.</label>
-                                        <input type="number" id="sched-home-score" placeholder="-" style="width:100%"
-                                            min="0">
-                                    </div>
-                                    <div style="flex:1">
-                                        <label>Skóre Host.</label>
-                                        <input type="number" id="sched-guest-score" placeholder="-" style="width:100%"
-                                            min="0">
-                                    </div>
-                                </div>
+                        </div>
+                        <div id="sched-event-fields" style="display:none;">
+                            <div class="form-group">
+                                <label>Délka trvání (sekundy)</label>
+                                <input type="number" id="sched-duration" value="600" min="1" style="width:100%">
                             </div>
-                            <div id="sched-event-fields" style="display:none;">
-                                <div class="form-group">
-                                    <label>Délka trvání (sekundy)</label>
-                                    <input type="number" id="sched-duration" value="600" min="1" style="width:100%">
-                                </div>
-                            </div>
-                            <div id="sched-controls-add" style="display:flex; gap:5px;">
-                                <button class="btn-full" onclick="admin.addMatch()"
-                                    style="background: var(--accent-blue);">Uložit</button>
-                                <button class="btn-full btn-yellow" onclick="admin.toggleAddMode()">Zrušit</button>
-                            </div>
-                            <div id="sched-controls-edit" style="display:none; gap:5px; margin-top:10px;">
-                                <button class="btn-full btn-green" onclick="admin.saveEditedMatch()">Uložit
-                                    Změny</button>
-                                <button class="btn-full btn-red" onclick="admin.deleteMatch()">Smazat</button>
-                                <button class="btn-full btn-yellow" onclick="admin.cancelEdit()">Zrušit</button>
-                            </div>
+                        </div>
+                        <div id="sched-controls-add" style="display:flex; gap:5px;">
+                            <button class="btn-full" onclick="admin.addMatch()"
+                                style="background: var(--accent-blue);">Uložit</button>
+                            <button class="btn-full btn-yellow" onclick="admin.toggleAddMode()">Zrušit</button>
+                        </div>
+                        <div id="sched-controls-edit" style="display:none; gap:5px; margin-top:10px;">
+                            <button class="btn-full btn-green" onclick="admin.saveEditedMatch()">Uložit
+                                Změny</button>
+                            <button class="btn-full btn-red" onclick="admin.deleteMatch()">Smazat</button>
+                            <button class="btn-full btn-yellow" onclick="admin.cancelEdit()">Zrušit</button>
                         </div>
                     </div>
 
-                    <button class="btn-full btn-green" onclick="admin.toggleAddMode()" style="margin-top:10px;">
-                        <b>+</b> Přidat nový zápas nebo událost
-                    </button>
-                </div>
+                    <!-- Match Queue Section -->
+                    <div class="schedule-toolbar">
+                        <button class="small-btn btn-green" onclick="admin.toggleAddMode()"
+                            title="Přidat nový zápas nebo událost"><b>+</b></button>
+                        <button class="small-btn" onclick="admin.moveSelected(-1)" title="Posunout nahoru">▲</button>
+                        <button class="small-btn" onclick="admin.moveSelected(1)" title="Posunout dolů">▼</button>
+                        <button class="small-btn btn-red" onclick="admin.deleteSelected()"
+                            title="Odstranit vybrané">x</button>
+                        <button class="small-btn btn-yellow" onclick="admin.resetSelectedScores()"
+                            title="Resetovat skóre">Reset</button>
+                        <button class="small-btn btn-yellow" onclick="admin.editSelected()" title="Upravit vybraný"
+                            style="margin-left: auto; background: #fbc02d; color: #000;">Upravit</button>
+                        <button class="small-btn btn-blue" onclick="admin.loadSelected()" title="Načíst vybraný"
+                            style="background: var(--accent-blue);">Načíst</button>
+                    </div>
 
-                <!-- Match Queue Section -->
-                <div class="schedule-toolbar">
-                    <button class="small-btn" onclick="admin.moveSelected(-1)" title="Posunout nahoru">▲</button>
-                    <button class="small-btn" onclick="admin.moveSelected(1)" title="Posunout dolů">▼</button>
-                    <button class="small-btn btn-red" onclick="admin.deleteSelected()"
-                        title="Odstranit vybrané">x</button>
-                    <button class="small-btn btn-yellow" onclick="admin.resetSelectedScores()"
-                        title="Resetovat skóre">Reset</button>
-                    <button class="small-btn btn-yellow" onclick="admin.editSelected()" title="Upravit vybraný"
-                        style="margin-left: auto; background: #fbc02d; color: #000;">Upravit</button>
-                    <button class="small-btn btn-blue" onclick="admin.loadSelected()" title="Načíst vybraný"
-                        style="background: var(--accent-blue);">Načíst</button>
+                    <h4 id="sched-list-header" style="margin-top:5px; border:none;">Pořadí:</h4>
+                    <ul class="match-list" id="match-queue"></ul>
                 </div>
-
-                <h4 style="margin-top:5px; border:none;">Pořadí:</h4>
-                <ul class="match-list" id="match-queue"></ul>
             </div>
-        </div>
 
-        <!-- 4. Music Player -->
-        <div class="accordion">
-            <div class="accordion-header" onclick="toggleAccordion('acc-music')">
-                Hudba na pozadí <span>▼</span>
-            </div>
-            <div id="acc-music" class="accordion-content">
-                <div class="form-group">
-                    <button class="btn-full" onclick="music.pickDirectory()" style="background:#444;">
-                        📁 Vybrat složku s hudbou
-                    </button>
+            <!-- 4. Music Player -->
+            <div class="accordion">
+                <div class="accordion-header" onclick="toggleAccordion('acc-music')">
+                    Hudba na pozadí <span>▼</span>
                 </div>
+                <div id="acc-music" class="accordion-content">
+                    <div class="form-group">
+                        <button class="btn-full" onclick="music.pickDirectory()" style="background:#444;">
+                            📁 Vybrat složku s hudbou
+                        </button>
+                    </div>
 
-                <div id="music-controls"
-                    style="display:none; margin-bottom:15px; background:#2a2a2a; padding:10px; border-radius:4px;">
-                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                        <div style="color:#aaa; font-size:0.8em;">Právě hraje:</div>
-                        <div id="current-track-name"
-                            style="flex:1; font-size:0.8em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#4caf50;">
-                            -</div>
+                    <div id="music-controls"
+                        style="display:none; margin-bottom:15px; background:#2a2a2a; padding:10px; border-radius:4px;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                            <div style="color:#aaa; font-size:0.8em;">Právě hraje:</div>
+                            <div id="current-track-name"
+                                style="flex:1; font-size:0.8em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#4caf50;">
+                                -</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Skladby přehrávat</label>
+                            <select id="input-music-mode" onchange="music.setMode(this.value)">
+                                <option value="continuous">Za sebou (podle seznamu)</option>
+                                <option value="random">Náhodně</option>
+                            </select>
+                        </div>
+                        <div class="form-group"
+                            style="border-top: 1px solid #444; padding-top: 10px; margin-top: 10px;">
+                            <label
+                                style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight: bold; color: #4caf50;">
+                                <input type="checkbox" id="input-music-auto"
+                                    onchange="music.setAutoEnabled(this.checked)" style="width:auto;">
+                                Automatický režim
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Změna skladby</label>
+                            <select id="input-music-auto-change" onchange="music.setAutoChangeStrategy(this.value)">
+                                <option value="continuous">Nechat hrát celou skladbu</option>
+                                <option value="per-step">Měnit skladbu se změnou kroku</option>
+                                <option value="per-match">Měnit skladbu se změnou zápasu</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Délka prolnutí: <span id="fade-dur-disp">1</span>s</label>
+                            <input type="range" id="input-music-fade" min="0" max="5" step="0.5" value="1"
+                                oninput="music.setFadeDuration(this.value)">
+                        </div>
+                    </div>
+
+                    <ul class="match-list" id="music-list" style="max-height:300px; overflow-y:auto;">
+                        <li style="color:#666; font-size:0.8em; text-align:center; padding:10px;">Složka nebyla
+                            vybrána
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+
+            <!-- 5. Application Settings -->
+            <div class="accordion">
+                <div class="accordion-header" onclick="toggleAccordion('acc-app-settings')">
+                    Nastavení Aplikace <span>▼</span>
+                </div>
+                <div id="acc-app-settings" class="accordion-content">
+                    <h4 style="margin-bottom:10px; border:none;">Projekční Okno</h4>
+                    <div class="form-group">
+                        <label>Vzhled (Téma)</label>
+                        <select id="input-theme" onchange="admin.saveSettings(false); game.syncProjection()">
+                            <option value="light">Světlý režim (Light Mode)</option>
+                            <option value="dark">Tmavý režim (Dark Mode)</option>
+                        </select>
+                    </div>
+                    <div class="form-group"
+                        style="background: rgba(26, 115, 232, 0.1); padding: 10px; border-radius: 8px; border: 1px solid var(--accent-blue); margin-top: 10px;">
+                        <label style="color: var(--accent-blue); font-weight: bold;">Projekční URL (pro OBS / druhý
+                            monitor)</label>
+                        <div style="display: flex; gap: 5px; margin-top: 5px;">
+                            <input type="text" id="projection-url-display" readonly
+                                style="flex: 1; font-size: 0.8em; background: rgba(0,0,0,0.2); border: 1px solid #555; color: #fff; padding: 5px;">
+                            <button class="small-btn"
+                                onclick="const el = document.getElementById('projection-url-display'); el.select(); document.execCommand('copy'); alert('URL zkopírována!');"
+                                title="Kopírovat">📋</button>
+                        </div>
+                        <small style="display: block; margin-top: 5px; color: #aaa; font-size: 0.75em;">Vložte tuto
+                            adresu do OBS Browser Source nebo otevřete v novém okně.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Prodleva před další položkou (s)</label>
+                        <input type="number" id="input-po-delay" value="10" min="1" max="30"
+                            oninput="admin.saveSettings(false)">
+                    </div>
+
+
+                    <h4 style="margin: 20px 0 10px 0; border:none;">Zvuky a Hlasitost</h4>
+                    <div class="form-group">
+                        <label>Vlastní siréna</label>
+                        <input type="file" id="input-audio-file" accept="audio/*" onchange="admin.saveSettings(false)">
                     </div>
 
                     <div class="form-group">
-                        <label>Skladby přehrávat</label>
-                        <select id="input-music-mode" onchange="music.setMode(this.value)">
-                            <option value="continuous">Za sebou (podle seznamu)</option>
-                            <option value="random">Náhodně</option>
-                        </select>
+                        <label>Hlasitost sirény: <span id="vol-signal-disp">50</span>%</label>
+                        <input type="range" id="input-vol-signal" min="0" max="1" step="0.05" value="0.5"
+                            oninput="document.getElementById('vol-signal-disp').innerText = Math.round(this.value * 100); admin.saveSettings(false)">
                     </div>
-                    <div class="form-group" style="border-top: 1px solid #444; padding-top: 10px; margin-top: 10px;">
-                        <label
-                            style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight: bold; color: #4caf50;">
-                            <input type="checkbox" id="input-music-auto" onchange="music.setAutoEnabled(this.checked)"
-                                style="width:auto;">
-                            Automatický režim
+
+                    <div class="form-group">
+                        <label>Hlasitost jinglů: <span id="vol-anthem-disp">50</span>%</label>
+                        <input type="range" id="input-vol-anthem" min="0" max="1" step="0.05" value="0.5"
+                            oninput="document.getElementById('vol-anthem-disp').innerText = Math.round(this.value * 100); admin.saveSettings(false)">
+                    </div>
+
+                    <div class="form-group" style="padding-top: 10px; margin-top: 10px; border-top: 1px solid #444;">
+                        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                            <input type="checkbox" id="input-show-footer" onchange="admin.saveSettings(false)"
+                                style="width:auto;" checked>
+                            Patička s informacemi
                         </label>
                     </div>
-                    <div class="form-group">
-                        <label>Změna skladby</label>
-                        <select id="input-music-auto-change" onchange="music.setAutoChangeStrategy(this.value)">
-                            <option value="continuous">Nechat hrát celou skladbu</option>
-                            <option value="per-step">Měnit skladbu se změnou kroku</option>
-                            <option value="per-match">Měnit skladbu se změnou zápasu</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Délka prolnutí: <span id="fade-dur-disp">1</span>s</label>
-                        <input type="range" id="input-music-fade" min="0" max="5" step="0.5" value="1"
-                            oninput="music.setFadeDuration(this.value)">
-                    </div>
-                </div>
 
-                <ul class="match-list" id="music-list" style="max-height:300px; overflow-y:auto;">
-                    <li style="color:#666; font-size:0.8em; text-align:center; padding:10px;">Složka nebyla
-                        vybrána
-                    </li>
-                </ul>
+                    <button class="btn-full" style="margin-top:20px; background: var(--accent-blue);"
+                        onclick="admin.saveSettings()">Uložit všechna nastavení</button>
+                    <button class="btn-full btn-red" style="margin-top:10px;" onclick="admin.resetApp()">Resetovat
+                        celou
+                        aplikaci</button>
+                </div>
             </div>
-        </div>
-
-
-        <!-- 5. Application Settings -->
-        <div class="accordion">
-            <div class="accordion-header" onclick="toggleAccordion('acc-app-settings')">
-                Nastavení Aplikace <span>▼</span>
-            </div>
-            <div id="acc-app-settings" class="accordion-content">
-                <h4 style="margin-bottom:10px; border:none;">Projekční Okno</h4>
-                <div class="form-group">
-                    <label>Vzhled (Téma)</label>
-                    <select id="input-theme" onchange="admin.saveSettings(false); game.syncProjection()">
-                        <option value="light">Světlý režim (Light Mode)</option>
-                        <option value="dark">Tmavý režim (Dark Mode)</option>
-                    </select>
-                </div>
-                <div class="form-group"
-                    style="background: rgba(26, 115, 232, 0.1); padding: 10px; border-radius: 8px; border: 1px solid var(--accent-blue); margin-top: 10px;">
-                    <label style="color: var(--accent-blue); font-weight: bold;">Projekční URL (pro OBS / druhý
-                        monitor)</label>
-                    <div style="display: flex; gap: 5px; margin-top: 5px;">
-                        <input type="text" id="projection-url-display" readonly
-                            style="flex: 1; font-size: 0.8em; background: rgba(0,0,0,0.2); border: 1px solid #555; color: #fff; padding: 5px;">
-                        <button class="small-btn"
-                            onclick="const el = document.getElementById('projection-url-display'); el.select(); document.execCommand('copy'); alert('URL zkopírována!');"
-                            title="Kopírovat">📋</button>
-                    </div>
-                    <small style="display: block; margin-top: 5px; color: #aaa; font-size: 0.75em;">Vložte tuto
-                        adresu do OBS Browser Source nebo otevřete v novém okně.</small>
-                </div>
-                <div class="form-group">
-                    <label>Prodleva před další položkou (s)</label>
-                    <input type="number" id="input-po-delay" value="10" min="1" max="30"
-                        oninput="admin.saveSettings(false)">
-                </div>
-
-
-                <h4 style="margin: 20px 0 10px 0; border:none;">Zvuky a Hlasitost</h4>
-                <div class="form-group">
-                    <label>Vlastní siréna</label>
-                    <input type="file" id="input-audio-file" accept="audio/*" onchange="admin.saveSettings(false)">
-                </div>
-
-                <div class="form-group">
-                    <label>Hlasitost sirény: <span id="vol-signal-disp">50</span>%</label>
-                    <input type="range" id="input-vol-signal" min="0" max="1" step="0.05" value="0.5"
-                        oninput="document.getElementById('vol-signal-disp').innerText = Math.round(this.value * 100); admin.saveSettings(false)">
-                </div>
-
-                <div class="form-group">
-                    <label>Hlasitost jinglů: <span id="vol-anthem-disp">50</span>%</label>
-                    <input type="range" id="input-vol-anthem" min="0" max="1" step="0.05" value="0.5"
-                        oninput="document.getElementById('vol-anthem-disp').innerText = Math.round(this.value * 100); admin.saveSettings(false)">
-                </div>
-
-                <div class="form-group" style="padding-top: 10px; margin-top: 10px; border-top: 1px solid #444;">
-                    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                        <input type="checkbox" id="input-show-footer" onchange="admin.saveSettings(false)"
-                            style="width:auto;" checked>
-                        Patička s informacemi
-                    </label>
-                </div>
-
-                <button class="btn-full" style="margin-top:20px; background: var(--accent-blue);"
-                    onclick="admin.saveSettings()">Uložit všechna nastavení</button>
-                <button class="btn-full btn-red" style="margin-top:10px;" onclick="admin.resetApp()">Resetovat
-                    celou
-                    aplikaci</button>
-            </div>
-        </div>
-    </div>
+        </div> <!-- END of #admin-panel -->
+    </div> <!-- END of #app-container -->
 
 
     <div id="admin-footer">
@@ -1449,7 +1448,6 @@
         <div id="admin-footer-end">-</div>
         <div id="admin-footer-time">-</div>
     </div>
-    </div> <!-- END of #app-container -->
 
     <!-- CLEAN PROJECTION LAYOUT -->
     <div id="projection-layout">
@@ -2604,7 +2602,7 @@
 
             setModificationMode: (mode) => {
                 state.scheduleModificationMode = mode;
-                document.querySelectorAll('.mode-toggle-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.mod-mode-btn').forEach(b => b.classList.remove('active'));
                 document.getElementById(`mode-sched-${mode}`).classList.add('active');
             },
 
@@ -3688,7 +3686,7 @@
             renderSchedule: () => {
                 const list = document.getElementById('match-queue');
                 const form = document.getElementById('sched-form-container');
-                const header = document.querySelector('#acc-schedule h4'); // Pořadí:
+                const header = document.getElementById('sched-list-header'); // Pořadí:
 
                 // Move form back to safe spot (below header) before clearing
                 if (form && header) {
