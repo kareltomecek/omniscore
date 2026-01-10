@@ -1062,18 +1062,24 @@
                     <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label style="font-size: 0.85em;">Poločas</label>
-                            <input type="number" id="time-play" value="420" min="0" style="width: 100%;"
-                                oninput="admin.saveSettings(false)">
+                            <input type="number" id="time-play" value="420" min="0" max="3599" style="width: 100%;"
+                                oninput="admin.validateTimeInput(this)">
+                            <small id="hint-time-play"
+                                style="color: #4caf50; font-size: 0.75em; display: block; margin-top: 2px;">-</small>
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label style="font-size: 0.85em;">Přestávka</label>
-                            <input type="number" id="time-break" value="105" min="0" style="width: 100%;"
-                                oninput="admin.saveSettings(false)">
+                            <input type="number" id="time-break" value="105" min="0" max="3599" style="width: 100%;"
+                                oninput="admin.validateTimeInput(this)">
+                            <small id="hint-time-break"
+                                style="color: #4caf50; font-size: 0.75em; display: block; margin-top: 2px;">-</small>
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label style="font-size: 0.85em;">Nastupuje</label>
-                            <input type="number" id="time-setup" value="10" min="0" style="width: 100%;"
-                                oninput="admin.saveSettings(false)">
+                            <input type="number" id="time-setup" value="10" min="0" max="3599" style="width: 100%;"
+                                oninput="admin.validateTimeInput(this)">
+                            <small id="hint-time-setup"
+                                style="color: #4caf50; font-size: 0.75em; display: block; margin-top: 2px;">-</small>
                         </div>
                     </div>
 
@@ -1166,28 +1172,16 @@
                                 rozpis (podle schématu)</label>
                             <div style="display:flex; gap:8px;">
                                 <select id="sched-template-select" style="flex:1">
-                                    <optgroup label="Základní (každý s každým)">
-                                        <option value="2">1. Pro 2 družstva</option>
-                                        <option value="3">2. Pro 3 družstva</option>
-                                        <option value="4">3. Pro 4 družstva</option>
-                                        <option value="5">4. Pro 5 družstev</option>
-                                        <option value="6">5. Pro 6 družstev</option>
-                                        <option value="7">6. Pro 7 družstev</option>
-                                        <option value="8">7. Pro 8 družstev</option>
+                                    <optgroup label="Vzory základní">
+                                        <option value="basic_1">1. Pro 3 družstva</option>
+                                        <option value="basic_2">2. Pro 4 družstva</option>
+                                        <option value="basic_3">3. Pro 5 družstev</option>
+                                        <option value="basic_4">4. Pro 6 družstev</option>
+                                        <option value="basic_5">5. Pro 7 družstev</option>
+                                        <option value="basic_6">6. Pro 8 družstev</option>
                                     </optgroup>
-                                    <optgroup label="Pokročilé (Skupiny + Play-off)">
-                                        <option value="8_groups">8. 8 týmů: 2 sk. po 4 + PO</option>
-                                        <option value="9_groups">9. 9 týmů: 2 sk. (4,5) + PO</option>
-                                        <option value="10_groups">10. 10 týmů: 2 sk. po 5 + PO</option>
-                                        <option value="11_groups">11. 11 týmů: 2 sk. (5,6) + PO</option>
-                                        <option value="12_groups">12. 12 týmů: 2 sk. po 6 + PO</option>
-                                        <option value="13_groups">13. 13 týmů: 3 sk. (4,4,5) + PO</option>
-                                    </optgroup>
-                                    <optgroup label="Turnaj ve skupinách (RR Tiered)">
-                                        <option value="12_groups_rr">14. 12 týmů: 3 sk. po 4 + RR umístění</option>
-                                        <option value="13_groups_rr">15. 13 týmů: 3 sk. (4,4,5) + RR umístění</option>
-                                        <option value="14_groups_rr">16. 14 týmů: 3 sk. (4,5,5) + RR umístění</option>
-                                        <option value="15_groups_rr">17. 15 týmů: 3 sk. po 5 + RR umístění</option>
+                                    <optgroup label="Vzory kolová 2022">
+                                        <!-- Bude doplněno později -->
                                     </optgroup>
                                 </select>
                                 <button class="small-btn btn-blue" onclick="admin.generateScheduleFromTemplate()"
@@ -1545,176 +1539,36 @@
         ];
 
         const SCHEDULE_TEMPLATES = {
-            2: [[1, 2, "Základní skupina"]],
-            3: [[1, 2, "Základní skupina"], [2, 3, "Základní skupina"], [1, 3, "Základní skupina"]],
-            4: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [1, 3, "Základní skupina"], [2, 4, "Základní skupina"], [1, 4, "Základní skupina"], [2, 3, "Základní skupina"]],
-            5: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [1, 5, "Základní skupina"], [2, 3, "Základní skupina"], [4, 5, "Základní skupina"], [1, 3, "Základní skupina"], [2, 4, "Základní skupina"], [3, 5, "Základní skupina"], [1, 4, "Základní skupina"], [2, 5, "Základní skupina"]],
-            6: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [5, 6, "Základní skupina"], [1, 4, "Základní skupina"], [2, 6, "Základní skupina"], [3, 5, "Základní skupina"], [1, 6, "Základní skupina"], [4, 5, "Základní skupina"], [2, 3, "Základní skupina"], [1, 5, "Základní skupina"], [3, 6, "Základní skupina"], [2, 4, "Základní skupina"], [1, 3, "Základní skupina"], [2, 5, "Základní skupina"], [4, 6, "Základní skupina"]],
-            7: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [5, 6, "Základní skupina"], [1, 7, "Základní skupina"], [2, 3, "Základní skupina"], [4, 5, "Základní skupina"], [6, 7, "Základní skupina"], [1, 3, "Základní skupina"], [2, 5, "Základní skupina"], [4, 7, "Základní skupina"], [1, 6, "Základní skupina"], [3, 5, "Základní skupina"], [2, 7, "Základní skupina"], [4, 6, "Zoladní skupina"], [1, 5, "Základní skupina"], [3, 7, "Základní skupina"], [2, 6, "Základní skupina"], [1, 4, "Základní skupina"], [5, 7, "Základní skupina"], [3, 6, "Základní skupina"], [2, 4, "Základní skupina"]],
-            8: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [5, 6, "Základní skupina"], [7, 8, "Základní skupina"], [1, 4, "Základní skupina"], [2, 5, "Základní skupina"], [3, 6, "Základní skupina"], [1, 7, "Základní skupina"], [5, 8, "Základní skupina"], [4, 6, "Základní skupina"], [2, 3, "Základní skupina"], [5, 7, "Základní skupina"], [1, 8, "Základní skupina"], [2, 6, "Základní skupina"], [4, 7, "Základní skupina"], [3, 5, "Základní skupina"], [1, 6, "Základní skupina"], [2, 8, "Základní skupina"], [3, 7, "Základní skupina"], [4, 5, "Základní skupina"], [6, 8, "Základní skupina"], [1, 3, "Základní skupina"], [2, 7, "Základní skupina"], [4, 8, "Základní skupina"], [1, 5, "Základní skupina"], [6, 7, "Základní skupina"], [3, 8, "Základní skupina"], [2, 4, "Základní skupina"]],
-            "8_groups": [
-                [1, 2, "Skupina A"], [5, 6, "Skupina B"], [3, 4, "Skupina A"], [7, 8, "Skupina B"],
-                [1, 3, "Skupina A"], [5, 7, "Skupina B"], [2, 4, "Skupina A"], [6, 8, "Skupina B"],
-                [1, 4, "Skupina A"], [5, 8, "Skupina B"], [2, 3, "Skupina A"], [6, 7, "Skupina B"],
-                ["4. ze sk. A", "4. ze sk. B", "o 7. místo"],
-                ["1. ze sk. A", "2. ze sk. B", "Semifinále 1"],
-                ["3. ze sk. A", "3. ze sk. B", "o 5. místo"],
-                ["1. ze sk. B", "2. ze sk. A", "Semifinále 2"],
-                ["Poražený SF1", "Poražený SF2", "o 3. místo"],
-                ["Vítěz SF1", "Vítěz SF2", "Finále"]
-            ],
-            "9_groups": [
-                [1, 2, "Skupina A"], [5, 6, "Skupina B"], [3, 4, "Skupina A"], [7, 8, "Skupina B"],
-                [1, 3, "Skupina A"], [5, 9, "Skupina B"], [2, 4, "Skupina A"], [6, 7, "Skupina B"],
-                [1, 4, "Skupina A"], [8, 9, "Skupina B"], [2, 3, "Skupina A"], [5, 7, "Skupina B"],
-                [6, 8, "Skupina B"], [7, 9, "Skupina B"], [5, 8, "Skupina B"], [6, 9, "Skupina B"],
-                ["4. ze sk. A", "4. ze sk. B", "Sk. o 7.-9. místo"],
-                ["1. ze sk. A", "2. ze sk. B", "Semifinále 1"],
-                ["4. ze sk. A", "5. ze sk. B", "Sk. o 7.-9. místo"],
-                ["1. ze sk. B", "2. ze sk. A", "Semifinále 2"],
-                ["4. ze sk. B", "5. ze sk. B", "Sk. o 7.-9. místo"],
-                ["3. ze sk. A", "3. ze sk. B", "o 5. místo"],
-                ["Poražený SF1", "Poražený SF2", "o 3. místo"],
-                ["Vítěz SF1", "Vítěz SF2", "Finále"]
-            ],
-            "10_groups": [
-                [1, 2, "Skupina A"], [6, 7, "Skupina B"], [3, 4, "Skupina A"], [8, 9, "Skupina B"],
-                [1, 5, "Skupina A"], [6, 10, "Skupina B"], [2, 3, "Skupina A"], [7, 8, "Skupina B"],
-                [4, 5, "Skupina A"], [9, 10, "Skupina B"], [1, 3, "Skupina A"], [6, 8, "Skupina B"],
-                [2, 4, "Skupina A"], [7, 9, "Skupina B"], [3, 5, "Skupina A"], [8, 10, "Skupina B"],
-                [1, 4, "Skupina A"], [6, 9, "Skupina B"], [2, 5, "Skupina A"], [7, 10, "Skupina B"],
-                ["5. ze sk. A", "5. ze sk. B", "o 9. místo"],
-                ["1. ze sk. A", "2. ze sk. B", "Semifinále 1"],
-                ["4. ze sk. A", "4. ze sk. B", "o 7. místo"],
-                ["1. ze sk. B", "2. ze sk. A", "Semifinále 2"],
-                ["3. ze sk. A", "3. ze sk. B", "o 5. místo"],
-                ["Poražený SF1", "Poražený SF2", "o 3. místo"],
-                ["Vítěz SF1", "Vítěz SF2", "Finále"]
-            ],
-            "11_groups": [
-                [1, 2, "Skupina A"], [6, 7, "Skupina B"], [3, 4, "Skupina A"], [8, 9, "Skupina B"],
-                [1, 5, "Skupina A"], [10, 11, "Skupina B"], [2, 3, "Skupina A"], [6, 9, "Skupina B"],
-                [4, 5, "Skupina A"], [7, 11, "Skupina B"], [1, 3, "Skupina A"], [8, 10, "Skupina B"],
-                [2, 4, "Skupina A"], [6, 11, "Skupina B"], [3, 5, "Skupina A"], [7, 9, "Skupina B"],
-                [1, 4, "Skupina A"], [6, 8, "Skupina B"], [2, 5, "Skupina A"], [7, 10, "Skupina B"],
-                [9, 11, "Skupina B"], [6, 10, "Skupina B"], [8, 11, "Skupina B"], [9, 10, "Skupina B"], [7, 8, "Skupina B"],
-                ["4. ze sk. A", "5. ze sk. B", "Sk. o 8.-11. místo"],
-                ["1. ze sk. A", "2. ze sk. B", "Semifinále 1"],
-                ["5. ze sk. A", "6. ze sk. B", "Sk. o 8.-11. místo"],
-                ["1. ze sk. B", "2. ze sk. A", "Semifinále 2"],
-                ["4. ze sk. A", "6. ze sk. B", "Sk. o 8.-11. místo"],
-                ["3. ze sk. A", "3. ze sk. B", "o 5. místo"],
-                ["5. ze sk. A", "5. ze sk. B", "Sk. o 8.-11. místo"],
-                ["4. ze sk. B", "5. ze sk. B", "o 7. místo"],
-                ["4. ze sk. A", "5. ze sk. B", "Sk. o 8.-11. místo"],
-                ["Poražený SF1", "Poražený SF2", "o 3. místo"],
-                ["5. ze sk. A", "6. ze sk. B", "Sk. o 8.-11. místo"],
-                ["Vítěz SF1", "Vítěz SF2", "Finále"]
-            ],
-            "12_groups": [
-                [1, 2, "Skupina A"], [7, 8, "Skupina B"], [3, 4, "Skupina A"], [9, 10, "Skupina B"],
-                [5, 6, "Skupina A"], [11, 12, "Skupina B"], [1, 4, "Skupina A"], [7, 10, "Skupina B"],
-                [2, 6, "Skupina A"], [8, 12, "Skupina B"], [3, 5, "Skupina A"], [9, 11, "Skupina B"],
-                [1, 6, "Skupina A"], [7, 12, "Skupina B"], [4, 5, "Skupina A"], [10, 11, "Skupina B"],
-                [2, 3, "Skupina A"], [8, 9, "Skupina B"], [1, 5, "Skupina A"], [7, 11, "Skupina B"],
-                [3, 6, "Skupina A"], [9, 12, "Skupina B"], [2, 4, "Skupina A"], [8, 10, "Skupina B"],
-                [1, 3, "Skupina A"], [7, 9, "Skupina B"], [2, 5, "Skupina A"], [8, 11, "Skupina B"],
-                [4, 6, "Skupina A"], [10, 12, "Skupina B"],
-                ["6. ze sk. A", "6. ze sk. B", "o 11. místo"],
-                ["1. ze sk. A", "2. ze sk. B", "Semifinále 1"],
-                ["5. ze sk. A", "5. ze sk. B", "o 9. místo"],
-                ["1. ze sk. B", "2. ze sk. A", "Semifinále 2"],
-                ["4. ze sk. A", "4. ze sk. B", "o 7. místo"],
-                ["Poražený SF1", "Poražený SF2", "o 3. místo"],
-                ["3. ze sk. A", "3. ze sk. B", "o 5. místo"],
-                ["Vítěz SF1", "Vítěz SF2", "Finále"]
-            ],
-            "12_groups_rr": [
-                [1, 2, "Skupina A"], [5, 6, "Skupina B"], [9, 10, "Skupina C"],
-                [3, 4, "Skupina A"], [7, 8, "Skupina B"], [11, 12, "Skupina C"],
-                [1, 3, "Skupina A"], [5, 7, "Skupina B"], [9, 11, "Skupina C"],
-                [2, 4, "Skupina A"], [6, 8, "Skupina B"], [10, 12, "Skupina C"],
-                [1, 4, "Skupina A"], [5, 8, "Skupina B"], [9, 12, "Skupina C"],
-                [2, 3, "Skupina A"], [6, 7, "Skupina B"], [10, 11, "Skupina C"],
-                ["4. ze sk. A", "4. ze sk. B", "o 9.-12. místo"],
-                ["1. ze sk. A", "1. ze sk. B", "o 1.-4. místo"],
-                ["4. ze sk. C", "Best of 3rd", "o 9.-12. místo"],
-                ["1. ze sk. C", "Best of 2nd", "o 1.-4. místo"],
-                ["2. ze sk. A", "2. ze sk. B", "o 5.-8. místo"],
-                ["4. ze sk. A", "4. ze sk. C", "o 9.-12. místo"],
-                ["1. ze sk. A", "1. ze sk. C", "o 1.-4. místo"],
-                ["2. ze sk. C", "2. Best 3rd", "o 5.-8. místo"],
-                ["4. ze sk. B", "Best of 3rd", "o 9.-12. místo"],
-                ["1. ze sk. B", "Best of 2nd", "o 1.-4. místo"],
-                ["2. ze sk. A", "2. ze sk. C", "o 5.-8. místo"],
-                ["4. ze sk. A", "Best of 3rd", "o 9.-12. místo"],
-                ["1. ze sk. A", "Best of 2nd", "o 1.-4. místo"],
-                ["2. ze sk. B", "2. Best 3rd", "o 5.-8. místo"],
-                ["4. ze sk. B", "4. ze sk. C", "o 9.-12. místo"],
-                ["2. ze sk. A", "2. Best 3rd", "o 5.-8. místo"],
-                ["2. ze sk. B", "2. ze sk. C", "o 5.-8. místo"],
-                ["1. ze sk. B", "1. ze sk. C", "o 1.-4. místo"],
-                ["1. ze sk. C", "Best of 2nd", "o 1.-4. místo"]
-            ],
-            "13_groups": [
-                [1, 2, "Skupina A"], [5, 6, "Skupina B"], [9, 10, "Skupina C"], [3, 4, "Skupina A"],
-                [7, 8, "Skupina B"], [11, 12, "Skupina C"], [1, 3, "Skupina A"], [5, 7, "Skupina B"],
-                [9, 13, "Skupina C"], [2, 4, "Skupina A"], [6, 8, "Skupina B"], [10, 11, "Skupina C"],
-                [1, 4, "Skupina A"], [5, 8, "Skupina B"], [12, 13, "Skupina C"], [2, 3, "Skupina A"],
-                [6, 7, "Skupina B"], [9, 11, "Skupina C"], [10, 13, "Skupina C"], [9, 12, "Skupina C"],
-                [11, 13, "Skupina C"], [10, 12, "Skupina C"],
-                ["Tým 9-13", "Tým 9-13", "o 9.-13. místo"],
-                ["1. ze sk. A", "Playoff Slot", "Semifinále 1"],
-                ["Tým 5-8", "Tým 5-8", "o 5.-8. místo"],
-                ["1. ze sk. B", "Playoff Slot", "Semifinále 2"],
-                ["Tým 9-13", "Tým 9-13", "o 9.-13. místo"],
-                ["Poražený SF1", "Poražený SF2", "o 3. místo"],
-                ["Vítěz SF1", "Vítěz SF2", "Finále"]
-            ],
-            "13_groups_rr": [
-                [1, 2, "Skupina A"], [5, 6, "Skupina B"], [9, 10, "Skupina C"], [3, 4, "Skupina A"],
-                [7, 8, "Skupina B"], [11, 12, "Skupina C"], [1, 3, "Skupina A"], [5, 7, "Skupina B"],
-                [13, 9, "Skupina C"], [11, 10, "Skupina C"], [1, 4, "Skupina A"], [5, 8, "Skupina B"],
-                [12, 13, "Skupina C"], [9, 11, "Skupina C"], [10, 13, "Skupina C"], [9, 12, "Skupina C"],
-                [11, 13, "Skupina C"], [10, 12, "Skupina C"], [2, 3, "Skupina A"], [6, 7, "Skupina B"],
-                ["4. ze sk. A", "4. ze sk. B", "o 9.-13. místo"],
-                ["1. ze sk. A", "1. ze sk. B", "o 1.-4. místo"],
-                ["2. ze sk. A", "2. ze sk. B", "o 5.-8. místo"],
-                ["Tým o 9.-13.", "Tým o 9.-13.", "o 9.-13. místo"],
-                ["Finálový blok", "Finálový blok", "o 1.-4. místo"],
-                ["Vítěz SF", "Vítěz SF", "Finále"]
-            ],
-            "14_groups_rr": [
-                [1, 2, "Skupina A"], [5, 6, "Skupina B"], [10, 11, "Skupina C"], [3, 4, "Skupina A"],
-                [7, 8, "Skupina B"], [12, 13, "Skupina C"], [1, 3, "Skupina A"], [9, 5, "Skupina B"],
-                [14, 10, "Skupina C"], [2, 4, "Skupina A"], [6, 7, "Skupina B"], [11, 12, "Skupina C"],
-                [1, 4, "Skupina A"], [8, 9, "Skupina B"], [13, 14, "Skupina C"], [2, 3, "Skupina A"],
-                [5, 7, "Skupina B"], [10, 12, "Skupina C"], [6, 8, "Skupina B"], [11, 13, "Skupina C"],
-                [5, 8, "Skupina B"], [10, 13, "Skupina C"], [6, 9, "Skupina B"], [11, 14, "Skupina C"],
-                [7, 9, "Skupina B"], [12, 14, "Skupina C"],
-                ["Tým 9-14", "Tým 9-14", "o 9.-14. místo"],
-                ["1. ze sk. A", "1. ze sk. B", "o 1.-4. místo"],
-                ["Tým 5-8", "Tým 5-8", "o 5.-8. místo"],
-                ["1. ze sk. C", "Tým 2.místo", "o 1.-4. místo"],
-                ["Tým 9-14", "Tým 9-14", "o 9.-14. místo"],
-                ["Vítězové SF", "Vítězové SF", "Finále"]
-            ],
-            "15_groups_rr": [
-                [1, 2, "Skupina A"], [6, 7, "Skupina B"], [11, 12, "Skupina C"], [3, 4, "Skupina A"],
-                [8, 9, "Skupina B"], [13, 14, "Skupina C"], [1, 5, "Skupina A"], [6, 10, "Skupina B"],
-                [11, 15, "Skupina C"], [2, 3, "Skupina A"], [7, 8, "Skupina B"], [12, 13, "Skupina C"],
-                [4, 5, "Skupina A"], [9, 10, "Skupina B"], [14, 15, "Skupina C"], [1, 3, "Skupina A"],
-                [6, 8, "Skupina B"], [11, 13, "Skupina C"], [2, 4, "Skupina A"], [7, 9, "Skupina B"],
-                [12, 14, "Skupina C"], [3, 5, "Skupina A"], [8, 10, "Skupina B"], [13, 15, "Skupina C"],
-                [1, 4, "Skupina A"], [6, 9, "Skupina B"], [11, 14, "Skupina C"], [2, 5, "Skupina A"],
-                [7, 10, "Skupina B"], [12, 15, "Skupina C"],
-                ["Tým 11-15", "Tým 11-15", "o 11.-15. místo"],
-                ["1. ze sk. A", "1. ze sk. B", "o 1.-5. místo"],
-                ["Tým 6-10", "Tým 6-10", "o 6.-10. místo"],
-                ["1. ze sk. C", "Tým 1.-5.", "o 1.-5. místo"],
-                ["Tým o umístění", "Tým o umístění", "o umístění"],
-                ["Vítězové SF", "Vítězové SF", "Finále"]
-            ]
+            "basic_1": {
+                name: "Pro 3 družstva",
+                teams: 3,
+                matches: [[1, 2, "Základní skupina"], [2, 3, "Základní skupina"], [1, 3, "Základní skupina"]]
+            },
+            "basic_2": {
+                name: "Pro 4 družstva",
+                teams: 4,
+                matches: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [1, 3, "Základní skupina"], [2, 4, "Základní skupina"], [1, 4, "Základní skupina"], [2, 3, "Základní skupina"]]
+            },
+            "basic_3": {
+                name: "Pro 5 družstev",
+                teams: 5,
+                matches: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [1, 5, "Základní skupina"], [2, 3, "Základní skupina"], [4, 5, "Základní skupina"], [1, 3, "Základní skupina"], [2, 4, "Základní skupina"], [3, 5, "Základní skupina"], [1, 4, "Základní skupina"], [2, 5, "Základní skupina"]]
+            },
+            "basic_4": {
+                name: "Pro 6 družstev",
+                teams: 6,
+                matches: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [5, 6, "Základní skupina"], [1, 4, "Základní skupina"], [2, 6, "Základní skupina"], [3, 5, "Základní skupina"], [1, 6, "Základní skupina"], [4, 5, "Základní skupina"], [2, 3, "Základní skupina"], [1, 5, "Základní skupina"], [3, 6, "Základní skupina"], [2, 4, "Základní skupina"], [1, 3, "Základní skupina"], [2, 5, "Základní skupina"], [4, 6, "Základní skupina"]]
+            },
+            "basic_5": {
+                name: "Pro 7 družstev",
+                teams: 7,
+                matches: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [5, 6, "Základní skupina"], [1, 7, "Základní skupina"], [2, 3, "Základní skupina"], [4, 5, "Základní skupina"], [6, 7, "Základní skupina"], [1, 3, "Základní skupina"], [2, 5, "Základní skupina"], [4, 7, "Základní skupina"], [1, 6, "Základní skupina"], [3, 5, "Základní skupina"], [2, 7, "Základní skupina"], [4, 6, "Zoladní skupina"], [1, 5, "Základní skupina"], [3, 7, "Základní skupina"], [2, 6, "Základní skupina"], [1, 4, "Základní skupina"], [5, 7, "Základní skupina"], [3, 6, "Základní skupina"], [2, 4, "Základní skupina"]]
+            },
+            "basic_6": {
+                name: "Pro 8 družstev",
+                teams: 8,
+                matches: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [5, 6, "Základní skupina"], [7, 8, "Základní skupina"], [1, 4, "Základní skupina"], [2, 5, "Základní skupina"], [3, 6, "Základní skupina"], [1, 7, "Základní skupina"], [5, 8, "Základní skupina"], [4, 6, "Základní skupina"], [2, 3, "Základní skupina"], [5, 7, "Základní skupina"], [1, 8, "Základní skupina"], [2, 6, "Základní skupina"], [4, 7, "Základní skupina"], [3, 5, "Základní skupina"], [1, 6, "Základní skupina"], [2, 8, "Základní skupina"], [3, 7, "Základní skupina"], [4, 5, "Základní skupina"], [6, 8, "Základní skupina"], [1, 3, "Základní skupina"], [2, 7, "Základní skupina"], [4, 8, "Základní skupina"], [1, 5, "Základní skupina"], [6, 7, "Základní skupina"], [3, 8, "Základní skupina"], [2, 4, "Základní skupina"]]
+            }
         };
 
         let state = {
@@ -2297,6 +2151,35 @@
                 }
             },
 
+            formatTime: (totalSeconds) => {
+                if (isNaN(totalSeconds) || totalSeconds < 0) return "0:00";
+                if (totalSeconds >= 3600) return "59:59";
+                const m = Math.floor(totalSeconds / 60);
+                const s = totalSeconds % 60;
+                // User requirement: no leading zero for whole minutes (e.g. 7:00 instead of 07:00)
+                // m.toString() naturally has no leading zero.
+                return `${m}:${s.toString().padStart(2, '0')}`;
+            },
+
+            validateTimeInput: (input) => {
+                // Ensure max 4 digits
+                if (input.value.length > 4) {
+                    input.value = input.value.slice(0, 4);
+                }
+
+                let val = parseInt(input.value);
+                if (!isNaN(val)) {
+                    // Force cap at 3599
+                    if (val > 3599) {
+                        input.value = 3599;
+                    }
+                }
+
+                // Save and update UI
+                admin.saveSettings(false);
+                ui.render();
+            },
+
             renderIdentityInputs: () => {
                 // Teams
                 const teamList = document.getElementById('teams-input-list');
@@ -2409,9 +2292,11 @@
             },
 
             generateScheduleFromTemplate: () => {
-                const count = parseInt(document.getElementById('sched-template-select').value);
-                if (!count || !SCHEDULE_TEMPLATES[count]) return;
+                const templateId = document.getElementById('sched-template-select').value;
+                const template = SCHEDULE_TEMPLATES[templateId];
+                if (!template) return;
 
+                const count = template.teams;
                 if (state.teams.length < count) {
                     alert(`Pro toto schéma je potřeba definovat alespoň ${count} družstev. Aktuálně jich máte ${state.teams.length}.`);
                     return;
@@ -2422,7 +2307,7 @@
                 state.activeMatchIndex = -1;
 
                 const startIdx = state.schedule.length;
-                const pairs = SCHEDULE_TEMPLATES[count];
+                const pairs = template.matches;
                 const defaultDuration = (state.times.play * 2) + state.times.break;
 
                 pairs.forEach((pair, idx) => {
@@ -2447,8 +2332,8 @@
                         home: home,
                         guest: guest,
                         referee: "",
-                        homeScore: 0,
-                        guestScore: 0,
+                        homeScore: null,
+                        guestScore: null,
                         phaseIndex: 0,
                         duration: defaultDuration
                     });
@@ -3214,6 +3099,9 @@
                     if (typeof parsed.musicFadeDuration !== 'undefined') state.musicFadeDuration = parsed.musicFadeDuration;
                     if (parsed.musicPlaylistOrder) state.musicPlaylistOrder = parsed.musicPlaylistOrder;
                     if (parsed.musicAutoChangeStrategy) state.musicAutoChangeStrategy = parsed.musicAutoChangeStrategy;
+                    if (typeof parsed.activeMatchIndex !== 'undefined') state.activeMatchIndex = parsed.activeMatchIndex;
+                    if (parsed.currentMatch) state.currentMatch = parsed.currentMatch;
+                    if (parsed.timer) state.timer = parsed.timer;
 
                     if (typeof parsed.tournamentStartTime !== 'undefined') state.tournamentStartTime = parsed.tournamentStartTime;
                     if (typeof parsed.playTimeAccumulated !== 'undefined') state.playTimeAccumulated = parsed.playTimeAccumulated;
@@ -3352,11 +3240,13 @@
                 const urlDisp = document.getElementById('projection-url-display');
                 if (urlDisp) urlDisp.value = window.location.origin + window.location.pathname + '?projection';
 
+                ui.updateDurationHints(); // INIT DURATION HINTS
+
                 // Init music handle if exists
                 music.getHandle().then(h => {
                     if (h) {
                         directoryHandle = h;
-                        music.listTracks(); // Try to list if access is already granted (though browser usually blocks this)
+                        music.listTracks(); // Try to list if access is already granted
                         document.getElementById('music-list').innerHTML = `<li style="color:#4caf50; font-size:0.8em; text-align:center; padding:10px;">Složka nalezena. Klikněte na 'Vybrat složku' pro obnovení přístupu.</li>`;
                     }
                 });
@@ -3851,14 +3741,19 @@
                 if (time) time.innerText = telemetry.time;
             },
             render: () => {
-                ui.renderPhase();
-                ui.updateScores();
-                ui.updateNames();
-                ui.updateTimer();
-                ui.updateTimerBtn();
-                ui.renderSchedule();
-                ui.renderMusic();
-                ui.renderStandings();
+                try {
+                    ui.renderPhase();
+                    ui.updateScores();
+                    ui.updateNames();
+                    ui.updateTimer();
+                    ui.updateTimerBtn();
+                    ui.renderSchedule();
+                    ui.renderMusic();
+                    ui.renderStandings();
+                    ui.updateDurationHints(); // Force update hints on every render
+                } catch (e) {
+                    console.error("UI: Fatal error in render()", e);
+                }
             },
 
             renderStandings: () => {
@@ -4035,30 +3930,44 @@
             },
 
             renderPhase: () => {
-                const isEvent = state.currentMatch.isEvent;
-                const phaseControls = document.getElementById('phase-controls');
-                const eventLabel = document.getElementById('event-label');
+                try {
+                    const isEvent = state.currentMatch.isEvent;
+                    const phaseControls = document.getElementById('phase-controls');
+                    const eventLabel = document.getElementById('event-label');
+                    const phase = state.currentMatch.phaseIndex;
 
-                if (isEvent) {
-                    if (phaseControls) phaseControls.style.display = 'none';
-                    if (eventLabel) {
-                        eventLabel.style.display = 'block';
-                        eventLabel.textContent = state.currentMatch.title;
+                    if (isEvent) {
+                        if (phaseControls) phaseControls.style.display = 'none';
+                        if (eventLabel) {
+                            eventLabel.style.display = 'block';
+                            eventLabel.textContent = state.currentMatch.title;
+                        }
+                        // Hide score controls for events
+                        const hp = document.getElementById('home-team-panel');
+                        const gp = document.getElementById('guest-team-panel');
+                        if (hp) hp.style.visibility = 'hidden';
+                        if (gp) gp.style.visibility = 'hidden';
+                    } else {
+                        if (phaseControls) phaseControls.style.display = 'flex';
+                        if (eventLabel) eventLabel.style.display = 'none';
+
+                        const buttons = document.querySelectorAll('.phase-btn');
+                        buttons.forEach(btn => {
+                            const bPhase = parseInt(btn.dataset.phase);
+                            const isActive = (bPhase === phase);
+                            btn.classList.toggle('active', isActive);
+                        });
+
+                        // Show score controls for matches
+                        const hp = document.getElementById('home-team-panel');
+                        const gp = document.getElementById('guest-team-panel');
+                        if (hp) hp.style.visibility = 'visible';
+                        if (gp) gp.style.visibility = 'visible';
                     }
-                    // Hide score controls for events
-                    document.getElementById('home-team-panel').style.visibility = 'hidden';
-                    document.getElementById('guest-team-panel').style.visibility = 'hidden';
-                } else {
-                    if (phaseControls) phaseControls.style.display = 'flex';
-                    if (eventLabel) eventLabel.style.display = 'none';
-                    document.querySelectorAll('.phase-btn').forEach(btn => {
-                        btn.classList.toggle('active', parseInt(btn.dataset.phase) === state.currentMatch.phaseIndex);
-                    });
-                    // Show score controls for matches
-                    document.getElementById('home-team-panel').style.visibility = 'visible';
-                    document.getElementById('guest-team-panel').style.visibility = 'visible';
+                    ui.updateMatchInfo();
+                } catch (e) {
+                    console.error("UI: Error in renderPhase", e);
                 }
-                ui.updateMatchInfo();
             },
 
             updateMatchInfo: () => {
@@ -4068,6 +3977,24 @@
                     infoDiv.textContent = `${state.activeMatchIndex + 1}. ${m.title || ""}`;
                 } else {
                     infoDiv.textContent = state.tournamentName || "Zápas";
+                }
+            },
+
+
+
+            updateDurationHints: () => {
+                try {
+                    const ids = ['time-play', 'time-break', 'time-setup'];
+                    ids.forEach(id => {
+                        const input = document.getElementById(id);
+                        const hint = document.getElementById(`hint-${id}`);
+                        if (input && hint) {
+                            const val = parseInt(input.value) || 0;
+                            hint.innerText = admin.formatTime(val);
+                        }
+                    });
+                } catch (e) {
+                    console.error("UI: Error updating duration hints:", e);
                 }
             },
 
