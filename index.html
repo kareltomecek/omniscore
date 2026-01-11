@@ -1316,12 +1316,12 @@
                         nastavení log</h4>
                     <div class="form-group"
                         style="background: rgba(76, 175, 80, 0.1); padding: 10px; border-radius: 8px; border: 1px solid var(--accent-green); margin-bottom: 20px;">
-                        <label style="color: var(--accent-green); font-weight: bold;">Výchozí logo (pro týmy bez
+                        <label style="color: var(--accent-green); font-weight: bold;">Výchozí logo (pro družstva bez
                             loga)</label>
                         <input type="file" id="input-default-logo" accept="image/*"
                             onchange="admin.handleDefaultLogo(this)">
                         <small style="display: block; margin-top: 5px; color: #aaa; font-size: 0.75em;">Tento soubor
-                            bude přiřazen všem týmům, které aktuálně nemají vybrané logo.</small>
+                            bude přiřazen všem družstvům, která aktuálně nemají vybrané logo.</small>
                     </div>
                 </div>
             </div>
@@ -1329,7 +1329,7 @@
             <!-- 4. Schedule -->
             <div class="accordion">
                 <div class="accordion-header" onclick="toggleAccordion('acc-schedule')">
-                    Rozpis Zápasů <span>▼</span>
+                    Zápasy <span>▼</span>
                 </div>
                 <div id="acc-schedule" class="accordion-content">
 
@@ -1389,8 +1389,8 @@
                                 <b style="color:#bbb; display:block; margin-bottom:4px;">Očekávané sloupce (v
                                     pořadí):</b>
                                 1. Název / Skupina (A)<br>
-                                2. Domácí tým (B)<br>
-                                3. Hostující tým (C)<br>
+                                2. Domácí družstvo (B)<br>
+                                3. Hostující družstvo (C)<br>
                                 4. Rozhodčí (D)<br>
                                 5. Délka v min. (E - volitelně)
                             </div>
@@ -1426,11 +1426,11 @@
                         </div>
                         <div id="sched-match-fields">
                             <div class="form-group">
-                                <label>Domácí</label>
+                                <label>Domácí družstvo</label>
                                 <select id="sched-home"></select>
                             </div>
                             <div class="form-group">
-                                <label>Hosté</label>
+                                <label>Hostující družstvo</label>
                                 <select id="sched-guest"></select>
                             </div>
                             <div class="form-group">
@@ -2326,6 +2326,9 @@
                 const b = state.times.break || 0;
                 const p = state.times.play || 0;
                 const plannedOverhead = s + b;
+
+                let avgLag = 0;
+                let learnedOverhead = 0;
 
                 // Adjust based on real performance if tournament started
                 if (state.tournamentStartTime && state.activeMatchIndex > 0) {
@@ -3320,6 +3323,8 @@
                 const startIdx = state.schedule.length;
                 const pairs = template.matches;
                 const defaultDuration = (state.times.play * 2) + state.times.break;
+                const refsPerMatch = template.refsPerMatch || 1;
+                let refIdx = 0;
 
                 pairs.forEach((pair, idx) => {
                     // Resolve home team
@@ -3337,12 +3342,22 @@
                     // Resolve title (optional 3rd element)
                     const title = pair[2] || `Zápas ${startIdx + idx + 1}`;
 
+                    // Assign Referees
+                    let assignedRefs = [];
+                    if (state.referees.length > 0) {
+                        for (let r = 0; r < refsPerMatch; r++) {
+                            const ref = state.referees[(refIdx + r) % state.referees.length];
+                            if (ref) assignedRefs.push(ref.name);
+                        }
+                        refIdx += refsPerMatch;
+                    }
+
                     state.schedule.push({
                         type: 'match',
                         title: title,
                         home: home,
                         guest: guest,
-                        referee: "",
+                        referee: assignedRefs.join(', '),
                         homeScore: null,
                         guestScore: null,
                         phaseIndex: 0,
@@ -3578,7 +3593,7 @@
                         let startRow = 0;
                         if (json[0] && json[0].length >= 2) {
                             const firstRowStr = json[0].join(" ").toLowerCase();
-                            if (firstRowStr.includes("tým") || firstRowStr.includes("host") || firstRowStr.includes("zápas") || firstRowStr.includes("skupina")) {
+                            if (firstRowStr.includes("tým") || firstRowStr.includes("družstvo") || firstRowStr.includes("host") || firstRowStr.includes("zápas") || firstRowStr.includes("skupina")) {
                                 startRow = 1;
                             }
                         }
@@ -3622,7 +3637,7 @@
                         admin.saveToStorage(); game.syncProjection();
                         admin.renderIdentityInputs(); // Refresh lists
                         game.syncProjection();
-                        alert(`Importováno ${newMatches.length} zápasů.\n(Přidáno ${addedTeams} nových týmů a ${addedRefs} rozhodčích)`);
+                        alert(`Importováno ${newMatches.length} zápasů.\n(Přidáno ${addedTeams} nových družstev a ${addedRefs} rozhodčích)`);
                         input.value = "";
                     } catch (err) {
                         console.error(err);
@@ -3762,9 +3777,9 @@
                             ui.updateLogos();
                             game.syncProjection();
                             admin.saveToStorage();
-                            alert(`Logo přiřazeno ${count} týmům.`);
+                            alert(`Logo přiřazeno ${count} družstvům.`);
                         } else {
-                            alert("Všechny týmy již mají svá loga.");
+                            alert("Všechna družstva již mají svá loga.");
                         }
                         input.value = ""; // Reset input
                     };
@@ -3979,9 +3994,25 @@
 
             calculateStandings: () => {
                 const teamsMap = {};
-                // Initialize map with all current teams
+
+                // Identify active teams from schedule
+                const activeTeamIds = new Set();
+                if (state.schedule.length > 0) {
+                    state.schedule.forEach(m => {
+                        if (m.home) activeTeamIds.add(m.home);
+                        if (m.guest) activeTeamIds.add(m.guest);
+                    });
+                } else {
+                    // Fallback: If schedule is empty, maybe show all? Or none? 
+                    // Let's show all to avoid empty table confusion during setup.
+                    state.teams.forEach(t => activeTeamIds.add(t.id));
+                }
+
+                // Initialize map with ACTIVE teams only
                 state.teams.forEach(t => {
-                    teamsMap[t.id] = { id: t.id, name: t.name, gp: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
+                    if (activeTeamIds.has(t.id)) {
+                        teamsMap[t.id] = { id: t.id, name: t.name, gp: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
+                    }
                 });
 
                 // Process schedule
@@ -4764,8 +4795,8 @@
                     return {
                         "Pořadí": i + 1,
                         "Název / Skupina": m.title || "Match",
-                        "Domácí": m.type === 'match' ? exporter.resolveName(m.home, 'team') : "-",
-                        "Hosté": m.type === 'match' ? exporter.resolveName(m.guest, 'team') : "-",
+                        "Domácí družstvo": m.type === 'match' ? exporter.resolveName(m.home, 'team') : "-",
+                        "Hostující družstvo": m.type === 'match' ? exporter.resolveName(m.guest, 'team') : "-",
                         "Skóre": m.type === 'match' ? (m.homeScore !== null ? `${m.homeScore}:${m.guestScore}` : "-") : "-",
                         "Rozhodčí": m.type === 'match' ? exporter.resolveName(m.referee, 'ref') : "-",
                         "Délka (s)": m.duration || (m.type === 'match' ? (state.times.play * 2 + state.times.break) : 600)
@@ -4846,7 +4877,7 @@
                     html += `</tbody></table>`;
                 }
 
-                html += `<h2 style="margin-top:40px;">Rozpis zápasů</h2>`;
+                html += `<h2 style="margin-top:40px;">Pořadí zápasů</h2>`;
                 html += `<table><thead><tr>
                     <th style="width:40px">#</th>
                     <th style="width:120px">Skupina / Fáze</th>
@@ -4883,7 +4914,7 @@
                     html += `<h2 style="margin-top:50px; page-break-before:always;">Křížová tabulka výsledků</h2>`;
                     html += `<table style="font-size:0.8em; text-align:center;"><thead style="background:#eee;"><tr>
                         <th style="width:30px">#</th>
-                        <th style="text-align:left;">Tým</th>`;
+                        <th style="text-align:left;">Družstvo</th>`;
                     state.teams.forEach((_, i) => html += `<th style="width:30px;">${i + 1}</th>`);
                     html += `<th style="width:40px;">Body</th><th style="width:70px;">Skóre</th></tr></thead><tbody>`;
 
@@ -4921,7 +4952,7 @@
                     html += `<h2 style="margin-top:50px;">Konečné pořadí / Tabulka</h2>`;
                     html += `<table><thead><tr>
                         <th style="width:40px">#</th>
-                        <th>Tým</th>
+                        <th>Družstvo</th>
                         <th style="text-align:center; width:40px;">Z</th>
                         <th style="text-align:center; width:40px;">V</th>
                         <th style="text-align:center; width:40px;">R</th>
@@ -5051,9 +5082,10 @@
                 let html = `<table style="width:100%; border-collapse:collapse; font-size:0.85em; margin-top:5px;">
                     <thead><tr style="background:#222; color:#aaa; text-align:left;">
                         <th style="padding:5px;">#</th>
-                        <th style="padding:5px;">Tým</th>
+                        <th style="padding:5px;">Družstvo</th>
                         <th style="padding:5px; text-align:center;">Z</th>
                         <th style="padding:5px; text-align:center;">S</th>
+                        <th style="padding:5px; text-align:center;">R</th>
                         <th style="padding:5px; text-align:center;">B</th>
                     </tr></thead><tbody>`;
 
@@ -5063,6 +5095,7 @@
                         <td style="padding:5px; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px;">${s.name}</td>
                         <td style="padding:5px; text-align:center;">${s.gp}</td>
                         <td style="padding:5px; text-align:center; color:#888;">${s.gf}:${s.ga}</td>
+                        <td style="padding:5px; text-align:center; color:${s.gd > 0 ? 'var(--accent-green)' : (s.gd < 0 ? 'var(--accent-red)' : '#888')}">${s.gd > 0 ? '+' + s.gd : s.gd}</td>
                         <td style="padding:5px; text-align:center; font-weight:bold; color:var(--accent-green);">${s.pts}</td>
                     </tr>`;
                 });
@@ -5072,13 +5105,21 @@
             },
 
             renderCrossTable: (container) => {
-                const teams = state.teams;
+                const standings = admin.calculateStandings();
+
+                // FILTER: Use teams present in standings (which are filtered by active schedule)
+                // We map IDs back to full team objects for rendering, preserving original order if possible, 
+                // or just using standings order. Let's use standings order for axes? 
+                // Actually, cross tables usually use a fixed order (e.g. 1st vs 2nd defined team).
+                // Let's filter state.teams by IDs found in standings.
+                const activeIds = new Set(standings.map(s => s.id));
+                const teams = state.teams.filter(t => activeIds.has(t.id));
+
                 if (teams.length === 0) {
                     container.innerHTML = `<p style="text-align:center; color:#666; font-size:0.9em; padding:10px;">Žádná družstva pro zobrazení.</p>`;
                     return;
                 }
 
-                const standings = admin.calculateStandings();
                 // Map of ranks for easy lookup
                 const ranks = {};
                 standings.forEach((s, i) => ranks[s.id] = i + 1);
@@ -5090,7 +5131,7 @@
                 let html = `<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:0.75em; text-align:center; table-layout:fixed;">
                     <thead><tr style="background:#222; color:#aaa;">
                         <th style="padding:4px; width:25px;">#</th>
-                        <th style="padding:4px; text-align:left; width:100px;">Tým</th>`;
+                        <th style="padding:4px; text-align:left; width:100px;">Družstvo</th>`;
 
                 teams.forEach((t, i) => {
                     html += `<th style="padding:4px; border-left:1px solid #444;">${i + 1}</th>`;
@@ -5098,6 +5139,7 @@
 
                 html += `<th style="padding:4px; border-left:2px solid #555; width:30px;">B</th>
                          <th style="padding:4px; border-left:1px solid #444; width:50px;">Skóre</th>
+                         <th style="padding:4px; border-left:1px solid #444; width:30px;">R</th>
                          <th style="padding:4px; border-left:1px solid #444; width:30px; background:#332;">M</th>
                     </tr></thead><tbody>`;
 
@@ -5138,6 +5180,7 @@
 
                     html += `<td style="padding:4px; border-left:2px solid #555; font-weight:bold; color:var(--accent-green);">${s.pts}</td>
                              <td style="padding:4px; border-left:1px solid #444; color:#888;">${s.gf}:${s.ga}</td>
+                             <td style="padding:4px; border-left:1px solid #444; color:#aaa; font-size:0.9em;">${s.gd > 0 ? '+' + s.gd : s.gd}</td>
                              <td style="padding:4px; border-left:1px solid #444; background:#332; font-weight:bold;">${rank}.</td>
                     </tr>`;
                 });
@@ -5579,7 +5622,7 @@
 
                     const getTName = (id) => {
                         const t = teams.find(x => x.id === id);
-                        return t ? t.name : (id || "Tým");
+                        return t ? t.name : (id || "Družstvo");
                     };
                     const getRName = (id) => {
                         const r = referees.find(x => x.id === id);
