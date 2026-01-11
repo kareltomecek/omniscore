@@ -1311,6 +1311,18 @@
                         style="margin-bottom:15px; border:1px solid #444; padding:10px; border-radius:4px; max-height:250px; overflow-y:auto;">
                         <!-- logo items here -->
                     </div>
+
+                    <h4 style="margin: 20px 0 10px 0; border:none; border-top:1px solid #444; padding-top:15px;">Výchozí
+                        nastavení log</h4>
+                    <div class="form-group"
+                        style="background: rgba(76, 175, 80, 0.1); padding: 10px; border-radius: 8px; border: 1px solid var(--accent-green); margin-bottom: 20px;">
+                        <label style="color: var(--accent-green); font-weight: bold;">Výchozí logo (pro týmy bez
+                            loga)</label>
+                        <input type="file" id="input-default-logo" accept="image/*"
+                            onchange="admin.handleDefaultLogo(this)">
+                        <small style="display: block; margin-top: 5px; color: #aaa; font-size: 0.75em;">Tento soubor
+                            bude přiřazen všem týmům, které aktuálně nemají vybrané logo.</small>
+                    </div>
                 </div>
             </div>
 
@@ -1676,16 +1688,7 @@
                             oninput="admin.saveSettings(false)">
                     </div>
 
-                    <h4 style="margin: 20px 0 10px 0; border:none;">Výchozí nastavení log</h4>
-                    <div class="form-group"
-                        style="background: rgba(76, 175, 80, 0.1); padding: 10px; border-radius: 8px; border: 1px solid var(--accent-green); margin-bottom: 20px;">
-                        <label style="color: var(--accent-green); font-weight: bold;">Výchozí logo (pro týmy bez
-                            loga)</label>
-                        <input type="file" id="input-default-logo" accept="image/*"
-                            onchange="admin.handleDefaultLogo(this)">
-                        <small style="display: block; margin-top: 5px; color: #aaa; font-size: 0.75em;">Tento soubor
-                            bude přiřazen všem týmům, které aktuálně nemají vybrané logo.</small>
-                    </div>
+
 
 
                     <h4 style="margin: 20px 0 10px 0; border:none;">Zvuky a Hlasitost</h4>
@@ -3685,7 +3688,10 @@
 
                     row.innerHTML = `
                         <div style="flex:1; font-size:0.9em; overflow:hidden; text-overflow:ellipsis;">${displayName}</div>
-                        <img src="${logoSrc}" style="width:30px; height:30px; object-fit:contain; background:#444; border-radius:3px; display:${logoSrc ? 'block' : 'none'}">
+                        <img src="${logoSrc}" 
+                             onclick="document.getElementById('logo-file-${team}').click()" 
+                             title="Kliknutím změníte logo"
+                             style="width:30px; height:30px; object-fit:contain; background:#444; border-radius:3px; cursor:pointer; display:${logoSrc ? 'block' : 'none'}">
                         
                         <input type="file" accept="image/*" style="display:none" id="logo-file-${team}" onchange="admin.handleLogoUpload('${team}', this)">
                         <button class="small-btn" onclick="document.getElementById('logo-file-${team}').click()" title="Nahrát Logo">🖼️</button>
