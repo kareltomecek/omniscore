@@ -1280,9 +1280,9 @@
                             </div>
                             <div style="display:flex; gap:5px;">
                                 <button class="small-btn" onclick="admin.updatePlayersFromCloud()"
-                                    title="Stáhne nejnovější databázi hráčů z Google Disku a synchronizuje ji s vaší lokální verzí."
-                                    style="background:#00a2ff; flex:1; font-weight:bold;">🔄 Aktualizovat z
-                                    cloudu</button>
+                                    title="Stáhne nejnovější globální databázi hráčů z Google Disku a synchronizuje ji s vaší hlavní lokální verzí."
+                                    style="background:#00a2ff; flex:1; font-weight:bold;">🔄 Aktualizovat databázi hráčů
+                                    z cloudu</button>
                                 <button class="small-btn" onclick="admin.exportPlayersWithPassword()"
                                     title="Vytvoří zálohu vaší aktuální databáze hráčů do souboru. Vyžaduje heslo."
                                     style="background:#555; flex:1;">📥 Export databáze</button>
@@ -1785,30 +1785,24 @@
     </div>
 
     <script>
-        let projectionWindow = null;
-        let qrWindow = null;
+        // ===================================================================================
+        // POZNÁMKY K ARCHITEKTUŘE (ARCHITECTURE NOTES)
+        // ===================================================================================
+        /*
+          Aplikace OmniScore (OmS) pro řízení sportovních turnajů.
+          
+          Základní komponenty:
+          - state: Jednotný zdroj pravdy pro data (tournament, teams, players, schedule, timers).
+          - game: Logické jádro (běh času, skóre, přepínání fází).
+          - admin: Správa dat, výpočty tabulek, importy/exporty, persistence (localStorage).
+          - ui: Vykreslovací vrstva pro ovládací okno i projekci.
+          - music/jingles: Moduly pro práci s audio soubory (FileSystem API, IndexedDB).
+          - syncChannel: Synchronizace dat mezi hlavním oknem a projekčním oknem (BroadcastChannel).
+        */
 
-        // --- SESSION HANDLING ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const isPO = urlParams.has('projection');
-        const isQR = urlParams.get('mode') === 'qr';
-        let sessionId = urlParams.get('session');
-
-        if (!sessionId) {
-            // Check sessionStorage for persistence across refreshes
-            sessionId = sessionStorage.getItem('oms_session_id');
-            if (!sessionId) {
-                // Generate new 5-character alphanumeric session ID
-                sessionId = Math.random().toString(36).substring(2, 7).toUpperCase();
-            }
-        }
-
-        // Persist session ID for ZO refreshes (only if not a PO window)
-        if (!isPO) {
-            sessionStorage.setItem('oms_session_id', sessionId);
-        }
-
-        const syncChannel = new BroadcastChannel('oms_sync_' + sessionId);
+        // ===================================================================================
+        // CONFIG & KONSTANTY
+        // ===================================================================================
         // --- DATA STRUCTURES ---
         const PHASES = [
             { id: 0, name: "Nastupuje", timeKey: 'setup' },
@@ -1866,9 +1860,12 @@
             "TJ Start Plzeň"
         ];
 
+        // ===================================================================================
+        // GLOBÁLNÍ STAV (STATE)
+        // ===================================================================================
         let state = {
-            isProjectionMode: isPO,
-            sessionId: sessionId,
+            isProjectionMode: false, // Will be set in KOMUNIKACE
+            sessionId: "", // Will be set in KOMUNIKACE
             isLoading: false,
             tournamentName: "",
             times: { setup: 10, play: 420, break: 105 }, // in seconds
@@ -1879,6 +1876,7 @@
             volAnthem: 0.5,
             referees: [],
             players: [],
+            masterPlayers: [], // Global pool of all known players (Main database)
             currentMatch: {
                 title: "",
                 homeName: "Domácí",
@@ -1901,7 +1899,7 @@
             schedule: [],
             activeMatchIndex: -1, // Track which match from schedule is active
             theme: "dark", // Default to dark for better initial projection appearance
-            cloudFileId: "", // Google Drive File ID for players database
+            cloudFileId: "1_cQYwU0C_dLKioLuEV7lyxUh06Q9qjXi", // Google Drive File ID for players database
             poTransitionActive: false,
             poTransitionData: null,
             poTransitionDelay: 10,
@@ -1910,7 +1908,7 @@
             jingleMode: 'priority', // 'priority' or 'random'
             musicPlaylist: [], // { name: string, handle: FileSystemFileHandle }
             musicAutoEnabled: false,
-            musicMode: 'continuous', // 'continuous' or 'random'
+            musicMode: 'random', // 'continuous' or 'random'
             musicFadeDuration: 1,
             musicAutoChangeStrategy: 'continuous', // 'continuous', 'per-step', 'per-match'
             musicPreviousPhase: -1, // Track previous phase for direction detection
@@ -1938,16 +1936,47 @@
             ] // { id: string, text: string }
         };
 
-
         let musicAudioA = new Audio();
         let musicAudioB = new Audio();
         let currentMusicAudio = musicAudioA; // Which one is currently playing
         let currentAnthemAudio = null;
         let currentMusicIndex = -1;
         let directoryHandle = null;
-
         let poTransitionTimeoutID = null;
 
+        // ===================================================================================
+        // KOMUNIKACE (SYNC)
+        // ===================================================================================
+        let projectionWindow = null;
+        let qrWindow = null;
+
+        // --- SESSION HANDLING ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const isPO = urlParams.has('projection');
+        const isQR = urlParams.get('mode') === 'qr';
+        let sessionId = urlParams.get('session');
+
+        if (!sessionId) {
+            sessionId = sessionStorage.getItem('oms_session_id');
+            if (!sessionId) {
+                sessionId = Math.random().toString(36).substring(2, 7).toUpperCase();
+            }
+        }
+
+        if (!isPO) {
+            sessionStorage.setItem('oms_session_id', sessionId);
+        }
+
+        const syncChannel = new BroadcastChannel('oms_sync_' + sessionId);
+
+        // Update state with session info
+        state.isProjectionMode = isPO;
+        state.sessionId = sessionId;
+
+
+        // ===================================================================================
+        // HERNÍ JÁDRO (GAME)
+        // ===================================================================================
         // --- CORE LOGIC CLASS ---
         const game = {
             init: () => {
@@ -2438,6 +2467,406 @@
             }
         };
 
+
+        // ===================================================================================
+        // AUDIO MODUL (MUSIC & JINGLES)
+        // ===================================================================================
+        // Music Audio Events for Indicator stability
+        musicAudioA.addEventListener('ended', () => {
+            if (currentMusicAudio === musicAudioA) music.next();
+        });
+        musicAudioB.addEventListener('ended', () => {
+            if (currentMusicAudio === musicAudioB) music.next();
+        });
+
+        // Update indicator when either audio plays/pauses
+        musicAudioA.addEventListener('play', () => {
+            if (currentMusicAudio === musicAudioA) ui.updateMusicIndicatorState();
+        });
+        musicAudioA.addEventListener('pause', () => {
+            if (currentMusicAudio === musicAudioA) ui.updateMusicIndicatorState();
+        });
+        musicAudioB.addEventListener('play', () => {
+            if (currentMusicAudio === musicAudioB) ui.updateMusicIndicatorState();
+        });
+        musicAudioB.addEventListener('pause', () => {
+            if (currentMusicAudio === musicAudioB) ui.updateMusicIndicatorState();
+        });
+
+        const music = {
+            fadeInterval: null,
+            async openDB() {
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open("MusicDB", 1);
+                    req.onupgradeneeded = () => req.result.createObjectStore("handles");
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            },
+            async saveHandle(handle) {
+                const db = await music.openDB();
+                const tx = db.transaction("handles", "readwrite");
+                tx.objectStore("handles").put(handle, "lastDirectory");
+            },
+            async getHandle() {
+                try {
+                    const db = await music.openDB();
+                    const tx = db.transaction("handles", "readonly");
+                    const req = tx.objectStore("handles").get("lastDirectory");
+                    return new Promise(resolve => {
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror = () => resolve(null);
+                    });
+                } catch (e) { return null; }
+            },
+            async pickDirectory() {
+                try {
+                    directoryHandle = await window.showDirectoryPicker();
+                    await music.saveHandle(directoryHandle);
+                    await music.listTracks();
+                } catch (e) { console.warn("Picker error:", e); }
+            },
+            async listTracks() {
+                if (!directoryHandle) return;
+                state.musicPlaylist = [];
+                try {
+                    for await (const entry of directoryHandle.values()) {
+                        if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.mp3')) {
+                            state.musicPlaylist.push({ name: entry.name, handle: entry });
+                        }
+                    }
+                    state.musicPlaylist.sort((a, b) => a.name.localeCompare(b.name));
+                    ui.renderMusic();
+                    const mc = document.getElementById('music-controls');
+                    const mp = document.getElementById('music-mini-panel');
+                    if (mc) mc.style.display = 'block';
+                    if (mp) mp.style.display = 'flex';
+                } catch (e) {
+                    alert("Nutno znovu povolit přístup ke složce s hudbou.");
+                }
+            },
+            toggle() {
+                if (currentMusicAudio.paused) {
+                    if (currentMusicIndex === -1 && state.musicPlaylist.length > 0) {
+                        music.play(0);
+                    } else {
+                        currentMusicAudio.play();
+                        music.fadeIn();
+                    }
+                } else {
+                    music.fadeOut();
+                }
+            },
+            next() {
+                if (state.musicPlaylist.length === 0) return;
+                let targetIndex;
+                if (state.musicMode === 'random') {
+                    targetIndex = Math.floor(Math.random() * state.musicPlaylist.length);
+                } else {
+                    targetIndex = currentMusicIndex + 1;
+                    if (targetIndex >= state.musicPlaylist.length) targetIndex = 0;
+                }
+                // Crossfade if music is playing and fade duration > 0
+                if (!currentMusicAudio.paused && state.musicFadeDuration > 0) {
+                    music.crossfadeTo(targetIndex);
+                } else {
+                    music.play(targetIndex);
+                }
+            },
+            prev() {
+                if (state.musicPlaylist.length === 0) return;
+                let targetIndex;
+                if (state.musicMode === 'random') {
+                    targetIndex = Math.floor(Math.random() * state.musicPlaylist.length);
+                } else {
+                    targetIndex = currentMusicIndex - 1;
+                    if (targetIndex < 0) targetIndex = state.musicPlaylist.length - 1;
+                }
+                // Crossfade if music is playing and fade duration > 0
+                if (!currentMusicAudio.paused && state.musicFadeDuration > 0) {
+                    music.crossfadeTo(targetIndex);
+                } else {
+                    music.play(targetIndex);
+                }
+            },
+            setVolume(val) {
+                state.volMusic = parseFloat(val);
+                if (!music.fadeInterval && !music.crossfadeInterval) {
+                    currentMusicAudio.volume = state.volMusic;
+                }
+                const disp = document.getElementById('vol-music-disp');
+                if (disp) disp.innerText = Math.round(state.volMusic * 100);
+                admin.saveToStorage(); game.syncProjection();
+            },
+            setAutoEnabled(val) {
+                state.musicAutoEnabled = val;
+                admin.saveToStorage(); game.syncProjection();
+            },
+            setMode(val) {
+                state.musicMode = val;
+                admin.saveToStorage(); game.syncProjection();
+            },
+            setFadeDuration(val) {
+                state.musicFadeDuration = parseFloat(val);
+                document.getElementById('fade-dur-disp').innerText = state.musicFadeDuration;
+                admin.saveToStorage(); game.syncProjection();
+            },
+            setAutoChangeStrategy(val) {
+                state.musicAutoChangeStrategy = val;
+                admin.saveToStorage(); game.syncProjection();
+            },
+            fadeIn() {
+                clearInterval(music.fadeInterval);
+                if (state.musicFadeDuration === 0) {
+                    currentMusicAudio.volume = state.volMusic;
+                    return;
+                }
+                currentMusicAudio.volume = 0;
+                const step = state.volMusic / (state.musicFadeDuration * 20);
+                music.fadeInterval = setInterval(() => {
+                    currentMusicAudio.volume = Math.min(state.volMusic, currentMusicAudio.volume + step);
+                    if (currentMusicAudio.volume >= state.volMusic) {
+                        clearInterval(music.fadeInterval);
+                        music.fadeInterval = null;
+                    }
+                }, 50);
+            },
+            fadeOut() {
+                clearInterval(music.fadeInterval);
+                if (state.musicFadeDuration === 0) {
+                    currentMusicAudio.pause();
+                    return;
+                }
+                const step = currentMusicAudio.volume / (state.musicFadeDuration * 20);
+                music.fadeInterval = setInterval(() => {
+                    currentMusicAudio.volume = Math.max(0, currentMusicAudio.volume - step);
+                    if (currentMusicAudio.volume <= 0) {
+                        clearInterval(music.fadeInterval);
+                        music.fadeInterval = null;
+                        currentMusicAudio.pause();
+                    }
+                }, 50);
+            },
+            startAuto() {
+                if (!state.musicAutoEnabled || state.musicPlaylist.length === 0) return;
+                // Start a new track from beginning (only when first entering auto mode)
+                if (state.musicMode === 'random') {
+                    const idx = Math.floor(Math.random() * state.musicPlaylist.length);
+                    music.play(idx, true);
+                } else {
+                    if (currentMusicIndex === -1) music.play(0, true);
+                    else music.play(currentMusicIndex, true);
+                }
+            },
+            resumeAuto(phaseIndex, previousPhase) {
+                if (!state.musicAutoEnabled || state.musicPlaylist.length === 0) return;
+
+                // Check if we should start a new track based on strategy
+                const shouldStartNew = (
+                    currentMusicIndex === -1 || // No track loaded
+                    (state.musicAutoChangeStrategy === 'per-step' && (phaseIndex === 0 || phaseIndex === 2)) // New track per step
+                );
+
+                if (shouldStartNew) {
+                    // Start new track only if not already playing or if strategy requires it
+                    music.startNewTrack();
+                } else if (currentMusicAudio.paused) {
+                    // Resume from where it was paused
+                    currentMusicAudio.play().then(() => {
+                        music.fadeIn();
+                    }).catch(e => console.warn("Resume failed, likely interupted:", e));
+                }
+            },
+            startNewTrack() {
+                // Start a new track (used by both auto strategies)
+                if (state.musicMode === 'random') {
+                    const idx = Math.floor(Math.random() * state.musicPlaylist.length);
+                    music.play(idx, true);
+                } else {
+                    let nextIdx = currentMusicIndex + 1;
+                    if (nextIdx >= state.musicPlaylist.length) nextIdx = 0;
+                    music.play(nextIdx, true);
+                }
+            },
+            pauseAuto() {
+                if (!state.musicAutoEnabled) return;
+                // Pause (not stop) - will resume from this position
+                if (!currentMusicAudio.paused) {
+                    music.fadeOut();
+                }
+            },
+            stopAuto() {
+                if (!state.musicAutoEnabled) return;
+                music.fadeOut();
+            },
+            reorder(fromIndex, toIndex) {
+                const item = state.musicPlaylist.splice(fromIndex, 1)[0];
+                state.musicPlaylist.splice(toIndex, 0, item);
+                state.musicPlaylistOrder = state.musicPlaylist.map(t => t.name);
+                admin.saveToStorage(); game.syncProjection();
+                ui.renderMusic();
+            },
+            crossfadeTo(index) {
+                // True crossfade: both tracks play simultaneously
+                clearInterval(music.crossfadeInterval);
+
+                // Determine which audio element to use for the new track
+                const oldAudio = currentMusicAudio;
+                const newAudio = (currentMusicAudio === musicAudioA) ? musicAudioB : musicAudioA;
+
+                // Load and start the new track
+                music.loadTrack(newAudio, index).then(() => {
+                    newAudio.volume = 0;
+                    newAudio.play();
+
+                    // Crossfade: old fades out, new fades in
+                    const steps = state.musicFadeDuration * 20;
+                    const oldStep = oldAudio.volume / steps;
+                    const newStep = state.volMusic / steps;
+                    let stepCount = 0;
+
+                    music.crossfadeInterval = setInterval(() => {
+                        stepCount++;
+                        oldAudio.volume = Math.max(0, oldAudio.volume - oldStep);
+                        newAudio.volume = Math.min(state.volMusic, newAudio.volume + newStep);
+
+                        if (stepCount >= steps) {
+                            clearInterval(music.crossfadeInterval);
+                            music.crossfadeInterval = null;
+                            oldAudio.pause();
+                            oldAudio.volume = state.volMusic; // Reset for next use
+                            currentMusicAudio = newAudio; // Switch active audio
+                        }
+                    }, 50);
+                }).catch(e => {
+                    console.error("Crossfade error:", e);
+                });
+            },
+            async loadTrack(audioElement, index) {
+                const track = state.musicPlaylist[index];
+                const file = await track.handle.getFile();
+                const url = URL.createObjectURL(file);
+                audioElement.src = url;
+                currentMusicIndex = index;
+                document.getElementById('current-track-name').textContent = track.name;
+                ui.renderMusic();
+            },
+            async play(index, isAuto = false) {
+                if (index < 0 || index >= state.musicPlaylist.length) return;
+                try {
+                    await music.loadTrack(currentMusicAudio, index);
+
+                    // CRITICAL: Double check if we are still in a musical phase after async load
+                    // Musical phases are 0 (Nastupuje) and 2 (Přestávka)
+                    const pIdx = state.currentMatch.phaseIndex;
+                    const isMusicalPhase = (pIdx === 0 || pIdx === 2);
+
+                    if (isAuto && !isMusicalPhase) {
+                        console.log("Music play cancelled: current phase is not musical", pIdx);
+                        return;
+                    }
+
+                    if (isAuto || state.musicFadeDuration > 0) {
+                        currentMusicAudio.volume = 0;
+                        currentMusicAudio.play().then(() => {
+                            music.fadeIn();
+                        }).catch(e => console.warn("Auto play interupted:", e));
+                    } else {
+                        currentMusicAudio.volume = state.volMusic;
+                        currentMusicAudio.play().catch(e => console.warn("Manual play failed:", e));
+                    }
+                } catch (e) {
+                    console.error("Play error:", e);
+                    if (!isAuto) alert("Chyba při přehrávání.");
+                }
+            }
+        };
+
+        const jingles = {
+            async openDB() {
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open("JingleDB", 1);
+                    req.onupgradeneeded = () => {
+                        const db = req.result;
+                        if (!db.objectStoreNames.contains("files")) {
+                            db.createObjectStore("files", { keyPath: "name" });
+                        }
+                    };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            },
+            async setMode(val) {
+                state.jingleMode = val;
+                admin.saveToStorage();
+            },
+            async handleUpload(input) {
+                if (!input.files || input.files.length === 0) return;
+                const db = await jingles.openDB();
+                const tx = db.transaction("files", "readwrite");
+                const store = tx.objectStore("files");
+
+                let loaded = 0;
+                for (const file of input.files) {
+                    store.put({ name: file.name, data: file });
+                    loaded++;
+                }
+
+                tx.oncomplete = () => {
+                    jingles.list();
+                    alert(`Nahráno ${loaded} jinglů.`);
+                    input.value = "";
+                };
+            },
+            async list() {
+                try {
+                    const db = await jingles.openDB();
+                    const tx = db.transaction("files", "readonly");
+                    const store = tx.objectStore("files");
+                    const req = store.getAllKeys();
+
+                    req.onsuccess = () => {
+                        const keys = req.result;
+                        state.jinglePool = keys;
+                        const countEl = document.getElementById('jingle-pool-count');
+                        if (countEl) countEl.innerText = `Počet jinglů: ${keys.length}`;
+
+                        const listEl = document.getElementById('jingle-pool-list');
+                        if (listEl) {
+                            listEl.innerHTML = keys.map(k => `<div style="padding:2px 0;">• ${k}</div>`).join('');
+                        }
+                    };
+                } catch (e) {
+                    console.error("Jingle list error:", e);
+                }
+            },
+            async clear() {
+                if (!confirm("Opravdu chcete vymazat celý zásobník jinglů?")) return;
+                const db = await jingles.openDB();
+                const tx = db.transaction("files", "readwrite");
+                tx.objectStore("files").clear();
+                tx.oncomplete = () => {
+                    jingles.list();
+                };
+            },
+            async getRandomJingle() {
+                if (state.jinglePool.length === 0) return null;
+                const db = await jingles.openDB();
+                const tx = db.transaction("files", "readonly");
+                const store = tx.objectStore("files");
+                const randomName = state.jinglePool[Math.floor(Math.random() * state.jinglePool.length)];
+
+                return new Promise(resolve => {
+                    const req = store.get(randomName);
+                    req.onsuccess = () => resolve(req.result ? req.result.data : null);
+                    req.onerror = () => resolve(null);
+                });
+            }
+        };
+
+        // ===================================================================================
+        // ADMINISTRATIVA (ADMIN)
+        // ===================================================================================
         // --- ADMIN HELPERS ---
         const admin = {
             saveSettings: (showAlert = true) => {
@@ -2676,26 +3105,65 @@
                 label.innerText = "#" + (index + 1);
 
                 // Surname
+                const surnameWrapper = document.createElement('div');
+                surnameWrapper.className = "suggestion-container";
+                surnameWrapper.style.flex = "2";
+                surnameWrapper.style.position = "relative";
+
                 const surnameInput = document.createElement('input');
                 surnameInput.type = "text";
                 surnameInput.placeholder = "Příjmení";
                 surnameInput.value = item.surname || "";
-                surnameInput.style.flex = "2";
+                surnameInput.style.width = "100%";
+
+                const sSugBox = document.createElement('div');
+                sSugBox.className = "suggestion-box";
+                sSugBox.style.display = "none";
+                sSugBox.style.width = "450px"; // Wider as requested
+                sSugBox.style.zIndex = "1100";
+
                 surnameInput.oninput = () => {
                     item.surname = surnameInput.value;
+                    const mp = state.masterPlayers.find(p => p.id === item.id);
+                    if (mp) mp.surname = item.surname;
+                    admin.showPlayerSuggestions(surnameInput, sSugBox, { context: 'players-list', playerRowItem: item, surnameInput });
                     admin.saveToStorage(); game.syncProjection();
                 };
+                surnameInput.onblur = () => setTimeout(() => { sSugBox.style.display = 'none'; }, 200);
+
+                surnameWrapper.appendChild(surnameInput);
+                surnameWrapper.appendChild(sSugBox);
 
                 // Name
+                const nameWrapper = document.createElement('div');
+                nameWrapper.className = "suggestion-container";
+                nameWrapper.style.flex = "2";
+                nameWrapper.style.position = "relative";
+
                 const nameInput = document.createElement('input');
                 nameInput.type = "text";
                 nameInput.placeholder = "Jméno";
                 nameInput.value = item.firstName || "";
-                nameInput.style.flex = "2";
+                nameInput.style.width = "100%";
+
+                const nSugBox = document.createElement('div');
+                nSugBox.className = "suggestion-box";
+                nSugBox.style.display = "none";
+                nSugBox.style.width = "450px"; // Wider as requested
+                nSugBox.style.left = "-205px"; // Offset so it spans across row if name field is middle
+                nSugBox.style.zIndex = "1100";
+
                 nameInput.oninput = () => {
                     item.firstName = nameInput.value;
+                    const mp = state.masterPlayers.find(p => p.id === item.id);
+                    if (mp) mp.firstName = item.firstName;
+                    admin.showPlayerSuggestions(nameInput, nSugBox, { context: 'players-list', playerRowItem: item, nameInput });
                     admin.saveToStorage(); game.syncProjection();
                 };
+                nameInput.onblur = () => setTimeout(() => { nSugBox.style.display = 'none'; }, 200);
+
+                nameWrapper.appendChild(nameInput);
+                nameWrapper.appendChild(nSugBox);
 
                 // UCI-ID
                 const uciInput = document.createElement('input');
@@ -2712,6 +3180,8 @@
                     } else {
                         uciInput.style.border = "";
                         item.uciId = newVal;
+                        const mp = state.masterPlayers.find(p => p.id === item.id);
+                        if (mp) mp.uciId = item.uciId;
                         // If UCI-ID is set, we could potentially use it as ID, 
                         // but it's safer to keep the persistent internal ID for references 
                         // and just use UCI-ID for reconciling during import/export.
@@ -2729,8 +3199,8 @@
                 };
 
                 div.appendChild(label);
-                div.appendChild(surnameInput);
-                div.appendChild(nameInput);
+                div.appendChild(surnameWrapper);
+                div.appendChild(nameWrapper);
                 div.appendChild(uciInput);
                 div.appendChild(removeBtn);
                 container.appendChild(div);
@@ -2801,24 +3271,31 @@
 
                     const playerInput = document.createElement('input');
                     playerInput.type = "text";
-                    playerInput.placeholder = "Hledat/přidat hráče...";
+                    playerInput.placeholder = "Hledat v soupisce..."; // More accurate placeholder
                     playerInput.style.fontSize = "0.75em";
                     playerInput.style.padding = "4px 8px";
 
                     const suggestionBox = document.createElement('div');
                     suggestionBox.className = "suggestion-box";
+                    suggestionBox.style.display = "none";
 
-                    playerInput.oninput = () => admin.showPlayerSuggestions(playerInput, suggestionBox, item, chipsContainer);
-                    playerInput.onblur = () => setTimeout(() => { suggestionBox.style.display = "none"; }, 200);
+                    playerInput.oninput = () => {
+                        admin.showPlayerSuggestions(playerInput, suggestionBox, {
+                            context: 'team-assign',
+                            team: item,
+                            chipsContainer: chipsContainer
+                        });
+                    };
+                    playerInput.onblur = () => setTimeout(() => { suggestionBox.style.display = 'none'; }, 200);
 
                     suggestWrapper.appendChild(playerInput);
                     suggestWrapper.appendChild(suggestionBox);
+
+                    admin.renderPlayerChips(chipsContainer, item);
+
                     playerSection.appendChild(chipsContainer);
                     playerSection.appendChild(suggestWrapper);
                     div.appendChild(playerSection);
-
-                    // Call this AFTER appending suggestWrapper so it can find it as a sibling
-                    admin.renderPlayerChips(chipsContainer, item);
                 }
 
                 div.appendChild(removeBtn);
@@ -2855,7 +3332,7 @@
                 }
             },
 
-            showPlayerSuggestions: (input, suggestionBox, team, chipsContainer) => {
+            showPlayerSuggestions: (input, suggestionBox, contextData) => {
                 const val = input.value.trim().toLowerCase();
                 suggestionBox.innerHTML = "";
                 if (!val) {
@@ -2863,54 +3340,70 @@
                     return;
                 }
 
-                const matches = state.players.filter(p =>
-                    (p.surname + " " + p.firstName + " " + (p.uciId || "")).toLowerCase().includes(val) &&
-                    !(team.playerIds || []).includes(p.id)
-                ).slice(0, 5);
+                const { context, team, chipsContainer, playerRowItem, surnameInput, nameInput } = contextData;
+                let matches = [];
+
+                if (context === 'team-assign') {
+                    // Search strictly in tournament players
+                    matches = state.players.filter(p =>
+                        (p.surname + " " + p.firstName + " " + (p.uciId || "")).toLowerCase().includes(val) &&
+                        !(team.playerIds || []).includes(p.id)
+                    ).slice(0, 5);
+                } else if (context === 'players-list') {
+                    // Search in Global Master DB
+                    matches = state.masterPlayers.filter(p =>
+                        (p.surname + " " + p.firstName + " " + (p.uciId || "")).toLowerCase().includes(val)
+                    ).slice(0, 5);
+                }
 
                 matches.forEach(p => {
                     const item = document.createElement('div');
                     item.className = "suggestion-item";
                     item.innerText = `${p.surname} ${p.firstName} ${p.uciId ? `(${p.uciId})` : ""}`;
                     item.onclick = () => {
-                        if (!team.playerIds) team.playerIds = [];
-                        if (team.playerIds.length < 2) {
-                            team.playerIds.push(p.id);
-                            input.value = "";
+                        if (context === 'team-assign') {
+                            if (!team.playerIds) team.playerIds = [];
+                            if (team.playerIds.length < 2) {
+                                team.playerIds.push(p.id);
+                                input.value = "";
+                                suggestionBox.style.display = "none";
+                                admin.renderPlayerChips(chipsContainer, team);
+                                admin.renderIdentityInputs();
+                                admin.saveToStorage(); game.syncProjection();
+                            } else {
+                                alert("Družstvo může mít maximálně 2 hráče.");
+                            }
+                        } else if (context === 'players-list') {
+                            const oldId = playerRowItem.id;
+
+                            // Fill the row in tournament list with suggested data
+                            playerRowItem.id = p.id;
+                            playerRowItem.surname = p.surname;
+                            playerRowItem.firstName = p.firstName;
+                            playerRowItem.uciId = p.uciId;
+
+                            // If we swapped ID, we need to remove the "ghost" entry with the old ID
+                            // from the tournament list (it was either empty or a partially typed name)
+                            if (oldId !== p.id) {
+                                state.players = state.players.filter(tp => tp.id !== oldId);
+                                // Note: we keep the oldId in masterPlayers just in case the user 
+                                // was editing an existing master player, but in state.players 
+                                // we only want one entry for this row.
+                            }
+
+                            input.value = (surnameInput ? p.surname : p.firstName);
+                            if (surnameInput && nameInput) {
+                                surnameInput.value = p.surname;
+                                nameInput.value = p.firstName;
+                            }
                             suggestionBox.style.display = "none";
-                            admin.renderPlayerChips(chipsContainer, team);
-                            admin.saveToStorage(); game.syncProjection();
-                        } else {
-                            alert("Družstvo může mít maximálně 2 hráče.");
+                            admin.renderIdentityInputs();
+                            admin.saveToStorage();
                         }
                     };
                     suggestionBox.appendChild(item);
                 });
 
-                // Add "Add New Player" option
-                const addNew = document.createElement('div');
-                addNew.className = "suggestion-item add-new";
-                addNew.innerText = `+ Přidat jako nového hráče: "${input.value}"`;
-                addNew.onclick = () => {
-                    const id = "player_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-                    const parts = input.value.trim().split(/\s+/);
-                    const surname = parts[0] || "";
-                    const firstName = parts.slice(1).join(" ") || "";
-                    const newPlayer = { id, surname, firstName, uciId: "" };
-                    state.players.push(newPlayer);
-
-                    if (!team.playerIds) team.playerIds = [];
-                    if (team.playerIds.length < 2) {
-                        team.playerIds.push(id);
-                    }
-
-                    input.value = "";
-                    suggestionBox.style.display = "none";
-                    admin.renderPlayerChips(chipsContainer, team);
-                    admin.renderIdentityInputs(); // Refresh the main players list too
-                    admin.saveToStorage(); game.syncProjection();
-                };
-                suggestionBox.appendChild(addNew);
                 suggestionBox.style.display = "block";
             },
 
@@ -2956,7 +3449,9 @@
 
             addPlayerSlot: () => {
                 const id = "player_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-                state.players.push({ id, surname: "", firstName: "", uciId: "" });
+                const newPlayer = { id, surname: "", firstName: "", uciId: "" };
+                state.players.push({ ...newPlayer });
+                state.masterPlayers.push({ ...newPlayer });
                 admin.renderIdentityInputs();
                 admin.saveSettings(false);
             },
@@ -3030,14 +3525,22 @@
                 btn.disabled = true;
 
                 try {
-                    // Try multiple Google Drive URL formats
+                    // 1. Prepare clean file ID
+                    const cleanFileId = fileId.trim();
+
+                    // 2. Define methods to try (Direct -> AllOrigins -> CORSProxy)
+                    // Note: 'https://drive.google.com/uc?export=download&id=' is the standard export URL
+                    const exportUrl = `https://drive.google.com/uc?export=download&id=${cleanFileId}`;
+
                     const methods = [
-                        // Method 1: Direct download link
-                        `https://drive.google.com/uc?export=download&id=${fileId}`,
-                        // Method 2: Alternative format
-                        `https://drive.usercontent.google.com/download?id=${fileId}&export=download`,
-                        // Method 3: Via CORS proxy
-                        `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`)}`
+                        // Method 1: Direct fetch (works if same-origin or CORS headers allow - rare for Drive)
+                        exportUrl,
+                        // Method 2: AllOrigins Proxy (reliable free proxy)
+                        `https://api.allorigins.win/raw?url=${encodeURIComponent(exportUrl)}`,
+                        // Method 3: CORSProxy.io (another reliable proxy)
+                        `https://corsproxy.io/?${encodeURIComponent(exportUrl)}`,
+                        // Method 4: Fallback alternate Drive URL (sometimes works differently)
+                        `https://drive.usercontent.google.com/download?id=${cleanFileId}&export=download`
                     ];
 
                     let lastError = null;
@@ -3046,26 +3549,51 @@
                     for (let i = 0; i < methods.length; i++) {
                         const url = methods[i];
                         try {
-                            console.log(`Pokus ${i + 1}/${methods.length}:`, url);
+                            console.log(`Cloud Sync: Zkouším metodu ${i + 1}/${methods.length}...`);
                             const resp = await fetch(url);
-                            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+                            if (!resp.ok) {
+                                // If 403/401, it's definitely a permission issue
+                                if (resp.status === 403 || resp.status === 401) {
+                                    throw new Error(`Přístup odepřen (HTTP ${resp.status}). Je soubor sdílený pro "Každý s odkazem"?`);
+                                }
+                                throw new Error(`HTTP ${resp.status}`);
+                            }
 
                             const text = await resp.text();
-                            if (text.trim().startsWith('<')) throw new Error("HTML místo JSON");
 
-                            imported = JSON.parse(text);
-                            if (!Array.isArray(imported)) throw new Error("Není pole");
+                            // Google Drive sometimes returns an HTML login page instead of the file
+                            if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
+                                throw new Error("Stažen HTML namísto JSON. (Pravděpodobně vyžaduje přihlášení - zkontrolujte sdílení).");
+                            }
 
-                            console.log("✓ Úspěch metodou", i + 1);
+                            try {
+                                imported = JSON.parse(text);
+                            } catch (e) {
+                                throw new Error("Stažená data nejsou platný JSON.");
+                            }
+
+                            if (!Array.isArray(imported)) throw new Error("Stažený JSON není pole hráčů.");
+
+                            console.log("✓ Cloud Sync: Úspěch metodou", i + 1);
                             break;
                         } catch (err) {
                             lastError = err;
-                            console.warn(`✗ Metoda ${i + 1} selhala:`, err.message);
+                            console.warn(`✗ Cloud Sync: Metoda ${i + 1} selhala:`, err.message);
                         }
                     }
 
                     if (!imported) {
-                        throw new Error(`Všechny metody selhaly.\n\nPoslední chyba: ${lastError?.message}\n\nZkontrolujte File ID a sdílení.`);
+                        // Construct a helpful error message
+                        let msg = "Všechny pokusy o stažení selhaly.\n\n";
+                        if (lastError?.message.includes("HTML") || lastError?.message.includes("Přístup odepřen")) {
+                            msg += "DŮVOD: Soubor pravděpodobně není veřejně sdílený.\n";
+                            msg += "ŘEŠENÍ: Na Google Disku nastavte sdílení na 'Každý s odkazem má přístup' (Anyone with the link).";
+                        } else {
+                            msg += `POSLEDNÍ CHYBA: ${lastError?.message}\n`;
+                            msg += "ZKONTROLUJTE: Je File ID správné? Máte připojení k internetu?";
+                        }
+                        throw new Error(msg);
                     }
 
                     // Reuse the existing conflict logic
@@ -3085,19 +3613,28 @@
                 const newEntries = [];
 
                 imported.forEach(pImp => {
-                    const byUci = pImp.uciId ? state.players.find(p => p.uciId === pImp.uciId) : null;
-                    const byName = state.players.find(p =>
+                    const byUci = pImp.uciId ? state.masterPlayers.find(p => p.uciId === pImp.uciId) : null;
+                    const byName = state.masterPlayers.find(p =>
                         p.surname?.toLowerCase() === pImp.surname?.toLowerCase() &&
                         p.firstName?.toLowerCase() === pImp.firstName?.toLowerCase()
                     );
 
-                    if (byUci || byName) {
-                        conflicts.push({
-                            imported: pImp,
-                            existing: byUci || byName,
-                            type: byUci ? 'uci' : 'name',
-                            choice: 'keep'
-                        });
+                    const existing = byUci || byName;
+                    if (existing) {
+                        // Check if it's an exact match (ignoring ID differences)
+                        const isExactMatch =
+                            existing.surname?.toLowerCase() === pImp.surname?.toLowerCase() &&
+                            existing.firstName?.toLowerCase() === pImp.firstName?.toLowerCase() &&
+                            (existing.uciId || "") === (pImp.uciId || "");
+
+                        if (!isExactMatch) {
+                            conflicts.push({
+                                imported: pImp,
+                                existing: existing,
+                                type: byUci ? 'uci' : 'name',
+                                choice: 'keep'
+                            });
+                        }
                     } else {
                         newEntries.push(pImp);
                     }
@@ -3108,11 +3645,10 @@
                 } else {
                     newEntries.forEach(p => {
                         if (!p.id) p.id = "player_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-                        state.players.push(p);
+                        state.masterPlayers.push(p);
                     });
-                    admin.renderIdentityInputs();
-                    admin.saveToStorage(); game.syncProjection();
-                    alert(`Importováno ${newEntries.length} nových hráčů.`);
+                    admin.saveToStorage();
+                    alert(`Importováno ${newEntries.length} nových hráčů do hlavní databáze.`);
                 }
             },
 
@@ -3153,13 +3689,22 @@
                                 p.firstName?.toLowerCase() === pImp.firstName?.toLowerCase()
                             );
 
-                            if (byUci || byName) {
-                                conflicts.push({
-                                    imported: pImp,
-                                    existing: byUci || byName,
-                                    type: byUci ? 'uci' : 'name',
-                                    choice: 'keep' // Default choice
-                                });
+                            const existing = byUci || byName;
+                            if (existing) {
+                                // Ignore exact matches
+                                const isExactMatch =
+                                    existing.surname?.toLowerCase() === pImp.surname?.toLowerCase() &&
+                                    existing.firstName?.toLowerCase() === pImp.firstName?.toLowerCase() &&
+                                    (existing.uciId || "") === (pImp.uciId || "");
+
+                                if (!isExactMatch) {
+                                    conflicts.push({
+                                        imported: pImp,
+                                        existing: existing,
+                                        type: byUci ? 'uci' : 'name',
+                                        choice: 'keep'
+                                    });
+                                }
                             } else {
                                 newEntries.push(pImp);
                             }
@@ -3168,14 +3713,13 @@
                         if (conflicts.length > 0) {
                             admin.showConflictReview(conflicts, newEntries);
                         } else {
-                            // No conflicts, just merge
+                            // No conflicts, just merge to master
                             newEntries.forEach(p => {
                                 if (!p.id) p.id = "player_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-                                state.players.push(p);
+                                state.masterPlayers.push(p);
                             });
-                            admin.renderIdentityInputs();
-                            admin.saveToStorage(); game.syncProjection();
-                            alert(`Importováno ${newEntries.length} nových hráčů.`);
+                            admin.saveToStorage();
+                            alert(`Importováno ${newEntries.length} nových hráčů do hlavní databáze.`);
                         }
                     } catch (err) {
                         alert("Chyba při importu: " + err.message);
@@ -3201,12 +3745,12 @@
                         <div class="conflict-header">${headerTxt}</div>
                         <div class="conflict-grid">
                             <div class="conflict-cell">
-                                <span class="conflict-label">Stávající v OmS</span>
+                                <span class="conflict-label">Stávající v hlavní DB</span>
                                 <div class="conflict-value">${conf.existing.surname} ${conf.existing.firstName}</div>
                                 <div class="conflict-value" style="font-size:0.8em; color:#888;">UCI: ${conf.existing.uciId || "-"}</div>
                             </div>
                             <div class="conflict-cell" style="border-left:1px solid #333;">
-                                <span class="conflict-label">V importovaném souboru</span>
+                                <span class="conflict-label">V importu (Cloud/Soubor)</span>
                                 <div class="conflict-value ${conf.existing.surname !== conf.imported.surname || conf.existing.firstName !== conf.imported.firstName ? 'val-diff' : ''}">
                                     ${conf.imported.surname} ${conf.imported.firstName}
                                 </div>
@@ -3235,23 +3779,25 @@
                     data.conflicts.forEach(c => {
                         if (c.choice === 'update') {
                             Object.assign(c.existing, c.imported);
+                            // Also update references in current tourney players if they exist there
+                            const inTourney = state.players.find(p => p.id === c.existing.id);
+                            if (inTourney) Object.assign(inTourney, c.imported);
                         } else if (c.choice === 'both') {
                             const p = { ...c.imported };
                             p.id = "player_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-                            state.players.push(p);
+                            state.masterPlayers.push(p);
                         }
-                        // 'keep' does nothing
                     });
 
                     data.newEntries.forEach(p => {
                         if (!p.id) p.id = "player_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-                        state.players.push(p);
+                        state.masterPlayers.push(p);
                     });
 
                     modal.style.display = 'none';
                     admin.renderIdentityInputs();
                     admin.saveToStorage(); game.syncProjection();
-                    alert(`Import dokončen.`);
+                    alert(`Import do hlavní databáze dokončen.`);
                 };
             },
 
@@ -4171,6 +4717,7 @@
                     if (typeof parsed.volAnthem !== 'undefined') state.volAnthem = parsed.volAnthem;
                     if (parsed.referees) state.referees = parsed.referees;
                     if (parsed.players) state.players = parsed.players;
+                    if (parsed.masterPlayers) state.masterPlayers = parsed.masterPlayers;
                     if (parsed.schedule) state.schedule = parsed.schedule;
                     if (parsed.audioData) state.audioData = parsed.audioData;
                     if (parsed.theme) state.theme = parsed.theme;
@@ -4395,376 +4942,7 @@
             }
         };
 
-        const music = {
-            fadeInterval: null,
-            async openDB() {
-                return new Promise((resolve, reject) => {
-                    const req = indexedDB.open("MusicDB", 1);
-                    req.onupgradeneeded = () => req.result.createObjectStore("handles");
-                    req.onsuccess = () => resolve(req.result);
-                    req.onerror = () => reject(req.error);
-                });
-            },
-            async saveHandle(handle) {
-                const db = await music.openDB();
-                const tx = db.transaction("handles", "readwrite");
-                tx.objectStore("handles").put(handle, "lastDirectory");
-            },
-            async getHandle() {
-                try {
-                    const db = await music.openDB();
-                    const tx = db.transaction("handles", "readonly");
-                    const req = tx.objectStore("handles").get("lastDirectory");
-                    return new Promise(resolve => {
-                        req.onsuccess = () => resolve(req.result);
-                        req.onerror = () => resolve(null);
-                    });
-                } catch (e) { return null; }
-            },
-            async pickDirectory() {
-                try {
-                    directoryHandle = await window.showDirectoryPicker();
-                    await music.saveHandle(directoryHandle);
-                    await music.listTracks();
-                } catch (e) { console.warn("Picker error:", e); }
-            },
-            async listTracks() {
-                if (!directoryHandle) return;
-                state.musicPlaylist = [];
-                try {
-                    for await (const entry of directoryHandle.values()) {
-                        if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.mp3')) {
-                            state.musicPlaylist.push({ name: entry.name, handle: entry });
-                        }
-                    }
-                    state.musicPlaylist.sort((a, b) => a.name.localeCompare(b.name));
-                    ui.renderMusic();
-                    const mc = document.getElementById('music-controls');
-                    const mp = document.getElementById('music-mini-panel');
-                    if (mc) mc.style.display = 'block';
-                    if (mp) mp.style.display = 'flex';
-                } catch (e) {
-                    alert("Nutno znovu povolit přístup ke složce s hudbou.");
-                }
-            },
-            toggle() {
-                if (currentMusicAudio.paused) {
-                    if (currentMusicIndex === -1 && state.musicPlaylist.length > 0) {
-                        music.play(0);
-                    } else {
-                        currentMusicAudio.play();
-                        music.fadeIn();
-                    }
-                } else {
-                    music.fadeOut();
-                }
-            },
-            next() {
-                if (state.musicPlaylist.length === 0) return;
-                let targetIndex;
-                if (state.musicMode === 'random') {
-                    targetIndex = Math.floor(Math.random() * state.musicPlaylist.length);
-                } else {
-                    targetIndex = currentMusicIndex + 1;
-                    if (targetIndex >= state.musicPlaylist.length) targetIndex = 0;
-                }
-                // Crossfade if music is playing and fade duration > 0
-                if (!currentMusicAudio.paused && state.musicFadeDuration > 0) {
-                    music.crossfadeTo(targetIndex);
-                } else {
-                    music.play(targetIndex);
-                }
-            },
-            prev() {
-                if (state.musicPlaylist.length === 0) return;
-                let targetIndex;
-                if (state.musicMode === 'random') {
-                    targetIndex = Math.floor(Math.random() * state.musicPlaylist.length);
-                } else {
-                    targetIndex = currentMusicIndex - 1;
-                    if (targetIndex < 0) targetIndex = state.musicPlaylist.length - 1;
-                }
-                // Crossfade if music is playing and fade duration > 0
-                if (!currentMusicAudio.paused && state.musicFadeDuration > 0) {
-                    music.crossfadeTo(targetIndex);
-                } else {
-                    music.play(targetIndex);
-                }
-            },
-            setVolume(val) {
-                state.volMusic = parseFloat(val);
-                if (!music.fadeInterval && !music.crossfadeInterval) {
-                    currentMusicAudio.volume = state.volMusic;
-                }
-                const disp = document.getElementById('vol-music-disp');
-                if (disp) disp.innerText = Math.round(state.volMusic * 100);
-                admin.saveToStorage(); game.syncProjection();
-            },
-            setAutoEnabled(val) {
-                state.musicAutoEnabled = val;
-                admin.saveToStorage(); game.syncProjection();
-            },
-            setMode(val) {
-                state.musicMode = val;
-                admin.saveToStorage(); game.syncProjection();
-            },
-            setFadeDuration(val) {
-                state.musicFadeDuration = parseFloat(val);
-                document.getElementById('fade-dur-disp').innerText = state.musicFadeDuration;
-                admin.saveToStorage(); game.syncProjection();
-            },
-            setAutoChangeStrategy(val) {
-                state.musicAutoChangeStrategy = val;
-                admin.saveToStorage(); game.syncProjection();
-            },
-            fadeIn() {
-                clearInterval(music.fadeInterval);
-                if (state.musicFadeDuration === 0) {
-                    currentMusicAudio.volume = state.volMusic;
-                    return;
-                }
-                currentMusicAudio.volume = 0;
-                const step = state.volMusic / (state.musicFadeDuration * 20);
-                music.fadeInterval = setInterval(() => {
-                    currentMusicAudio.volume = Math.min(state.volMusic, currentMusicAudio.volume + step);
-                    if (currentMusicAudio.volume >= state.volMusic) {
-                        clearInterval(music.fadeInterval);
-                        music.fadeInterval = null;
-                    }
-                }, 50);
-            },
-            fadeOut() {
-                clearInterval(music.fadeInterval);
-                if (state.musicFadeDuration === 0) {
-                    currentMusicAudio.pause();
-                    return;
-                }
-                const step = currentMusicAudio.volume / (state.musicFadeDuration * 20);
-                music.fadeInterval = setInterval(() => {
-                    currentMusicAudio.volume = Math.max(0, currentMusicAudio.volume - step);
-                    if (currentMusicAudio.volume <= 0) {
-                        clearInterval(music.fadeInterval);
-                        music.fadeInterval = null;
-                        currentMusicAudio.pause();
-                    }
-                }, 50);
-            },
-            startAuto() {
-                if (!state.musicAutoEnabled || state.musicPlaylist.length === 0) return;
-                // Start a new track from beginning (only when first entering auto mode)
-                if (state.musicMode === 'random') {
-                    const idx = Math.floor(Math.random() * state.musicPlaylist.length);
-                    music.play(idx, true);
-                } else {
-                    if (currentMusicIndex === -1) music.play(0, true);
-                    else music.play(currentMusicIndex, true);
-                }
-            },
-            resumeAuto(phaseIndex, previousPhase) {
-                if (!state.musicAutoEnabled || state.musicPlaylist.length === 0) return;
 
-                // Check if we should start a new track based on strategy
-                const shouldStartNew = (
-                    currentMusicIndex === -1 || // No track loaded
-                    (state.musicAutoChangeStrategy === 'per-step' && (phaseIndex === 0 || phaseIndex === 2)) // New track per step
-                );
-
-                if (shouldStartNew) {
-                    // Start new track only if not already playing or if strategy requires it
-                    music.startNewTrack();
-                } else if (currentMusicAudio.paused) {
-                    // Resume from where it was paused
-                    currentMusicAudio.play().then(() => {
-                        music.fadeIn();
-                    }).catch(e => console.warn("Resume failed, likely interupted:", e));
-                }
-            },
-            startNewTrack() {
-                // Start a new track (used by both auto strategies)
-                if (state.musicMode === 'random') {
-                    const idx = Math.floor(Math.random() * state.musicPlaylist.length);
-                    music.play(idx, true);
-                } else {
-                    let nextIdx = currentMusicIndex + 1;
-                    if (nextIdx >= state.musicPlaylist.length) nextIdx = 0;
-                    music.play(nextIdx, true);
-                }
-            },
-            pauseAuto() {
-                if (!state.musicAutoEnabled) return;
-                // Pause (not stop) - will resume from this position
-                if (!currentMusicAudio.paused) {
-                    music.fadeOut();
-                }
-            },
-            stopAuto() {
-                if (!state.musicAutoEnabled) return;
-                music.fadeOut();
-            },
-            reorder(fromIndex, toIndex) {
-                const item = state.musicPlaylist.splice(fromIndex, 1)[0];
-                state.musicPlaylist.splice(toIndex, 0, item);
-                state.musicPlaylistOrder = state.musicPlaylist.map(t => t.name);
-                admin.saveToStorage(); game.syncProjection();
-                ui.renderMusic();
-            },
-            crossfadeTo(index) {
-                // True crossfade: both tracks play simultaneously
-                clearInterval(music.crossfadeInterval);
-
-                // Determine which audio element to use for the new track
-                const oldAudio = currentMusicAudio;
-                const newAudio = (currentMusicAudio === musicAudioA) ? musicAudioB : musicAudioA;
-
-                // Load and start the new track
-                music.loadTrack(newAudio, index).then(() => {
-                    newAudio.volume = 0;
-                    newAudio.play();
-
-                    // Crossfade: old fades out, new fades in
-                    const steps = state.musicFadeDuration * 20;
-                    const oldStep = oldAudio.volume / steps;
-                    const newStep = state.volMusic / steps;
-                    let stepCount = 0;
-
-                    music.crossfadeInterval = setInterval(() => {
-                        stepCount++;
-                        oldAudio.volume = Math.max(0, oldAudio.volume - oldStep);
-                        newAudio.volume = Math.min(state.volMusic, newAudio.volume + newStep);
-
-                        if (stepCount >= steps) {
-                            clearInterval(music.crossfadeInterval);
-                            music.crossfadeInterval = null;
-                            oldAudio.pause();
-                            oldAudio.volume = state.volMusic; // Reset for next use
-                            currentMusicAudio = newAudio; // Switch active audio
-                        }
-                    }, 50);
-                }).catch(e => {
-                    console.error("Crossfade error:", e);
-                });
-            },
-            async loadTrack(audioElement, index) {
-                const track = state.musicPlaylist[index];
-                const file = await track.handle.getFile();
-                const url = URL.createObjectURL(file);
-                audioElement.src = url;
-                currentMusicIndex = index;
-                document.getElementById('current-track-name').textContent = track.name;
-                ui.renderMusic();
-            },
-            async play(index, isAuto = false) {
-                if (index < 0 || index >= state.musicPlaylist.length) return;
-                try {
-                    await music.loadTrack(currentMusicAudio, index);
-
-                    // CRITICAL: Double check if we are still in a musical phase after async load
-                    // Musical phases are 0 (Nastupuje) and 2 (Přestávka)
-                    const pIdx = state.currentMatch.phaseIndex;
-                    const isMusicalPhase = (pIdx === 0 || pIdx === 2);
-
-                    if (isAuto && !isMusicalPhase) {
-                        console.log("Music play cancelled: current phase is not musical", pIdx);
-                        return;
-                    }
-
-                    if (isAuto || state.musicFadeDuration > 0) {
-                        currentMusicAudio.volume = 0;
-                        currentMusicAudio.play().then(() => {
-                            music.fadeIn();
-                        }).catch(e => console.warn("Auto play interupted:", e));
-                    } else {
-                        currentMusicAudio.volume = state.volMusic;
-                        currentMusicAudio.play().catch(e => console.warn("Manual play failed:", e));
-                    }
-                } catch (e) {
-                    console.error("Play error:", e);
-                    if (!isAuto) alert("Chyba při přehrávání.");
-                }
-            }
-        };
-
-        const jingles = {
-            async openDB() {
-                return new Promise((resolve, reject) => {
-                    const req = indexedDB.open("JingleDB", 1);
-                    req.onupgradeneeded = () => {
-                        const db = req.result;
-                        if (!db.objectStoreNames.contains("files")) {
-                            db.createObjectStore("files", { keyPath: "name" });
-                        }
-                    };
-                    req.onsuccess = () => resolve(req.result);
-                    req.onerror = () => reject(req.error);
-                });
-            },
-            async setMode(val) {
-                state.jingleMode = val;
-                admin.saveToStorage();
-            },
-            async handleUpload(input) {
-                if (!input.files || input.files.length === 0) return;
-                const db = await jingles.openDB();
-                const tx = db.transaction("files", "readwrite");
-                const store = tx.objectStore("files");
-
-                let loaded = 0;
-                for (const file of input.files) {
-                    store.put({ name: file.name, data: file });
-                    loaded++;
-                }
-
-                tx.oncomplete = () => {
-                    jingles.list();
-                    alert(`Nahráno ${loaded} jinglů.`);
-                    input.value = "";
-                };
-            },
-            async list() {
-                try {
-                    const db = await jingles.openDB();
-                    const tx = db.transaction("files", "readonly");
-                    const store = tx.objectStore("files");
-                    const req = store.getAllKeys();
-
-                    req.onsuccess = () => {
-                        const keys = req.result;
-                        state.jinglePool = keys;
-                        const countEl = document.getElementById('jingle-pool-count');
-                        if (countEl) countEl.innerText = `Počet jinglů: ${keys.length}`;
-
-                        const listEl = document.getElementById('jingle-pool-list');
-                        if (listEl) {
-                            listEl.innerHTML = keys.map(k => `<div style="padding:2px 0;">• ${k}</div>`).join('');
-                        }
-                    };
-                } catch (e) {
-                    console.error("Jingle list error:", e);
-                }
-            },
-            async clear() {
-                if (!confirm("Opravdu chcete vymazat celý zásobník jinglů?")) return;
-                const db = await jingles.openDB();
-                const tx = db.transaction("files", "readwrite");
-                tx.objectStore("files").clear();
-                tx.oncomplete = () => {
-                    jingles.list();
-                };
-            },
-            async getRandomJingle() {
-                if (state.jinglePool.length === 0) return null;
-                const db = await jingles.openDB();
-                const tx = db.transaction("files", "readonly");
-                const store = tx.objectStore("files");
-                const randomName = state.jinglePool[Math.floor(Math.random() * state.jinglePool.length)];
-
-                return new Promise(resolve => {
-                    const req = store.get(randomName);
-                    req.onsuccess = () => resolve(req.result ? req.result.data : null);
-                    req.onerror = () => resolve(null);
-                });
-            }
-        };
 
 
         const exporter = {
@@ -4996,29 +5174,16 @@
             }
         };
 
-        // Event listeners for both audio elements
-        musicAudioA.addEventListener('ended', () => {
-            if (currentMusicAudio === musicAudioA) music.next();
-        });
-        musicAudioB.addEventListener('ended', () => {
-            if (currentMusicAudio === musicAudioB) music.next();
-        });
+        function openProjectionWindow() {
+            game.syncProjection();
+        }
 
-        // Update indicator when either audio plays/pauses
-        musicAudioA.addEventListener('play', () => {
-            if (currentMusicAudio === musicAudioA) ui.updateMusicIndicatorState();
-        });
-        musicAudioA.addEventListener('pause', () => {
-            if (currentMusicAudio === musicAudioA) ui.updateMusicIndicatorState();
-        });
-        musicAudioB.addEventListener('play', () => {
-            if (currentMusicAudio === musicAudioB) ui.updateMusicIndicatorState();
-        });
-        musicAudioB.addEventListener('pause', () => {
-            if (currentMusicAudio === musicAudioB) ui.updateMusicIndicatorState();
-        });
 
-        // --- UI DRAWING ---
+        // (End of UI Engine)
+
+        // ===================================================================================
+        // UI ENGINE
+        // ===================================================================================
         const ui = {
             updateFooterVisibility: () => {
                 const footer = document.getElementById('admin-footer');
@@ -5762,6 +5927,10 @@
             }
         };
 
+
+        // ===================================================================================
+        // POMOCNÉ FUNKCE (UTILS)
+        // ===================================================================================
         // --- UTILS ---
         function toggleAccordion(id) {
             const content = document.getElementById(id);
@@ -5786,14 +5955,11 @@
             }
         }
 
-        // Legacy implementation removed.
-
+        // ===================================================================================
+        // INICIALIZACE
+        // ===================================================================================
         // Initial Sync for Admin/Main view
         game.syncProjection();
-
-
-        // Music Audio Events for Indicator stability
-        // (Already set up above for both audio elements)
 
         // --- INIT ---
         window.addEventListener('load', game.init);
