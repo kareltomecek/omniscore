@@ -962,7 +962,7 @@
             position: absolute;
             top: 100%;
             left: 0;
-            right: 0;
+            width: 240px;
             background: #222;
             border: 1px solid #444;
             max-height: 150px;
@@ -3119,7 +3119,7 @@
                 const sSugBox = document.createElement('div');
                 sSugBox.className = "suggestion-box";
                 sSugBox.style.display = "none";
-                sSugBox.style.width = "450px"; // Wider as requested
+                sSugBox.style.width = "240px";
                 sSugBox.style.zIndex = "1100";
 
                 surnameInput.oninput = () => {
@@ -3149,8 +3149,8 @@
                 const nSugBox = document.createElement('div');
                 nSugBox.className = "suggestion-box";
                 nSugBox.style.display = "none";
-                nSugBox.style.width = "450px"; // Wider as requested
-                nSugBox.style.left = "-205px"; // Offset so it spans across row if name field is middle
+                nSugBox.style.width = "240px";
+                nSugBox.style.left = "0";
                 nSugBox.style.zIndex = "1100";
 
                 nameInput.oninput = () => {
@@ -3241,6 +3241,13 @@
                 removeBtn.innerText = "x";
                 removeBtn.onclick = () => {
                     if (type === 'team') {
+                        // Check if team is used in schedule
+                        const isUsed = state.schedule.some(m => m.type === 'match' && (m.home === item.id || m.guest === item.id));
+                        if (isUsed) {
+                            if (!confirm(`Družstvo "${item.name}" je nasazeno v zápasech. Opravdu ho chcete smazat? Zápasy zůstanou, ale jméno se ztratí.`)) {
+                                return;
+                            }
+                        }
                         state.teams = state.teams.filter(t => t.id !== item.id);
                     } else {
                         state.referees = state.referees.filter(r => r.id !== item.id);
@@ -3291,6 +3298,13 @@
                     suggestWrapper.appendChild(playerInput);
                     suggestWrapper.appendChild(suggestionBox);
 
+                    // Auto-heal: Filter out IDs of players that no longer exist in the tournament list
+                    if (!item.playerIds) item.playerIds = [];
+                    item.playerIds = item.playerIds.filter(pid => state.players.some(p => p.id === pid));
+
+                    // Set visibility based on valid player count
+                    suggestWrapper.style.display = (item.playerIds.length >= 2) ? "none" : "block";
+
                     admin.renderPlayerChips(chipsContainer, item);
 
                     playerSection.appendChild(chipsContainer);
@@ -3317,19 +3331,14 @@
                         remove.onclick = (e) => {
                             e.stopPropagation();
                             team.playerIds = team.playerIds.filter(id => id !== pid);
-                            admin.renderPlayerChips(container, team);
+                            admin.renderIdentityInputs(); // Force full re-render
                             admin.saveToStorage(); game.syncProjection();
                         };
                         chip.appendChild(remove);
                         container.appendChild(chip);
                     }
                 });
-
-                // Toggle visibility of input field if it exists as next sibling
-                const wrapper = container.nextElementSibling;
-                if (wrapper && wrapper.classList.contains('suggestion-container')) {
-                    wrapper.style.display = (team.playerIds.length >= 2) ? "none" : "block";
-                }
+                // REMOVED: Side-effect visibility toggling. Handled in renderIdentityRow.
             },
 
             showPlayerSuggestions: (input, suggestionBox, contextData) => {
@@ -3367,7 +3376,6 @@
                                 team.playerIds.push(p.id);
                                 input.value = "";
                                 suggestionBox.style.display = "none";
-                                admin.renderPlayerChips(chipsContainer, team);
                                 admin.renderIdentityInputs();
                                 admin.saveToStorage(); game.syncProjection();
                             } else {
@@ -3409,7 +3417,7 @@
 
             getTeamName: (id) => {
                 const team = state.teams.find(t => t.id === id);
-                return team ? team.name : (id || "Tým");
+                return team ? team.name : (id ? "XXX" : "Tým");
             },
 
             getRefName: (id) => {
@@ -3832,16 +3840,7 @@
                 }
             },
 
-            getTeamName: (id) => {
-                const t = state.teams.find(x => x.id === id);
-                return t ? t.name : (id ? id : "Tým");
-            },
 
-            getRefName: (id) => {
-                if (!id) return "-";
-                const r = state.referees.find(x => x.id === id);
-                return r ? r.name : id;
-            },
 
             updateCurrentMatch: () => {
                 // Manually updating from input fields is deprecated as fields were removed.
@@ -5787,7 +5786,7 @@
 
                     const getTName = (id) => {
                         const t = teams.find(x => x.id === id);
-                        return t ? t.name : (id || "Družstvo");
+                        return t ? t.name : (id ? "XXX" : "Družstvo");
                     };
                     const getRName = (id) => {
                         const r = referees.find(x => x.id === id);
