@@ -1694,8 +1694,9 @@
                                 title="Odemknout pro úpravy (vyžaduje heslo)"
                                 style="font-size: 0.7em; padding: 2px 8px; background: #444;">🔒 Upravit</button>
                         </label>
-                        <input type="password" id="input-cloud-file-id" placeholder="ID souboru z Google Disku"
-                            oninput="admin.saveSettings(false)" disabled style="opacity: 0.7; cursor: not-allowed;">
+                        <input type="text" id="input-cloud-file-id" placeholder="ID souboru z Google Disku"
+                            autocomplete="off" oninput="admin.saveSettings(false)" disabled
+                            style="opacity: 0.7; cursor: not-allowed; -webkit-text-security: disc;">
                         <small style="color:#888; font-size:0.75em; display:block; margin-top:4px;">
                             ID získáte z odkazu pro sdílení (např. 19QC...e1f3). Nastaveno správcem.
                         </small>
@@ -3632,7 +3633,7 @@
                     const input = document.getElementById('input-cloud-file-id');
                     const btn = document.getElementById('btn-unlock-cloud-id');
                     input.disabled = false;
-                    input.type = 'text'; // Reveal the ID
+                    input.style.webkitTextSecurity = 'none'; // Reveal the ID
                     input.style.opacity = '1';
                     input.style.cursor = 'text';
                     input.focus();
