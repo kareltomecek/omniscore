@@ -2051,6 +2051,11 @@
                 if (!firebase.apps.length) {
                     firebase.initializeApp(firebaseConfig);
                     console.log("Firebase initialized");
+
+                    // Schedule cleanup on disconnect (Only for Admin window)
+                    if (!isPO) {
+                        firebase.database().ref('sessions/' + sessionId).onDisconnect().remove();
+                    }
                 }
             } catch (e) { console.error("Firebase init failed:", e); }
         }
@@ -3988,7 +3993,15 @@
                         });
                     };
 
-                    Promise.all([deleteDB("MusicDB"), deleteDB("JingleDB")]).then(() => {
+                    // Cleanup Firebase session if possible
+                    let firebaseCleanup = Promise.resolve();
+                    if (typeof firebase !== 'undefined' && !state.isProjectionMode) {
+                        try {
+                            firebaseCleanup = firebase.database().ref('sessions/' + state.sessionId).remove();
+                        } catch (e) { console.warn("Firebase reset cleanup failed:", e); }
+                    }
+
+                    Promise.all([deleteDB("MusicDB"), deleteDB("JingleDB"), firebaseCleanup]).then(() => {
                         location.reload();
                     });
                 }
