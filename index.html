@@ -1142,6 +1142,126 @@
             text-align: center;
         }
 
+        /* QR Grid Styles */
+        .qr-grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 3vh 2vw;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .qr-grid-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2.5vh;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .theme-light .qr-grid-item {
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .qr-grid-label {
+            font-size: 1.1vw;
+            font-weight: bold;
+            margin-bottom: 2vh;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .qr-grid-code {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            width: 170px;
+            height: 170px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .qr-grid-code:hover {
+            transform: scale(1.03);
+        }
+
+        /* Horizontal QR Grid for Projection Bottom Row */
+        .qr-grid-horizontal {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1vw;
+            width: 100%;
+            padding: 1vh 2vw;
+            box-sizing: border-box;
+            align-items: center;
+        }
+
+        .qr-grid-horizontal .qr-grid-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1vh;
+            border-radius: 8px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .qr-grid-horizontal .qr-grid-label {
+            font-size: 0.8vw;
+            font-weight: bold;
+            margin-bottom: 0.5vh;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .qr-grid-horizontal .qr-grid-code {
+            background: white;
+            padding: 5px;
+            border-radius: 6px;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .qr-grid-horizontal .qr-grid-code canvas,
+        .qr-grid-horizontal .qr-grid-code img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* Transitions for Projection Bottom Row */
+        #p-upcoming-container,
+        #p-qr-projection-container {
+            transition: opacity var(--qr-transition-duration, 1.5s) ease;
+            width: 100%;
+        }
+
+        #p-qr-projection-container {
+            position: absolute;
+            top: 5vh;
+            /* Align with upcoming header */
+            left: 0;
+            height: calc(100% - 5vh);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
         /* Table header/cell theme overrides */
         .theme-dark .pv-table th {
             background: rgba(255, 255, 255, 0.05);
@@ -1963,39 +2083,60 @@
                     Veřejná zobrazení <span>▼</span>
                 </div>
                 <div id="acc-public-views" class="accordion-content">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom: 20px;">
+                    <div class="form-group"
+                        style="background: rgba(255,193,7,0.05); padding: 15px; border-radius: 10px; border: 1px solid var(--accent-yellow); margin-bottom: 20px;">
+                        <label
+                            style="color: var(--accent-yellow); font-weight: bold; display: block; margin-bottom: 10px; font-size: 0.9em; text-transform: uppercase;">Hlavní
+                            rozcestník (Hub)</label>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn-full btn-yellow" onclick="admin.openAllQRWindow()"
+                                style="margin:0; flex:1; height: 50px; font-weight: bold;">
+                                📱 QR MŘÍŽKA (2x2)
+                            </button>
+                            <button class="small-btn btn-yellow" onclick="admin.openQRWindow('all')"
+                                title="QR kód pro přístup k mřížce"
+                                style="width: 50px; height: 50px; margin:0; display:flex; align-items:center; justify-content:center; font-size: 1.5em;">
+                                📱
+                            </button>
+                        </div>
+                    </div>
+
+                    <h4
+                        style="margin: 0 0 10px 0; border:none; padding-bottom:5px; color:#888; font-size: 0.8em; text-transform: uppercase;">
+                        Jednotlivá zobrazení</h4>
+
+                    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 20px;">
                         <!-- PO -->
-                        <div style="flex-direction:column; display:flex; gap:5px;">
+                        <div style="display:flex; gap:8px;">
                             <button class="btn-full" onclick="openProjectionWindow()"
-                                title="Otevřít hlavní projekci v novém okně."
-                                style="background:#9c27b0; margin-top:0;">📽️
+                                style="background:#9c27b0; margin:0; flex:1; text-align: left; padding-left: 15px;">📽️
                                 Projekce Skóre</button>
                             <button class="small-btn btn-yellow" onclick="admin.openQRWindow()"
-                                style="margin-top:0; width:100%;">📱 QR kód</button>
+                                title="QR kód pro Projekci" style="width: 45px; margin:0;">📱</button>
                         </div>
                         <!-- Schedule -->
-                        <div style="flex-direction:column; display:flex; gap:5px;">
+                        <div style="display:flex; gap:8px;">
                             <button class="btn-full" onclick="admin.openPublicView('schedule')"
-                                title="Otevřít pořadí zápasů v novém okně." style="background:#2196f3; margin-top:0;">📋
+                                style="background:#2196f3; margin:0; flex:1; text-align: left; padding-left: 15px;">📋
                                 Pořadí Zápasů</button>
                             <button class="small-btn btn-yellow" onclick="admin.openQRWindow('schedule')"
-                                style="margin-top:0; width:100%;">📱 QR kód</button>
+                                title="QR kód pro Pořadí" style="width: 45px; margin:0;">📱</button>
                         </div>
                         <!-- Standings -->
-                        <div style="flex-direction:column; display:flex; gap:5px;">
+                        <div style="display:flex; gap:8px;">
                             <button class="btn-full" onclick="admin.openPublicView('standings')"
-                                title="Otevřít tabulku pořadí v novém okně."
-                                style="background:#4caf50; margin-top:0;">📊 Tabulka Pořadí</button>
+                                style="background:#4caf50; margin:0; flex:1; text-align: left; padding-left: 15px;">📊
+                                Tabulka Pořadí</button>
                             <button class="small-btn btn-yellow" onclick="admin.openQRWindow('standings')"
-                                style="margin-top:0; width:100%;">📱 QR kód</button>
+                                title="QR kód pro Tabulku" style="width: 45px; margin:0;">📱</button>
                         </div>
                         <!-- Cross -->
-                        <div style="flex-direction:column; display:flex; gap:5px;">
+                        <div style="display:flex; gap:8px;">
                             <button class="btn-full" onclick="admin.openPublicView('cross')"
-                                title="Otevřít křížovou tabulku v novém okně."
-                                style="background:#4caf50; margin-top:0;">🔢 Tabulka Křížová</button>
+                                style="background:#4caf50; margin:0; flex:1; text-align: left; padding-left: 15px;">🔢
+                                Tabulka Křížová</button>
                             <button class="small-btn btn-yellow" onclick="admin.openQRWindow('cross')"
-                                style="margin-top:0; width:100%;">📱 QR kód</button>
+                                title="QR kód pro Křížovou" style="width: 45px; margin:0;">📱</button>
                         </div>
                     </div>
 
@@ -2013,6 +2154,24 @@
                             <label>Zpoždění 1. kroku (s) v Projekci Skóre</label>
                             <input type="number" id="input-po-delay" value="10" min="1" max="30"
                                 oninput="admin.saveSettings(false)">
+                        </div>
+                        <div class="form-group" style="border-top: 1px solid #333; padding-top: 10px; margin-top: 5px;">
+                            <label
+                                style="display:flex; align-items:center; gap:10px; cursor:pointer; color: var(--accent-yellow); font-weight: bold;">
+                                <input type="checkbox" id="input-qr-cycling"
+                                    onchange="admin.saveSettings(false); game.syncProjection()" style="width:auto;">
+                                Střídat QR kódy v projekci
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Interval střídání (sekundy)</label>
+                            <input type="number" id="input-qr-interval" value="20" min="5" max="60"
+                                oninput="admin.saveSettings(false); game.syncProjection()">
+                        </div>
+                        <div class="form-group">
+                            <label>Délka prolínání (sekundy)</label>
+                            <input type="number" id="input-qr-transition" value="2" min="1" max="5" step="1"
+                                oninput="admin.saveSettings(false); game.syncProjection()">
                         </div>
                     </div>
                 </div>
@@ -2128,16 +2287,39 @@
             <div id="p-event-content"></div>
         </div>
 
-        <div id="p-row-bot" class="p-row">
-            <div id="p-upcoming-header">
-                <div></div>
-                <div style="text-align:center;">NÁSLEDUJE</div>
-                <div style="text-align:right;">ROZHODČÍ</div>
+        <div id="p-row-bot" class="p-row" style="position: relative;">
+            <div id="p-upcoming-container">
+                <div id="p-upcoming-header">
+                    <div></div>
+                    <div style="text-align:center;">NÁSLEDUJE</div>
+                    <div style="text-align:right;">ROZHODČÍ</div>
+                </div>
+                <div style="padding: 0 4vw; width: 100%; box-sizing: border-box;">
+                    <table class="p-sched-table">
+                        <tbody id="p-upcoming-body"></tbody>
+                    </table>
+                </div>
             </div>
-            <div style="padding: 0 4vw; width: 100%; box-sizing: border-box;">
-                <table class="p-sched-table">
-                    <tbody id="p-upcoming-body"></tbody>
-                </table>
+
+            <div id="p-qr-projection-container" style="display: none; opacity: 0;">
+                <div class="qr-grid-horizontal">
+                    <div class="qr-grid-item">
+                        <div class="qr-grid-label">Projekce Skóre</div>
+                        <div id="p-qr-grid-projection" class="qr-grid-code"></div>
+                    </div>
+                    <div class="qr-grid-item">
+                        <div class="qr-grid-label">Pořadí Zápasů</div>
+                        <div id="p-qr-grid-schedule" class="qr-grid-code"></div>
+                    </div>
+                    <div class="qr-grid-item">
+                        <div class="qr-grid-label">Tabulka Pořadí</div>
+                        <div id="p-qr-grid-standings" class="qr-grid-code"></div>
+                    </div>
+                    <div class="qr-grid-item">
+                        <div class="qr-grid-label">Tabulka Křížová</div>
+                        <div id="p-qr-grid-cross" class="qr-grid-code"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -2295,6 +2477,10 @@
             referees: [],
             players: [],
             masterPlayers: [], // Global pool of all known players (Main database)
+            qrCyclingEnabled: false,
+            qrCyclingInterval: 20,
+            qrTransitionDuration: 2,
+            qrCyclingActive: false, // Internal state for alternating
             currentMatch: {
                 title: "",
                 homeName: "Domácí",
@@ -2384,7 +2570,7 @@
         // ===================================================================================
         const urlParams = new URLSearchParams(window.location.search);
         const isPO = urlParams.has('projection');
-        const isQR = urlParams.get('mode') === 'qr';
+        const isQR = urlParams.get('mode') && urlParams.get('mode').startsWith('qr');
         const viewMode = urlParams.get('view'); // 'schedule', 'standings', 'cross'
         let sessionId = urlParams.get('session');
 
@@ -3429,6 +3615,10 @@
                 state.officialTimekeeper = document.getElementById('official-timekeeper').value;
                 state.officialRecorder = document.getElementById('official-recorder').value;
 
+                state.qrCyclingEnabled = document.getElementById('input-qr-cycling').checked;
+                state.qrCyclingInterval = Math.max(5, parseInt(document.getElementById('input-qr-interval').value || 20));
+                state.qrTransitionDuration = parseFloat(document.getElementById('input-qr-transition').value || 1.5);
+
                 const fileInput = document.getElementById('input-audio-file');
                 if (fileInput.files.length > 0) {
                     const file = fileInput.files[0];
@@ -3532,6 +3722,41 @@
                         admin.renderMiscRow(miscList, item, idx);
                     });
                 }
+            },
+
+            updateSettingsUI: () => {
+                const setVal = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        if (el.type === 'checkbox') el.checked = !!val;
+                        else el.value = val;
+                    }
+                };
+
+                setVal('input-tournament-name', state.tournamentName);
+                setVal('input-tournament-category', state.tournamentCategory);
+                setVal('time-setup', state.times.setup);
+                setVal('time-play', state.times.play);
+                setVal('time-break', state.times.break);
+                setVal('rule-win', state.rules.winPoints);
+                setVal('rule-draw', state.rules.drawPoints);
+                setVal('rule-loss', state.rules.lossPoints);
+                setVal('rule-mini-tables', state.rules.useMiniTables);
+                setVal('input-vol-signal', state.volSignal);
+                setVal('input-vol-anthem', state.volAnthem);
+                setVal('input-show-footer', state.showFooter);
+                setVal('input-theme', state.theme);
+                setVal('input-cloud-file-id', state.cloudFileId);
+                setVal('input-tournament-date', state.tournamentDate);
+                setVal('input-tournament-location', state.tournamentLocation);
+                setVal('input-tournament-organizer', state.tournamentOrganizer);
+                setVal('input-pitch-size', state.pitchSize);
+                setVal('official-chief-referee', state.officialChiefReferee);
+                setVal('official-timekeeper', state.officialTimekeeper);
+                setVal('official-recorder', state.officialRecorder);
+                setVal('input-qr-cycling', state.qrCyclingEnabled);
+                setVal('input-qr-interval', state.qrCyclingInterval);
+                setVal('input-qr-transition', state.qrTransitionDuration);
             },
 
             renderMiscRow: (container, item, index) => {
@@ -5340,6 +5565,9 @@
                     if (parsed.misc && parsed.misc.length > 0) {
                         state.misc = parsed.misc;
                     }
+                    if (typeof parsed.qrCyclingEnabled !== 'undefined') state.qrCyclingEnabled = parsed.qrCyclingEnabled;
+                    if (parsed.qrCyclingInterval) state.qrCyclingInterval = parsed.qrCyclingInterval;
+                    if (parsed.qrTransitionDuration) state.qrTransitionDuration = parsed.qrTransitionDuration;
 
                     // Metadata
                     if (parsed.tournamentDate) state.tournamentDate = parsed.tournamentDate;
@@ -5361,6 +5589,8 @@
 
                     if (typeof parsed.tournamentStartTime !== 'undefined') state.tournamentStartTime = parsed.tournamentStartTime;
                     if (typeof parsed.playTimeAccumulated !== 'undefined') state.playTimeAccumulated = parsed.playTimeAccumulated;
+
+                    admin.updateSettingsUI();
 
                     // MIGRATION: Strings -> Objects with IDs
                     if (state.teams.length > 0 && typeof state.teams[0] === 'string') {
@@ -5553,6 +5783,13 @@
                 let url = baseUrl + '?projection&mode=qr&session=' + state.sessionId;
                 if (v) url += '&view=' + v;
                 qrWindow = window.open(url, "ScoreboardQR_" + (v || "proj") + "_" + state.sessionId, "width=600,height=600");
+                if (!qrWindow) alert("Vyskakovací okno bylo zablokováno.");
+            },
+
+            openAllQRWindow: () => {
+                const baseUrl = window.location.origin + window.location.pathname;
+                const url = baseUrl + '?projection&mode=qr-all&session=' + state.sessionId;
+                qrWindow = window.open(url, "ScoreboardQR_ALL_" + state.sessionId, "width=1000,height=900");
                 if (!qrWindow) alert("Vyskakovací okno bylo zablokováno.");
             },
         };
@@ -6367,6 +6604,9 @@
                 try {
                     if (!state.isProjectionMode && !state.viewMode) return;
 
+                    // Apply CSS variable for QR transition duration
+                    document.body.style.setProperty('--qr-transition-duration', (state.qrTransitionDuration || 1.5) + 's');
+
                     const pLayout = document.getElementById('projection-layout');
                     const qrLayout = document.getElementById('qr-layout');
 
@@ -6375,54 +6615,106 @@
                         if (qrLayout) {
                             qrLayout.style.display = 'flex';
 
+                            // 1. Handle SINGLE QR Mode (view=...)
                             const v = urlParams.get('view');
-                            let viewName = "";
-                            if (v === 'schedule') viewName = " - POŘADÍ ZÁPASŮ";
-                            else if (v === 'standings') viewName = " - TABULKA POŘADÍ";
-                            else if (v === 'cross') viewName = " - TABULKA KŘÍŽOVÁ";
-                            else viewName = ' - "Projekce Skóre"';
+                            const mode = urlParams.get('mode');
 
-                            const titleStr = (state.tournamentName || "OmniScore") + viewName;
-                            document.getElementById('qr-tournament-name').innerText = titleStr;
-                            document.title = titleStr;
-                            document.getElementById('qr-session-id').innerText = state.sessionId;
+                            if (mode === 'qr-all') {
+                                // GRID MODE
+                                document.getElementById('qr-single-view').style.display = 'none';
+                                document.getElementById('qr-grid-view').style.display = 'flex';
+                                document.getElementById('qr-session-id-grid').innerText = state.sessionId;
+                                document.getElementById('qr-tournament-name').innerText = (state.tournamentName || "OmniScore") + " - Všechny QR kódy";
+                                document.title = (state.tournamentName || "OmniScore") + " - Všechny QR kódy";
 
-                            // Generate QR Code once if empty (trimming to ignore whitespace)
-                            const container = document.getElementById('qr-container');
-                            const isEmpty = container && container.innerHTML.trim() === "";
-                            const isGenerated = container && container.dataset.generated === "true";
 
-                            if (container && isEmpty && !isGenerated) {
-                                container.dataset.generated = "true";
-                                setTimeout(() => {
-                                    try {
-                                        if (typeof QRCode === 'undefined') {
-                                            delete container.dataset.generated;
-                                            return;
-                                        }
-                                        const v = urlParams.get('view');
-                                        const poUrl = window.location.origin + window.location.pathname + '?session=' + state.sessionId + (v ? '&view=' + v : '&projection');
+                                const configs = [
+                                    { id: 'qr-grid-projection', param: 'projection' },
+                                    { id: 'qr-grid-schedule', param: 'view=schedule' },
+                                    { id: 'qr-grid-standings', param: 'view=standings' },
+                                    { id: 'qr-grid-cross', param: 'view=cross' }
+                                ];
 
-                                        // Use fixed size for reliability in 300px container
-                                        const size = 260;
-
-                                        // Clear just in case before new generation
-                                        container.innerHTML = "";
-
-                                        new QRCode(container, {
-                                            text: poUrl,
-                                            width: size,
-                                            height: size,
-                                            colorDark: "#000000",
-                                            colorLight: "#ffffff",
-                                            correctLevel: QRCode.CorrectLevel.L
-                                        });
-                                    } catch (err) {
-                                        console.error("QR Generation failed", err);
-                                        delete container.dataset.generated;
-                                        container.innerHTML = "";
+                                configs.forEach(cfg => {
+                                    const container = document.getElementById(cfg.id);
+                                    if (container && container.innerHTML.trim() === "" && !container.dataset.generated) {
+                                        container.dataset.generated = "true";
+                                        setTimeout(() => {
+                                            try {
+                                                if (typeof QRCode === 'undefined') return;
+                                                const poUrl = window.location.origin + window.location.pathname + '?session=' + state.sessionId + '&' + cfg.param;
+                                                new QRCode(container, {
+                                                    text: poUrl,
+                                                    width: 150,
+                                                    height: 150,
+                                                    colorDark: "#000000",
+                                                    colorLight: "#ffffff",
+                                                    correctLevel: QRCode.CorrectLevel.L
+                                                });
+                                                // Make interactive - Open as standalone window
+                                                container.onclick = () => {
+                                                    const winName = "ScoreboardClick_" + cfg.id + "_" + state.sessionId;
+                                                    window.open(poUrl, winName, "width=1000,height=700");
+                                                };
+                                                container.title = "Kliknutím otevřete v samostatném okně";
+                                            } catch (err) {
+                                                console.error("Grid QR Generation failed", err);
+                                                delete container.dataset.generated;
+                                            }
+                                        }, 500);
                                     }
-                                }, 500);
+                                });
+                            } else {
+                                // SINGLE MODE
+                                document.getElementById('qr-single-view').style.display = 'flex';
+                                document.getElementById('qr-grid-view').style.display = 'none';
+
+                                let viewName = "";
+                                if (v === 'schedule') viewName = " - POŘADÍ ZÁPASŮ";
+                                else if (v === 'standings') viewName = " - TABULKA POŘADÍ";
+                                else if (v === 'cross') viewName = " - TABULKA KŘÍŽOVÁ";
+                                else if (v === 'all') viewName = " - Hub (Všechna zobrazení)";
+                                else viewName = ' - "Projekce Skóre"';
+
+                                const titleStr = (state.tournamentName || "OmniScore") + viewName;
+                                document.getElementById('qr-tournament-name').innerText = titleStr;
+                                document.title = titleStr;
+                                document.getElementById('qr-session-id').innerText = state.sessionId;
+
+                                // Generate single QR
+                                const container = document.getElementById('qr-container');
+                                const isEmpty = container && container.innerHTML.trim() === "";
+                                const isGenerated = container && container.dataset.generated === "true";
+
+                                if (container && isEmpty && !isGenerated) {
+                                    container.dataset.generated = "true";
+                                    setTimeout(() => {
+                                        try {
+                                            if (typeof QRCode === 'undefined') {
+                                                delete container.dataset.generated;
+                                                return;
+                                            }
+
+                                            let poUrlParams = "";
+                                            if (v === 'all') poUrlParams = '&mode=qr-all';
+                                            else poUrlParams = (v ? '&view=' + v : '&projection');
+
+                                            const poUrl = window.location.origin + window.location.pathname + '?session=' + state.sessionId + poUrlParams;
+                                            new QRCode(container, {
+                                                text: poUrl,
+                                                width: 260,
+                                                height: 260,
+                                                colorDark: "#000000",
+                                                colorLight: "#ffffff",
+                                                correctLevel: QRCode.CorrectLevel.L
+                                            });
+                                        } catch (err) {
+                                            console.error("QR Generation failed", err);
+                                            delete container.dataset.generated;
+                                            container.innerHTML = "";
+                                        }
+                                    }, 500);
+                                }
                             }
                         }
                         return;
@@ -6591,6 +6883,85 @@
                     if (state.viewMode === 'schedule') ui.renderScheduleView();
                     if (state.viewMode === 'standings') ui.renderStandingsView();
                     if (state.viewMode === 'cross') ui.renderCrossView();
+
+                    // --- QR CYCLING LOGIC (Projection Bottom Row) ---
+                    if (!state.viewMode && state.isProjectionMode) {
+                        if (state.qrCyclingEnabled) {
+                            if (!ui.qrCycleIntervalID || ui.qrCycleCurrentInterval !== state.qrCyclingInterval) {
+                                if (ui.qrCycleIntervalID) clearInterval(ui.qrCycleIntervalID);
+                                ui.qrCycleCurrentInterval = state.qrCyclingInterval;
+                                ui.qrCycleIntervalID = setInterval(() => {
+                                    state.qrCyclingActive = !state.qrCyclingActive;
+                                    ui.updateProjection();
+                                }, (state.qrCyclingInterval || 15) * 1000);
+                            }
+                        } else {
+                            if (ui.qrCycleIntervalID) {
+                                clearInterval(ui.qrCycleIntervalID);
+                                ui.qrCycleIntervalID = null;
+                            }
+                            state.qrCyclingActive = false;
+                        }
+
+                        const upcomingCont = document.getElementById('p-upcoming-container');
+                        const qrProjCont = document.getElementById('p-qr-projection-container');
+
+                        if (upcomingCont && qrProjCont) {
+                            if (state.qrCyclingActive) {
+                                // Generate QR codes if showing the QR container
+                                const configs = [
+                                    { id: 'p-qr-grid-projection', param: 'projection' },
+                                    { id: 'p-qr-grid-schedule', param: 'view=schedule' },
+                                    { id: 'p-qr-grid-standings', param: 'view=standings' },
+                                    { id: 'p-qr-grid-cross', param: 'view=cross' }
+                                ];
+
+                                configs.forEach(cfg => {
+                                    const container = document.getElementById(cfg.id);
+                                    if (container && container.innerHTML.trim() === "" && !container.dataset.generated) {
+                                        container.dataset.generated = "true";
+                                        try {
+                                            if (typeof QRCode === 'undefined') return;
+                                            const poUrl = window.location.origin + window.location.pathname + '?session=' + state.sessionId + '&' + cfg.param;
+                                            new QRCode(container, {
+                                                text: poUrl,
+                                                width: 120,
+                                                height: 120,
+                                                colorDark: "#000000",
+                                                colorLight: "#ffffff",
+                                                correctLevel: QRCode.CorrectLevel.L
+                                            });
+                                        } catch (err) {
+                                            console.error("Projection QR Generation failed", err);
+                                            delete container.dataset.generated;
+                                        }
+                                    }
+                                });
+
+                                if (qrProjCont.style.display === 'none') {
+                                    upcomingCont.style.opacity = '0';
+                                    setTimeout(() => {
+                                        if (state.qrCyclingActive) {
+                                            upcomingCont.style.display = 'none';
+                                            qrProjCont.style.display = 'flex';
+                                            setTimeout(() => { qrProjCont.style.opacity = '1'; }, 50);
+                                        }
+                                    }, (state.qrTransitionDuration || 1.5) * 1000);
+                                }
+                            } else {
+                                if (upcomingCont.style.display === 'none') {
+                                    qrProjCont.style.opacity = '0';
+                                    setTimeout(() => {
+                                        if (!state.qrCyclingActive) {
+                                            qrProjCont.style.display = 'none';
+                                            upcomingCont.style.display = 'block';
+                                            setTimeout(() => { upcomingCont.style.opacity = '1'; }, 50);
+                                        }
+                                    }, (state.qrTransitionDuration || 1.5) * 1000);
+                                }
+                            }
+                        }
+                    }
 
                 } catch (err) {
                     console.error("UI Update Error:", err);
@@ -6842,15 +7213,42 @@
         <div class="pv-header">
             <div class="pv-title" id="qr-tournament-name">OmniScore</div>
         </div>
-        <div class="qr-inner">
+
+        <!-- Single QR View -->
+        <div id="qr-single-view" class="qr-inner">
             <div id="qr-container"
                 style="background:white; padding:20px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5); width:300px; height:300px; display:flex; align-items:center; justify-content:center; margin:0 auto;">
             </div>
+            <div style="margin-top:4vh; font-size:2vw;">
+                <p>Naskenujte pro sledování výsledků na mobilu</p>
+                <p style="font-size:1.5vw; color:#888; margin-top:1vh;"><span id="qr-session-id"
+                        style="color:var(--accent-blue); font-weight:bold;">---</span></p>
+            </div>
         </div>
-        <div style="margin-top:4vh; font-size:2vw;">
-            <p>Naskenujte pro sledování výsledků na mobilu</p>
-            <p style="font-size:1.5vw; color:#888; margin-top:1vh;"><span id="qr-session-id"
-                    style="color:var(--accent-blue); font-weight:bold;">---</span></p>
+
+        <!-- Grid QR View (2x2) -->
+        <div id="qr-grid-view" class="qr-inner" style="display:none;">
+            <div class="qr-grid-container">
+                <div class="qr-grid-item">
+                    <div class="qr-grid-label">Projekce Skóre</div>
+                    <div id="qr-grid-projection" class="qr-grid-code"></div>
+                </div>
+                <div class="qr-grid-item">
+                    <div class="qr-grid-label">Pořadí Zápasů</div>
+                    <div id="qr-grid-schedule" class="qr-grid-code"></div>
+                </div>
+                <div class="qr-grid-item">
+                    <div class="qr-grid-label">Tabulka Pořadí</div>
+                    <div id="qr-grid-standings" class="qr-grid-code"></div>
+                </div>
+                <div class="qr-grid-item">
+                    <div class="qr-grid-label">Tabulka Křížová</div>
+                    <div id="qr-grid-cross" class="qr-grid-code"></div>
+                </div>
+            </div>
+            <div style="margin-top:4vh; font-size:1.5vw; color:#888;">
+                ID relace: <span id="qr-session-id-grid" style="color:var(--accent-blue); font-weight:bold;">---</span>
+            </div>
         </div>
     </div>
     </div>
