@@ -501,6 +501,21 @@
             background: #388e3c !important;
         }
 
+        .identity-row {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .identity-label {
+            width: 120px;
+            font-size: 0.8em;
+            color: #888;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
         /* --- Admin Footer --- */
         #admin-footer {
             display: grid;
@@ -581,6 +596,9 @@
             font-size: 3vw;
             text-align: left;
             font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         #p-phase-name {
@@ -1458,7 +1476,7 @@
                     <div id="match-info-display" style="color:#aaa; margin-bottom:5px; font-weight:bold;">-</div>
                     <div class="timer-display">
                         <span id="main-timer" onblur="game.manualTimeEntry()"
-                            onkeydown="if(event.key==='Enter'){this.blur(); event.preventDefault();}">00:00</span>
+                            onkeydown="if(event.key==='Enter'){this.blur(); event.preventDefault();} else { return admin.restrictToNumbers(event); }">00:00</span>
                         <div class="timer-arrows">
                             <button class="arrow-btn" id="btn-time-up" onclick="game.adjustTime(1)">▲</button>
                             <button class="arrow-btn" id="btn-time-down" onclick="game.adjustTime(-1)">▼</button>
@@ -1515,61 +1533,58 @@
                 <div id="acc-settings" class="accordion-content">
                     <!-- BEGIN: QUICK START / IMPORT SECTION -->
                     <div id="quick-setup-box"
-                        style="background: rgba(33, 150, 243, 0.1); border: 2px solid var(--accent-blue); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        style="background: rgba(76, 175, 80, 0.1); border: 2px solid var(--accent-green); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                         <h4
-                            style="margin: 0 0 10px 0; border: none; padding: 0; color: var(--accent-blue); display: flex; align-items: center; gap: 8px;">
-                            🚀 Rychlý start / Import turnaje
+                            style="margin: 0 0 10px 0; border: none; padding: 0; color: var(--accent-green); display: flex; align-items: center; gap: 8px;">
+                            🚀 Rychlý start / Import / Obnova
                         </h4>
                         <div id="sched-section-import">
                             <label
                                 style="display:block; font-size:0.85em; color:#bbb; font-weight:bold; margin-bottom:12px;">
-                                Nahrát rozpis z Excelu (.xlsx, .xls, .csv)
+                                Nahrát rozpis nebo Zálohu turnaje (.xlsx, .xls, .csv)
                             </label>
 
                             <input type="file" id="input-sched-import" accept=".xlsx, .xls, .csv" style="display:none"
                                 onchange="admin.handleScheduleImport(this)">
                             <button class="btn-full" onclick="document.getElementById('input-sched-import').click()"
-                                style="background: var(--accent-blue); margin-top:0;">📂 Vybrat soubor a nastavit
-                                turnaj</button>
+                                style="background: var(--accent-green); color: #000; font-weight: bold; margin-top:0;">📂
+                                Vybrat soubor (Rozpis nebo Záloha)</button>
 
                             <div
                                 style="margin-top:15px; font-size:0.8em; color:#ddd; background:rgba(0,0,0,0.2); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                                <b style="color:var(--accent-blue); display:block; margin-bottom:8px; font-size:0.9em;">💡
-                                    Nápověda k importu:</b>
+                                <b
+                                    style="color:var(--accent-green); display:block; margin-bottom:8px; font-size:0.9em;">💡
+                                    Inteligentní Import:</b>
 
                                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; line-height:1.4;">
                                     <div>
-                                        <b style="color:#bbb; font-size:0.85em;">Klíčové sloupce:</b>
-                                        <ul style="margin:4px 0; padding-left:15px; color:#aaa;">
-                                            <li><span style="color:#fff;">Domácí, Hosté</span> (týmy)</li>
-                                            <li><span style="color:#fff;">Název</span> (skupina/fáze)</li>
-                                            <li><span style="color:#fff;">Rozhodčí</span></li>
-                                            <li><span style="color:#fff;">Délka</span> (v minutách)</li>
-                                        </ul>
+                                        <b style="color:#bbb; font-size:0.85em;">1. Záloha turnaje:</b>
+                                        <div style="color:#aaa; font-style:italic;">
+                                            Pokud nahrajete soubor vytvořený funkcí "Export", aplikace rozpozná zálohu a
+                                            nabídne kompletní obnovení.
+                                        </div>
                                     </div>
                                     <div>
-                                        <b style="color:#bbb; font-size:0.85em;">Výhody:</b>
+                                        <b style="color:#bbb; font-size:0.85em;">2. Běžný rozpis:</b>
                                         <ul style="margin:4px 0; padding-left:15px; color:#aaa;">
-                                            <li><b>Smart Detekce:</b> Nezáleží na pořadí sloupců.</li>
-                                            <li><b>Sync:</b> Zachová loga a jingly týmů.</li>
-                                            <li><b>Cleanup:</b> Odstraní nepoužitá data.</li>
+                                            <li>Auto-detekce sloupců</li>
+                                            <li>Zachování log a jinglů</li>
+                                            <li>Podpora XLSX i CSV</li>
                                         </ul>
                                     </div>
-                                </div>
-
-                                <div
-                                    style="margin-top:8px; font-size:0.85em; color:rgba(255,255,255,0.5); font-style:italic; border-top:1px solid rgba(255,255,255,0.05); padding-top:5px;">
-                                    Aplikace umí načíst i vlastní exporty (Round-trip). Podporuje .xlsx, .xls a .csv.
                                 </div>
                             </div>
                         </div>
                     </div>
                     <!-- END: QUICK START / IMPORT SECTION -->
 
+                    <button class="btn-full btn-yellow" onclick="admin.resetTournament()"
+                        style="margin-bottom: 20px;">Resetovat Turnaj</button>
+
                     <div class="form-group">
                         <label>Název Turnaje</label>
-                        <input type="text" id="input-tournament-name" placeholder="Např. Zimní Pohár"
-                            oninput="admin.saveSettings(false)">
+                        <input type="text" id="input-tournament-name" placeholder="Např. Zimní Pohár" maxlength="96"
+                            oninput="admin.sanitizeInput(this); admin.saveSettings(false)">
                     </div>
 
                     <div class="form-group">
@@ -1603,21 +1618,24 @@
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label style="font-size: 0.85em;">Poločas</label>
                             <input type="number" id="time-play" value="420" min="0" max="3599" style="width: 100%;"
-                                oninput="admin.validateTimeInput(this)">
+                                oninput="admin.validateTimeInput(this)"
+                                onkeydown="return admin.restrictToNumbers(event)">
                             <small id="hint-time-play"
                                 style="color: #4caf50; font-size: 0.75em; display: block; margin-top: 2px;">-</small>
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label style="font-size: 0.85em;">Přestávka</label>
                             <input type="number" id="time-break" value="105" min="0" max="3599" style="width: 100%;"
-                                oninput="admin.validateTimeInput(this)">
+                                oninput="admin.validateTimeInput(this)"
+                                onkeydown="return admin.restrictToNumbers(event)">
                             <small id="hint-time-break"
                                 style="color: #4caf50; font-size: 0.75em; display: block; margin-top: 2px;">-</small>
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label style="font-size: 0.85em;">Nastupuje</label>
                             <input type="number" id="time-setup" value="10" min="0" max="3599" style="width: 100%;"
-                                oninput="admin.validateTimeInput(this)">
+                                oninput="admin.validateTimeInput(this)"
+                                onkeydown="return admin.restrictToNumbers(event)">
                             <small id="hint-time-setup"
                                 style="color: #4caf50; font-size: 0.75em; display: block; margin-top: 2px;">-</small>
                         </div>
@@ -1631,7 +1649,7 @@
                         <div style="flex: 2;">
                             <label>Místo konání</label>
                             <input type="text" id="input-tournament-location" placeholder="Město, hala..."
-                                oninput="admin.saveSettings(false)">
+                                maxlength="32" oninput="admin.sanitizeInput(this); admin.saveSettings(false)">
                         </div>
                     </div>
 
@@ -1644,27 +1662,44 @@
 
                     <div class="form-group">
                         <label>Hrací plocha</label>
-                        <input type="text" id="input-pitch-size" placeholder="např. 11 x 14 (m)"
-                            oninput="admin.saveSettings(false)">
+                        <input type="text" id="input-pitch-size" placeholder="např. 11 x 14 (m)" maxlength="32"
+                            oninput="admin.sanitizeInput(this); admin.saveSettings(false)">
                     </div>
 
                     <h4 style="margin: 20px 0 10px 0; border: none; padding: 0;">Oficiální činitelé</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div class="form-group">
-                            <label>Hlavní rozhodčí</label>
-                            <input type="text" id="official-chief-referee" oninput="admin.saveSettings(false)">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <div class="identity-row">
+                            <span class="identity-label">Hlavní rozhodčí</span>
+                            <div style="display: flex; gap: 5px; flex: 1;">
+                                <input type="text" id="official-chief-referee-surname" placeholder="Příjmení"
+                                    oninput="admin.sanitizeInput(this); admin.saveSettings(false)" maxlength="32"
+                                    style="flex:1.2">
+                                <input type="text" id="official-chief-referee-firstname" placeholder="Jméno"
+                                    oninput="admin.sanitizeInput(this); admin.saveSettings(false)" maxlength="32"
+                                    style="flex:1">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Zapisovatel</label>
-                            <input type="text" id="official-recorder" oninput="admin.saveSettings(false)">
+                        <div class="identity-row">
+                            <span class="identity-label">Zapisovatel</span>
+                            <div style="display: flex; gap: 5px; flex: 1;">
+                                <input type="text" id="official-recorder-surname" placeholder="Příjmení"
+                                    oninput="admin.sanitizeInput(this); admin.saveSettings(false)" maxlength="32"
+                                    style="flex:1.2">
+                                <input type="text" id="official-recorder-firstname" placeholder="Jméno"
+                                    oninput="admin.sanitizeInput(this); admin.saveSettings(false)" maxlength="32"
+                                    style="flex:1">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Časoměřič</label>
-                            <input type="text" id="official-timekeeper" oninput="admin.saveSettings(false)">
-                        </div>
-                        <div class="form-group" style="visibility:hidden"> <!-- Spacer for grid balance if needed -->
-                            <label>Ostatní</label>
-                            <input type="text">
+                        <div class="identity-row">
+                            <span class="identity-label">Časoměřič</span>
+                            <div style="display: flex; gap: 5px; flex: 1;">
+                                <input type="text" id="official-timekeeper-surname" placeholder="Příjmení"
+                                    oninput="admin.sanitizeInput(this); admin.saveSettings(false)" maxlength="32"
+                                    style="flex:1.2">
+                                <input type="text" id="official-timekeeper-firstname" placeholder="Jméno"
+                                    oninput="admin.sanitizeInput(this); admin.saveSettings(false)" maxlength="32"
+                                    style="flex:1">
+                            </div>
                         </div>
                     </div>
 
@@ -1703,17 +1738,20 @@
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label style="font-size: 0.85em;">Výhra</label>
                                 <input type="number" id="rule-win" value="3" min="0" style="width: 100%;"
-                                    oninput="admin.saveSettings(false)" disabled>
+                                    oninput="admin.saveSettings(false)" disabled
+                                    onkeydown="return admin.restrictToNumbers(event)">
                             </div>
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label style="font-size: 0.85em;">Remíza</label>
                                 <input type="number" id="rule-draw" value="1" min="0" style="width: 100%;"
-                                    oninput="admin.saveSettings(false)" disabled>
+                                    oninput="admin.saveSettings(false)" disabled
+                                    onkeydown="return admin.restrictToNumbers(event)">
                             </div>
                             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                                 <label style="font-size: 0.85em;">Prohra</label>
                                 <input type="number" id="rule-loss" value="0" min="0" style="width: 100%;"
-                                    oninput="admin.saveSettings(false)" disabled>
+                                    oninput="admin.saveSettings(false)" disabled
+                                    onkeydown="return admin.restrictToNumbers(event)">
                             </div>
                         </div>
 
@@ -1864,8 +1902,8 @@
                                     <option value="Finále">Finále</option>
                                     <option value="O umístění">O umístění</option>
                                 </select>
-                                <input type="text" id="sched-custom-title" placeholder="Vlastní název..."
-                                    style="flex:1; display:none;">
+                                <input type="text" id="sched-custom-title" placeholder="Vlastní název..." maxlength="32"
+                                    style="flex:1; display:none;" oninput="admin.sanitizeInput(this)">
                             </div>
                         </div>
                         <div id="sched-match-fields">
@@ -1885,19 +1923,20 @@
                                 <div style="flex:1">
                                     <label>Skóre Dom.</label>
                                     <input type="number" id="sched-home-score" placeholder="-" style="width:100%"
-                                        min="0">
+                                        min="0" onkeydown="return admin.restrictToNumbers(event)">
                                 </div>
                                 <div style="flex:1">
                                     <label>Skóre Host.</label>
                                     <input type="number" id="sched-guest-score" placeholder="-" style="width:100%"
-                                        min="0">
+                                        min="0" onkeydown="return admin.restrictToNumbers(event)">
                                 </div>
                             </div>
                         </div>
                         <div id="sched-event-fields" style="display:none;">
                             <div class="form-group">
                                 <label>Délka trvání (sekundy)</label>
-                                <input type="number" id="sched-duration" value="600" min="1" style="width:100%">
+                                <input type="number" id="sched-duration" value="600" min="1" style="width:100%"
+                                    onkeydown="return admin.restrictToNumbers(event)">
                             </div>
                         </div>
                         <div id="sched-controls-add" style="display:flex; gap:5px;">
@@ -1962,7 +2001,7 @@
                 </div>
                 <div id="acc-export" class="accordion-content">
                     <h4 style="margin: 0 0 10px 0; border: none; padding: 0; color: #4caf50;">Vzor základní</h4>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom: 20px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom: 10px;">
                         <button class="btn-full" onclick="exporter.toXLSX()"
                             title="Exportovat rozpis, tabulky a seznam hráčů do Excel souboru (.xlsx)."
                             style="background:#4caf50; margin-top:0;">📊 Excel</button>
@@ -1970,6 +2009,8 @@
                             title="Vygenerovat tiskovou verzi rozpisu a tabulek (otevře se v novém okně)."
                             style="background:#2196f3; margin-top:0;">🖨️ Pro tisk</button>
                     </div>
+
+
 
                     <h4 style="margin: 0 0 10px 0; border: none; padding: 0; color: #888;">Vzor kolová 2022</h4>
                     <div
@@ -2023,7 +2064,7 @@
                                 style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight: bold; color: #4caf50;">
                                 <input type="checkbox" id="input-music-auto"
                                     onchange="music.setAutoEnabled(this.checked)" style="width:auto;">
-                                Automatický režim
+                                Automatický režim podle kroků
                             </label>
                         </div>
                         <div class="form-group">
@@ -2152,8 +2193,9 @@
                         </div>
                         <div class="form-group">
                             <label>Zpoždění 1. kroku (s) v Projekci Skóre</label>
-                            <input type="number" id="input-po-delay" value="10" min="1" max="30"
-                                oninput="admin.saveSettings(false)">
+                            <input type="number" id="input-po-delay" value="10" min="1" max="20"
+                                oninput="admin.validateInputRange(this, 20)"
+                                onkeydown="return admin.restrictToNumbers(event)">
                         </div>
                         <div class="form-group" style="border-top: 1px solid #333; padding-top: 10px; margin-top: 5px;">
                             <label
@@ -2164,14 +2206,16 @@
                             </label>
                         </div>
                         <div class="form-group">
-                            <label>Interval střídání (sekundy)</label>
-                            <input type="number" id="input-qr-interval" value="20" min="5" max="60"
-                                oninput="admin.saveSettings(false); game.syncProjection()">
+                            <label>Interval střídání (s)</label>
+                            <input type="number" id="input-qr-interval" value="8" min="5" max="60"
+                                oninput="admin.validateInputRange(this, 60)"
+                                onkeydown="return admin.restrictToNumbers(event)">
                         </div>
                         <div class="form-group">
-                            <label>Délka prolínání (sekundy)</label>
+                            <label>Délka prolínání (s)</label>
                             <input type="number" id="input-qr-transition" value="2" min="1" max="5" step="1"
-                                oninput="admin.saveSettings(false); game.syncProjection()">
+                                oninput="admin.validateInputRange(this, 5)"
+                                onkeydown="return admin.restrictToNumbers(event)">
                         </div>
                     </div>
                 </div>
@@ -2365,10 +2409,9 @@
                         <th class="col-rank">#</th>
                         <th>Družstvo</th>
                         <th class="col-pts">Z</th>
+                        <th class="col-pts">B</th>
                         <th class="col-score">S</th>
                         <th class="col-pts">R</th>
-                        <th class="col-pts">B</th>
-                        <th class="col-rank">M</th>
                     </tr>
                 </thead>
                 <tbody id="pv-stand-body"></tbody>
@@ -2478,7 +2521,7 @@
             players: [],
             masterPlayers: [], // Global pool of all known players (Main database)
             qrCyclingEnabled: false,
-            qrCyclingInterval: 20,
+            qrCyclingInterval: 8,
             qrTransitionDuration: 2,
             qrCyclingActive: false, // Internal state for alternating
             currentMatch: {
@@ -2631,6 +2674,7 @@
                         if (!receivedState || typeof receivedState !== 'object') return;
                         if (receivedState === 'REQUEST_SYNC') return;
 
+
                         // Keep local window modes
                         const modePO = state.isProjectionMode;
                         const modeView = state.viewMode;
@@ -2638,6 +2682,7 @@
                         state.isProjectionMode = modePO;
                         state.viewMode = modeView;
 
+                        state.isSynced = true;
                         ui.updateProjection();
                     };
 
@@ -2654,6 +2699,15 @@
                         } catch (e) { console.error("Firebase sync error:", e); }
                     }
 
+                    const syncRetry = setInterval(() => {
+                        if (state.isSynced) {
+                            console.log("init: Sync successful, stopping retry");
+                            clearInterval(syncRetry);
+                            return;
+                        }
+                        console.log("init: Sync still empty, retrying REQUEST_SYNC...");
+                        syncChannel.postMessage('REQUEST_SYNC');
+                    }, 2000);
                     syncChannel.postMessage('REQUEST_SYNC');
 
                     setInterval(() => {
@@ -2695,8 +2749,17 @@
                     }
 
                     admin.loadFromStorage();
+
+                    // Re-activate current match if any was active before F5
+                    if (state.activeMatchIndex > -1) {
+                        admin.loadMatch(state.activeMatchIndex, false);
+                    }
+
                     ui.renderSchedule();
                     ui.render();
+
+                    // Force broadcast state immediately after load so opened windows get data
+                    game.syncProjection();
 
                     // Listen for sync requests from projection windows
                     syncChannel.onmessage = (event) => {
@@ -2705,9 +2768,7 @@
                         }
                     };
 
-                    // Start periodic Firebase sync (backup sync every 5 seconds or just rely on syncProjection)
-                    // We will rely on game.syncProjection() which is called on every state change.
-
+                    // Start periodic Firebase sync
                     setInterval(() => game.tick(), 100);
                     setInterval(() => ui.updateAdminFooter(), 1000);
                 } catch (e) {
@@ -3073,6 +3134,11 @@
             },
 
             syncProjection: () => {
+                // IMPORTANT: Prevent projection/public windows from broadcasting their (empty) state
+                if (state.isProjectionMode || state.viewMode) {
+                    console.log("syncProjection: Skipping broadcast (not in admin mode)");
+                    return;
+                }
                 const payload = { ...state, telemetry: game.getTelemetry() };
                 const plainPayload = JSON.parse(JSON.stringify(payload));
 
@@ -3575,12 +3641,17 @@
 
                 // Save referees from dynamic list
                 state.referees = [];
-                const refInputs = document.querySelectorAll('.ref-name-input');
-                refInputs.forEach(input => {
-                    const id = input.dataset.id;
-                    const name = input.value.trim();
+                const refRows = document.querySelectorAll('.referee-identity-row');
+                refRows.forEach(row => {
+                    const id = row.dataset.id;
+                    const surname = row.querySelector('.ref-surname-input').value.trim();
+                    const firstName = row.querySelector('.ref-firstname-input').value.trim();
                     if (id) {
-                        state.referees.push({ id, name: name || "Rozhodčí" });
+                        state.referees.push({
+                            id,
+                            surname: surname || "Rozhodčí",
+                            firstName: firstName || ""
+                        });
                     }
                 });
 
@@ -3611,12 +3682,21 @@
                 state.tournamentLocation = document.getElementById('input-tournament-location').value;
                 state.tournamentOrganizer = document.getElementById('input-tournament-organizer').value;
                 state.pitchSize = document.getElementById('input-pitch-size').value;
-                state.officialChiefReferee = document.getElementById('official-chief-referee').value;
-                state.officialTimekeeper = document.getElementById('official-timekeeper').value;
-                state.officialRecorder = document.getElementById('official-recorder').value;
+                state.officialChiefReferee = {
+                    surname: document.getElementById('official-chief-referee-surname').value.trim(),
+                    firstName: document.getElementById('official-chief-referee-firstname').value.trim()
+                };
+                state.officialTimekeeper = {
+                    surname: document.getElementById('official-timekeeper-surname').value.trim(),
+                    firstName: document.getElementById('official-timekeeper-name').value.trim()
+                };
+                state.officialRecorder = {
+                    surname: document.getElementById('official-recorder-surname').value.trim(),
+                    firstName: document.getElementById('official-recorder-name').value.trim()
+                };
 
                 state.qrCyclingEnabled = document.getElementById('input-qr-cycling').checked;
-                state.qrCyclingInterval = Math.max(5, parseInt(document.getElementById('input-qr-interval').value || 20));
+                state.qrCyclingInterval = Math.max(5, parseInt(document.getElementById('input-qr-interval').value || 8));
                 state.qrTransitionDuration = parseFloat(document.getElementById('input-qr-transition').value || 1.5);
 
                 const fileInput = document.getElementById('input-audio-file');
@@ -3690,6 +3770,38 @@
                 ui.render();
             },
 
+            validateInputRange: (input, max) => {
+                let val = parseInt(input.value);
+                if (!isNaN(val)) {
+                    if (val > max) input.value = max;
+                }
+                admin.saveSettings(false);
+            },
+
+            restrictToNumbers: (e) => {
+                // Allow: backspace, delete, tab, escape, enter
+                if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                    // Allow: Ctrl+A,C,V,X
+                    (e.ctrlKey === true && [65, 67, 86, 88].indexOf(e.keyCode) !== -1) ||
+                    // Allow: home, end, left, right
+                    (e.keyCode >= 35 && e.keyCode <= 39)) {
+                    return true;
+                }
+                // Ensure that it is a number and stop the keypress
+                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                    e.preventDefault();
+                    return false;
+                }
+                return true;
+            },
+
+            sanitizeInput: (input) => {
+                let val = input.value;
+                if (val.match(/[<>]/)) {
+                    input.value = val.replace(/[<>]/g, '');
+                }
+            },
+
             renderIdentityInputs: () => {
                 // Teams
                 const teamList = document.getElementById('teams-input-list');
@@ -3702,7 +3814,7 @@
                 const refList = document.getElementById('referees-input-list');
                 refList.innerHTML = "";
                 state.referees.forEach((ref, idx) => {
-                    admin.renderIdentityRow(refList, ref, idx, 'ref');
+                    admin.renderIdentityRow(refList, ref, idx, 'referee');
                 });
 
                 // Players
@@ -3778,8 +3890,10 @@
                 input.dataset.id = item.id;
                 input.value = item.text || "";
                 input.placeholder = "Doplňující info...";
+                input.maxLength = 256;
                 input.style.flex = "1";
                 input.oninput = () => {
+                    admin.sanitizeInput(input);
                     state.misc.find(m => m.id === item.id).text = input.value;
                     admin.saveToStorage(); game.syncProjection();
                 };
@@ -3826,6 +3940,7 @@
                 surnameInput.type = "text";
                 surnameInput.placeholder = "Příjmení";
                 surnameInput.value = item.surname || "";
+                surnameInput.maxLength = 32;
                 surnameInput.style.width = "100%";
 
                 const sSugBox = document.createElement('div');
@@ -3835,6 +3950,7 @@
                 sSugBox.style.zIndex = "1100";
 
                 surnameInput.oninput = () => {
+                    admin.sanitizeInput(surnameInput);
                     item.surname = surnameInput.value;
                     const mp = state.masterPlayers.find(p => p.id === item.id);
                     if (mp) mp.surname = item.surname;
@@ -3856,6 +3972,7 @@
                 nameInput.type = "text";
                 nameInput.placeholder = "Jméno";
                 nameInput.value = item.firstName || "";
+                nameInput.maxLength = 32;
                 nameInput.style.width = "100%";
 
                 const nSugBox = document.createElement('div');
@@ -3866,6 +3983,7 @@
                 nSugBox.style.zIndex = "1100";
 
                 nameInput.oninput = () => {
+                    admin.sanitizeInput(nameInput);
                     item.firstName = nameInput.value;
                     const mp = state.masterPlayers.find(p => p.id === item.id);
                     if (mp) mp.firstName = item.firstName;
@@ -3885,6 +4003,7 @@
                 uciInput.style.flex = "3";
                 uciInput.maxLength = 11;
                 uciInput.oninput = () => {
+                    admin.sanitizeInput(uciInput);
                     const newVal = uciInput.value.trim();
                     // Basic validation: check if UCI-ID is already taken by ANOTHER player
                     if (newVal && state.players.some(p => p.uciId === newVal && p.id !== item.id)) {
@@ -3920,33 +4039,61 @@
 
             renderIdentityRow: (container, item, index, type) => {
                 const div = document.createElement('div');
-                div.style.display = "flex";
-                div.style.gap = "5px";
-                div.style.alignItems = "center";
+                div.className = "identity-row " + (type === 'referee' ? "referee-identity-row" : "team-identity-row");
+                div.dataset.id = item.id;
 
                 const label = document.createElement('span');
-                label.style.width = "80px";
-                label.style.fontSize = "0.8em";
-                label.style.color = "#888";
+                label.className = "identity-label";
                 label.innerText = (type === 'team' ? "Družstvo " : "Rozhodčí ") + (index + 1);
+                div.appendChild(label);
 
-                const input = document.createElement('input');
-                input.type = "text";
-                input.className = type === 'team' ? "team-name-input" : "ref-name-input";
-                input.dataset.id = item.id;
-                input.value = item.name;
-                input.maxLength = 20;
-                input.style.flex = "1";
-                input.oninput = () => {
-                    item.name = input.value;
-                    if (type === 'team') {
+                if (type === 'team') {
+                    const input = document.createElement('input');
+                    input.type = "text";
+                    input.className = "team-name-input";
+                    input.dataset.id = item.id;
+                    input.value = item.name || "";
+                    input.maxLength = 32;
+                    input.style.flex = "1";
+                    input.oninput = () => {
+                        admin.sanitizeInput(input);
+                        item.name = input.value;
                         admin.renderLogoSettings();
                         ui.updateNames();
-                    }
-                    ui.fillSelects();
-                    ui.renderSchedule();
-                    admin.saveToStorage(); game.syncProjection(); // Auto-save on name change
-                };
+                        ui.fillSelects();
+                        ui.renderSchedule();
+                        admin.saveToStorage(); game.syncProjection();
+                    };
+                    div.appendChild(input);
+                } else {
+                    // Referee
+                    const sInput = document.createElement('input');
+                    sInput.type = "text";
+                    sInput.className = "ref-surname-input";
+                    sInput.placeholder = "Příjmení";
+                    sInput.value = item.surname || "";
+                    sInput.style.flex = "1.2";
+                    sInput.oninput = () => {
+                        admin.sanitizeInput(sInput);
+                        item.surname = sInput.value;
+                        ui.fillSelects();
+                        admin.saveToStorage(); game.syncProjection();
+                    };
+                    const nInput = document.createElement('input');
+                    nInput.type = "text";
+                    nInput.className = "ref-firstname-input";
+                    nInput.placeholder = "Jméno";
+                    nInput.value = item.firstName || "";
+                    nInput.style.flex = "1";
+                    nInput.oninput = () => {
+                        admin.sanitizeInput(nInput);
+                        item.firstName = nInput.value;
+                        ui.fillSelects();
+                        admin.saveToStorage(); game.syncProjection();
+                    };
+                    div.appendChild(sInput);
+                    div.appendChild(nInput);
+                }
 
                 const removeBtn = document.createElement('button');
                 removeBtn.className = "small-btn btn-red";
@@ -3968,9 +4115,6 @@
                     admin.renderLogoSettings();
                     admin.saveToStorage(); game.syncProjection(); // Auto-save on removal
                 };
-
-                div.appendChild(label);
-                div.appendChild(input);
 
                 if (type === 'team') {
                     // Player selection UI
@@ -3999,6 +4143,7 @@
                     suggestionBox.style.display = "none";
 
                     playerInput.oninput = () => {
+                        admin.sanitizeInput(playerInput);
                         admin.showPlayerSuggestions(playerInput, suggestionBox, {
                             context: 'team-assign',
                             team: item,
@@ -4132,9 +4277,25 @@
                 return team ? team.name : (id ? "XXX" : "Tým");
             },
 
-            getRefName: (id) => {
-                const ref = state.referees.find(r => r.id === id);
-                return ref ? ref.name : (id || "-");
+            getRefName: (inp, full = false) => {
+                if (!inp) return "-";
+                let ref = null;
+                if (typeof inp === 'string') {
+                    ref = state.referees.find(r => r.id === inp);
+                    if (!ref) return inp;
+                } else if (typeof inp === 'object') {
+                    ref = inp;
+                } else return "-";
+
+                if (full) {
+                    if (ref.surname || ref.firstName) {
+                        return `${ref.surname || ""} ${ref.firstName || ""}`.trim() || "-";
+                    }
+                    return ref.name || "-";
+                } else {
+                    // UI view: Surname only (or fallback to shared name)
+                    return ref.surname || ref.name || "-";
+                }
             },
 
             getTeamPlayers: (teamId) => {
@@ -4155,7 +4316,7 @@
 
             addRefereeSlot: () => {
                 const id = "ref_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-                state.referees.push({ id, name: "" });
+                state.referees.push({ id, surname: "", firstName: "" });
                 admin.renderIdentityInputs();
                 admin.saveToStorage(); game.syncProjection();
             },
@@ -4580,8 +4741,65 @@
                 // ID-based system handles renames implicitly.
             },
 
+            resetTournament: () => {
+                if (confirm("Opravdu chcete resetovat TURNAJ? Vymaže se rozpis, družstva a výsledky. Nastavení aplikace (zvuky, téma, master databáze) zůstane zachováno.")) {
+                    // 1. Stop timer
+                    if (state.timer.running) {
+                        game.toggleTimer();
+                    }
+
+                    // 2. Clear Tournament Data
+                    state.tournamentName = "";
+                    state.tournamentCategory = "";
+                    state.tournamentDate = new Date().toISOString().split('T')[0];
+                    state.tournamentLocation = "";
+                    state.tournamentOrganizer = "";
+                    state.pitchSize = "11 x 14 (m)";
+                    state.officialChiefReferee = "";
+                    state.officialRecorder = "";
+                    state.officialTimekeeper = "";
+
+                    state.teams = [];
+                    state.players = []; // Tournament players
+                    state.referees = [];
+                    state.schedule = [];
+                    state.misc = []; // Misc info
+
+                    // 3. Clear Assets linked to teams (optional, but good for cleanup)
+                    state.teamLogos = {};
+                    state.teamAnthems = {};
+
+                    // 4. Reset Match State
+                    state.currentMatch = {
+                        title: "",
+                        homeName: "Domácí",
+                        guestName: "Hosté",
+                        homeScore: 0,
+                        guestScore: 0,
+                        referee: "",
+                        phaseIndex: 0,
+                        isEvent: false,
+                        duration: 600
+                    };
+                    state.activeMatchIndex = -1;
+                    state.pendingEditIndex = -1;
+                    state.selectedIndices = [];
+
+                    // 5. Reset Timer State
+                    state.timer.timeLeft = state.times.play; // Default to play time
+                    state.timer.lastTick = 0;
+                    state.playTimeAccumulated = 0;
+                    state.tournamentStartTime = null;
+
+                    // 6. Save and Reload/Render
+                    admin.saveToStorage();
+                    alert("Turnaj byl resetován.");
+                    location.reload();
+                }
+            },
+
             resetApp: () => {
-                if (confirm("Opravdu chcete vymazat všechna data aplikace (týmy, rozpis, zvuk, jingly)? Tuto akci nelze vzít zpět.")) {
+                if (confirm("Opravdu chcete vymazat všechna data aplikace (družstva, rozpis, zvuk, jingly)? Tuto akci nelze vzít zpět.")) {
                     localStorage.removeItem('scoreboardState');
 
                     const deleteDB = (name) => {
@@ -4918,9 +5136,40 @@
 
                         if (json.length < 1) {
                             alert("Soubor je prázdný nebo nečitelný.");
+                            input.value = "";
                             return;
                         }
 
+                        // --- INTELLIGENT DETECTION: Backup vs Schedule ---
+
+                        // Check for Backup Signature:
+                        // 1. Row 12 (index 12) usually contains header "Pořadí" | "Název / Skupina" | "Domácí družstvo"
+                        // 2. Row 0 (index 0) usually has tournament name
+                        let isBackup = false;
+                        let backupHeaderRow = -1;
+
+                        // Scan specifically for Backup Header signature around row 12 (allow some slack)
+                        for (let r = 10; r < 15; r++) {
+                            if (json[r]) {
+                                const rowStr = json[r].join(" ").toLowerCase();
+                                if (rowStr.includes("pořadí") && rowStr.includes("domácí družstvo") && rowStr.includes("hostující družstvo")) {
+                                    isBackup = true;
+                                    backupHeaderRow = r;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (isBackup) {
+                            if (confirm(`Detekována záloha turnaje "${json[0]?.[0] || 'Neznámý'}".\n\nChcete OBNOVIT celý turnaj ze zálohy?\n(Tato akce nahradí všechna data turnaje)`)) {
+                                admin._restoreTournamentFromBackup(json, backupHeaderRow);
+                                input.value = "";
+                                return;
+                            }
+                            // If user cancels, we fall through to try standard schedule import
+                        }
+
+                        // --- STANDARD SCHEDULE IMPORT LOGIC (Original) ---
                         const newMatches = [];
                         let colMap = { title: 0, home: 1, guest: 2, referee: 3, duration: 4 };
                         let headerRowIndex = -1;
@@ -4949,11 +5198,13 @@
                         }
 
                         let startRow = headerRowIndex + 1;
-                        let addedTeams = 0;
-                        let addedRefs = 0;
+                        // Determine basic duration fallback
+                        const fallbackDuration = (state.times.play * 2) + state.times.break;
 
                         const usedTeamIds = new Set();
                         const usedRefIds = new Set();
+                        let addedTeams = 0;
+                        let addedRefs = 0;
 
                         for (let i = startRow; i < json.length; i++) {
                             const row = json[i];
@@ -4963,8 +5214,13 @@
                             const home = String(row[colMap.home] || "").trim();
                             const guest = String(row[colMap.guest] || "").trim();
                             const ref = String(row[colMap.referee] || "").trim();
-                            const durationVal = row[colMap.duration];
-                            const duration = parseInt(durationVal || 600);
+
+                            // Parse duration if column exists, else use rule-based default
+                            let duration = fallbackDuration;
+                            if (colMap.duration !== undefined) {
+                                const dVal = parseInt(row[colMap.duration]);
+                                if (!isNaN(dVal) && dVal > 0) duration = dVal;
+                            }
 
                             const resHome = admin.ensureIdentityExists(home, 'team');
                             if (resHome) {
@@ -5019,20 +5275,290 @@
                         input.value = "";
                     } catch (err) {
                         console.error(err);
-                        alert("Chyba při čtení souboru. Ujistěte se, že je to platný Excel nebo CSV.");
+                        alert("Chyba při čtení souboru. Ujistěte se, že je to platný Excel nebo CSV.\n\n" + err.message);
+                        input.value = "";
                     }
                 };
                 reader.readAsArrayBuffer(file);
             },
 
+            _restoreTournamentFromBackup: (json, headerRowIndex) => {
+                try {
+                    // Parse metadata (rows 0-10)
+                    state.tournamentName = json[0][0] || "";
+                    state.tournamentCategory = json[1][1] || "";
+                    state.tournamentOrganizer = json[2][1] || "";
+
+                    let dateStr = json[3][1];
+                    if (dateStr && dateStr !== "-") {
+                        if (dateStr instanceof Date) {
+                            state.tournamentDate = dateStr.toISOString().split('T')[0];
+                        } else {
+                            // Robust parsing of "D. M. YYYY" or "D.M.YYYY"
+                            const cleanDate = String(dateStr).replace(/\s/g, '');
+                            const parts = cleanDate.split('.');
+                            if (parts.length === 3) {
+                                const d = parts[0].padStart(2, '0');
+                                const m = parts[1].padStart(2, '0');
+                                const y = parts[2];
+                                // Check if year is 4 digits
+                                if (y.length === 4) {
+                                    state.tournamentDate = `${y}-${m}-${d}`;
+                                }
+                            }
+                        }
+                    }
+
+                    state.tournamentLocation = json[4][1] || "";
+                    state.pitchSize = json[5][1] || "";
+
+                    const splitName = (val) => {
+                        if (!val || val === "-") return { surname: "", firstName: "" };
+                        const p = String(val).trim().split(" ");
+                        return { surname: p[0] || "", firstName: p.slice(1).join(" ") || "" };
+                    };
+
+                    state.officialChiefReferee = splitName(json[6][1]);
+                    state.officialTimekeeper = splitName(json[7][1]);
+                    state.officialRecorder = splitName(json[8][1]);
+
+                    // Scoring Rules
+                    const ruleStr = json[9][1];
+                    if (ruleStr && String(ruleStr).includes("/")) {
+                        const pts = String(ruleStr).split("/");
+                        if (!state.rules) state.rules = {};
+                        state.rules.winPoints = parseInt(pts[0]) || 3;
+                        state.rules.drawPoints = parseInt(pts[1]) || 1;
+                        state.rules.lossPoints = parseInt(pts[2]) || 0;
+                    }
+                    const miniStr = json[10][1];
+                    if (!state.rules) state.rules = {};
+                    state.rules.useMiniTables = (miniStr === "Ano");
+
+                    // Times
+                    const timeStr = json[11][1];
+                    if (timeStr && String(timeStr).includes("/")) {
+                        const tpt = String(timeStr).split("/");
+                        if (!state.times) state.times = {};
+                        state.times.play = parseInt(tpt[0]) || 420;
+                        state.times.break = parseInt(tpt[1]) || 105;
+                        state.times.setup = parseInt(tpt[2]) || 10;
+                    }
+
+                    // Clear basics
+                    state.teams = [];
+                    state.players = [];
+                    state.referees = [];
+                    state.schedule = [];
+                    state.teamLogos = {};
+                    state.teamAnthems = {};
+                    state.activeMatchIndex = -1;
+                    state.misc = [];
+
+                    // --- 1. Parse Schedule FIRST to build base Team/Ref maps ---
+                    const teamMap = new Map(); // name -> id
+                    const refMap = new Map(); // name -> id
+
+                    let currentRowIndex = headerRowIndex + 1;
+
+                    // Keep reading until we hit an empty row or a known section header
+                    for (; currentRowIndex < json.length; currentRowIndex++) {
+                        const row = json[currentRowIndex];
+                        if (!row || row.length < 2) break; // Break on empty/short row between sections
+
+                        const firstCell = String(row[0] || "").trim().toUpperCase();
+                        if (firstCell.includes("SBOR ROZHODČÍCH") || firstCell.includes("SOUPISKY DRUŽSTEV") || firstCell.includes("RŮZNÉ")) {
+                            break; // End of schedule, start of new section
+                        }
+
+                        const title = String(row[1] || "").trim();
+                        const homeTeam = String(row[2] || "").trim();
+                        const guestTeam = String(row[3] || "").trim();
+                        const scoreStr = String(row[4] || "").trim();
+                        const refName = String(row[5] || "").trim();
+                        const duration = parseInt(row[6]) || 600;
+
+                        const isEvent = homeTeam === "-" || homeTeam === "" || title.includes("UDÁLOST");
+
+                        if (isEvent) {
+                            state.schedule.push({
+                                type: 'event',
+                                title: title,
+                                duration: duration
+                            });
+                        } else {
+                            if (homeTeam && !teamMap.has(homeTeam)) {
+                                const id = "team_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+                                teamMap.set(homeTeam, id);
+                                state.teams.push({ id, name: homeTeam, playerIds: [] });
+                            }
+                            if (guestTeam && !teamMap.has(guestTeam)) {
+                                const id = "team_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+                                teamMap.set(guestTeam, id);
+                                state.teams.push({ id, name: guestTeam, playerIds: [] });
+                            }
+                            if (refName && refName !== "-" && !refMap.has(refName)) {
+                                const id = "ref_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+                                refMap.set(refName, id);
+                                const p = String(refName).trim().split(" ");
+                                state.referees.push({
+                                    id,
+                                    surname: p[0] || "",
+                                    firstName: p.slice(1).join(" ") || ""
+                                });
+                            }
+
+                            let homeScore = null;
+                            let guestScore = null;
+                            if (scoreStr && scoreStr !== "-" && scoreStr.includes(":")) {
+                                const parts = scoreStr.split(":");
+                                homeScore = parseInt(parts[0]);
+                                guestScore = parseInt(parts[1]);
+                                if (isNaN(homeScore) || isNaN(guestScore)) { homeScore = null; guestScore = null; }
+                            }
+
+                            state.schedule.push({
+                                type: 'match',
+                                title: title,
+                                home: teamMap.get(homeTeam),
+                                guest: teamMap.get(guestTeam),
+                                referee: refMap.get(refName) || "",
+                                homeScore: homeScore,
+                                guestScore: guestScore,
+                                duration: duration
+                            });
+                        }
+                    }
+
+                    // --- 2. Parse Other Sections ---
+                    // Scan remaining rows for section headers
+                    let section = null; // 'refs', 'rosters', 'misc'
+
+                    for (; currentRowIndex < json.length; currentRowIndex++) {
+                        const row = json[currentRowIndex];
+                        if (!row || row.length === 0) continue;
+
+                        const val0 = String(row[0] || "").trim().toUpperCase();
+                        const val1 = String(row[1] || "").trim().toUpperCase();
+
+                        // Detect Section Headers
+                        if (val0 === "SBOR ROZHODČÍCH") { section = 'refs'; continue; }
+                        if (val0 === "SOUPISKY DRUŽSTEV" || (val0 === "DRUŽSTVO" && val1.includes("HRÁČ"))) { section = 'rosters'; continue; }
+                        if (val0 === "RŮZNÉ") { section = 'misc'; continue; }
+
+                        // Parse Content based on current section
+                        if (section === 'refs') {
+                            const name = String(row[0] || "").trim();
+                            if (name && !refMap.has(name)) {
+                                const id = "ref_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+                                refMap.set(name, id);
+                                const p = String(name).trim().split(" ");
+                                state.referees.push({
+                                    id,
+                                    surname: p[0] || "",
+                                    firstName: p.slice(1).join(" ") || ""
+                                });
+                            }
+                        }
+                        else if (section === 'rosters') {
+                            // Column 0: Team Name
+                            // Column 1: Player 1 Name, Column 2: UCI-ID 1
+                            // Column 3: Player 2 Name, Column 4: UCI-ID 2
+                            const tName = String(row[0] || "").trim();
+                            // Skip header row if repeated
+                            if (tName === "SOUPISKY DRUŽSTEV" || tName === "DRUŽSTVO") continue;
+
+                            if (tName) {
+                                // Find team
+                                let tId = teamMap.get(tName);
+                                if (!tId) {
+                                    tId = "team_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+                                    teamMap.set(tName, tId);
+                                    state.teams.push({ id: tId, name: tName, playerIds: [] });
+                                }
+                                const teamObj = state.teams.find(t => t.id === tId);
+
+                                // Helper to process player
+                                const processPlayer = (name, uci) => {
+                                    if (!name || name === "-") return null;
+                                    // Parse name
+                                    const parts = name.split(" ");
+                                    const surname = parts[0] || "";
+                                    const firstname = parts.slice(1).join(" ") || "";
+
+                                    // Make new player (no complex lookup needed for backup restore, we trust the file)
+                                    const pid = "player_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+                                    state.players.push({
+                                        id: pid,
+                                        firstName: firstname,
+                                        surname: surname,
+                                        uciId: uci || ""
+                                    });
+                                    return pid;
+                                };
+
+                                const p1Id = processPlayer(String(row[1] || "").trim(), String(row[2] || "").trim());
+                                const p2Id = processPlayer(String(row[3] || "").trim(), String(row[4] || "").trim());
+
+                                teamObj.playerIds = [];
+                                if (p1Id) teamObj.playerIds.push(p1Id);
+                                if (p2Id) teamObj.playerIds.push(p2Id);
+                            }
+                        }
+                        else if (section === 'misc') {
+                            const text = String(row[0] || "").trim();
+                            if (text) {
+                                state.misc.push({ id: "misc_" + Date.now() + "_" + Math.floor(Math.random() * 1000), text });
+                            }
+                        }
+                    }
+
+                    // Reset current match
+                    state.currentMatch = {
+                        title: "",
+                        homeName: "Domácí",
+                        guestName: "Hosté",
+                        homeScore: 0,
+                        guestScore: 0,
+                        referee: "",
+                        phaseIndex: 0,
+                        isEvent: false,
+                        duration: 600
+                    };
+
+                    // Save and refresh UI
+                    admin.saveToStorage();
+                    admin.renderIdentityInputs();
+                    admin.renderLogoSettings();
+                    ui.fillSelects();
+                    ui.renderSchedule();
+                    admin.updateSettingsUI(); // Update metadata inputs!
+                    ui.renderStandings();
+                    game.syncProjection();
+
+                    alert(`Obnovení turnaje dokončeno!\n\nTurnaj: ${state.tournamentName}\nDružstva: ${state.teams.length}\nZápasy: ${state.schedule.filter(m => m.type === 'match').length}\nRozhodčí: ${state.referees.length}`);
+                } catch (e) {
+                    console.error(e);
+                    alert("Chyba při obnově ze zálohy: " + e.message);
+                }
+            },
+
             ensureIdentityExists: (name, type) => {
                 if (!name || name === "-" || name.toLowerCase() === "volno") return null;
                 const list = type === 'team' ? state.teams : state.referees;
-                const existing = list.find(item => item.name.toLowerCase() === name.toLowerCase());
+                const existing = list.find(item => {
+                    if (type === 'team') return item.name && item.name.toLowerCase() === name.toLowerCase();
+                    const fullName = admin.getRefName(item.id).toLowerCase();
+                    return fullName === name.toLowerCase();
+                });
                 if (existing) return existing.id;
-
                 const id = (type === 'team' ? "team_" : "ref_") + Date.now() + "_" + Math.floor(Math.random() * 1000);
-                list.push({ id, name });
+                if (type === 'team') {
+                    list.push({ id, name });
+                } else {
+                    const p = name.trim().split(" ");
+                    list.push({ id, surname: p[0] || "", firstName: p.slice(1).join(" ") || "" });
+                }
                 return id;
             },
 
@@ -5524,6 +6050,78 @@
                 }
             },
 
+            updateSettingsUI: () => {
+                const setVal = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = val || "";
+                };
+                setVal('input-tournament-name', state.tournamentName);
+                setVal('input-tournament-date', state.tournamentDate);
+                setVal('input-tournament-location', state.tournamentLocation);
+                setVal('input-tournament-organizer', state.tournamentOrganizer);
+                setVal('input-pitch-size', state.pitchSize);
+
+                // Officials (handle objects or strings)
+                const populateOfficial = (prefix, val) => {
+                    if (val && typeof val === 'object') {
+                        setVal(prefix + '-surname', val.surname);
+                        setVal(prefix + '-firstname', val.firstName);
+                    } else if (typeof val === 'string') {
+                        // Migration-on-the-fly for UI display
+                        const p = val.trim().split(' ');
+                        setVal(prefix + '-surname', p[0]);
+                        setVal(prefix + '-firstname', p.slice(1).join(' '));
+                    }
+                };
+                populateOfficial('official-chief-referee', state.officialChiefReferee);
+                populateOfficial('official-timekeeper', state.officialTimekeeper);
+                populateOfficial('official-recorder', state.officialRecorder);
+                // Category needs special handling to match options
+                const catEl = document.getElementById('input-tournament-category');
+                if (catEl) catEl.value = state.tournamentCategory || "";
+
+                // Times
+                if (state.times) {
+                    setVal('time-play', state.times.play);
+                    setVal('time-break', state.times.break);
+                    setVal('time-setup', state.times.setup);
+                }
+
+                if (state.rules) {
+                    setVal('rule-win', state.rules.winPoints);
+                    setVal('rule-draw', state.rules.drawPoints);
+                    setVal('rule-loss', state.rules.lossPoints);
+                    const miniEl = document.getElementById('rule-mini-tables');
+                    if (miniEl) miniEl.checked = !!state.rules.useMiniTables;
+                }
+
+                setVal('input-cloud-file-id', state.cloudFileId);
+                setVal('input-vol-signal', state.volSignal || 1.0);
+                const vsDisp = document.getElementById('vol-signal-disp');
+                if (vsDisp) vsDisp.innerText = Math.round((state.volSignal || 1.0) * 100);
+
+                setVal('input-vol-anthem', state.volAnthem || 1.0);
+                const vaDisp = document.getElementById('vol-anthem-disp');
+                if (vaDisp) vaDisp.innerText = Math.round((state.volAnthem || 1.0) * 100);
+
+                setVal('input-theme', state.theme || "light");
+                setVal('input-po-delay', state.poTransitionDelay || 10);
+                const footerEl = document.getElementById('input-show-footer');
+                if (footerEl) footerEl.checked = (state.showFooter !== false);
+
+                const jingleEl = document.getElementById('input-jingle-mode');
+                if (jingleEl) jingleEl.value = state.jingleMode || "manual";
+
+                const musicAuto = document.getElementById('input-music-auto');
+                if (musicAuto) musicAuto.checked = !!state.musicAutoEnabled;
+                const musicMode = document.getElementById('input-music-mode');
+                if (musicMode) musicMode.value = state.musicMode || 'continuous';
+                const musicFade = document.getElementById('input-music-fade');
+                if (musicFade) musicFade.value = state.musicFadeDuration || 1;
+                const fadeDisp = document.getElementById('fade-dur-disp');
+                if (fadeDisp) fadeDisp.innerText = state.musicFadeDuration || 1;
+            },
+
             saveToStorage: () => {
                 localStorage.setItem('scoreboardState', JSON.stringify(state));
             },
@@ -5577,6 +6175,28 @@
                     if (parsed.officialChiefReferee) state.officialChiefReferee = parsed.officialChiefReferee;
                     if (parsed.officialTimekeeper) state.officialTimekeeper = parsed.officialTimekeeper;
                     if (parsed.officialRecorder) state.officialRecorder = parsed.officialRecorder;
+
+                    const migrateOfficial = (val) => {
+                        if (typeof val === 'string' && val.trim()) {
+                            const p = val.trim().split(' ');
+                            return { surname: p[0], firstName: p.slice(1).join(' ') };
+                        }
+                        if (val && typeof val === 'object' && (val.surname || val.firstName)) return val;
+                        return { surname: "", firstName: "" };
+                    };
+                    state.officialChiefReferee = migrateOfficial(state.officialChiefReferee);
+                    state.officialTimekeeper = migrateOfficial(state.officialTimekeeper);
+                    state.officialRecorder = migrateOfficial(state.officialRecorder);
+
+                    // Migrate referees
+                    state.referees.forEach(r => {
+                        if (r.name && !r.surname && !r.firstName) {
+                            const p = r.name.trim().split(' ');
+                            r.surname = p[0];
+                            r.firstName = p.slice(1).join(' ');
+                            delete r.name;
+                        }
+                    });
                     if (parsed.cloudFileId) state.cloudFileId = parsed.cloudFileId;
 
                     // Fallback to default if empty or only empty rows exist
@@ -5674,77 +6294,12 @@
                     });
                 }
 
-                // Set Inputs
-                document.getElementById('input-tournament-name').value = state.tournamentName;
-                document.getElementById('input-tournament-category').value = state.tournamentCategory || "";
-                document.getElementById('time-setup').value = state.times.setup;
-                document.getElementById('time-play').value = state.times.play;
-                document.getElementById('time-break').value = state.times.break;
-
-                // Volume Controls
-                document.getElementById('input-cloud-file-id').value = state.cloudFileId || "";
-
-                // Metadata inputs
-                document.getElementById('input-tournament-date').value = state.tournamentDate || "";
-                document.getElementById('input-tournament-location').value = state.tournamentLocation || "";
-                document.getElementById('input-pitch-size').value = state.pitchSize || "11 x 14 (m)";
-                document.getElementById('official-chief-referee').value = state.officialChiefReferee || "";
-                document.getElementById('official-timekeeper').value = state.officialTimekeeper || "";
-                document.getElementById('official-recorder').value = state.officialRecorder || "";
-
-                // Populate and set organizer
-                const orgSelect = document.getElementById('input-tournament-organizer');
-                if (orgSelect) {
-                    orgSelect.innerHTML = '<option value="">-- vybrat ze seznamu --</option>';
-                    CLUBS.forEach(club => {
-                        const opt = document.createElement('option');
-                        opt.value = club;
-                        opt.innerText = club;
-                        orgSelect.appendChild(opt);
-                    });
-                    orgSelect.value = state.tournamentOrganizer || "";
-                }
-                document.getElementById('input-vol-signal').value = state.volSignal || 1.0;
-                document.getElementById('vol-signal-disp').innerText = Math.round((state.volSignal || 1.0) * 100);
-                document.getElementById('input-vol-anthem').value = state.volAnthem || 1.0;
-                document.getElementById('vol-anthem-disp').innerText = Math.round((state.volAnthem || 1.0) * 100);
-                document.getElementById('input-theme').value = state.theme || "light";
-                document.getElementById('input-po-delay').value = state.poTransitionDelay || 10;
-                document.getElementById('input-show-footer').checked = (state.showFooter !== false);
-
-                if (state.rules) {
-                    document.getElementById('rule-win').value = state.rules.winPoints;
-                    document.getElementById('rule-draw').value = state.rules.drawPoints;
-                    document.getElementById('rule-loss').value = state.rules.lossPoints;
-                    document.getElementById('rule-mini-tables').checked = !!state.rules.useMiniTables;
-                }
-
-                if (state.jingleMode) {
-                    const el = document.getElementById('input-jingle-mode');
-                    if (el) el.value = state.jingleMode;
-                }
+                admin.updateSettingsUI();
                 jingles.list();
 
                 state.isLoading = false;
 
-                // Ensure Rules are locked on load
-                const lockToggle = document.getElementById('rule-lock-toggle');
-                if (lockToggle) {
-                    lockToggle.checked = false;
-                    admin.toggleRulesLock();
-                }
-
                 ui.updateFooterVisibility();
-
-                // Music Settings
-                const elAuto = document.getElementById('input-music-auto');
-                if (elAuto) elAuto.checked = state.musicAutoEnabled;
-                const elMode = document.getElementById('input-music-mode');
-                if (elMode) elMode.value = state.musicMode || 'continuous';
-                const elFade = document.getElementById('input-music-fade');
-                if (elFade) elFade.value = state.musicFadeDuration || 1;
-                const elFadeDisp = document.getElementById('fade-dur-disp');
-                if (elFadeDisp) elFadeDisp.innerText = state.musicFadeDuration || 1;
 
                 const elAutoChange = document.getElementById('input-music-auto-change');
                 if (elAutoChange) elAutoChange.value = state.musicAutoChangeStrategy || 'continuous';
@@ -5764,13 +6319,25 @@
                 ui.updateDurationHints(); // INIT DURATION HINTS
 
                 // Init music handle if exists
-                music.getHandle().then(h => {
-                    if (h) {
-                        directoryHandle = h;
-                        music.listTracks(); // Try to list if access is already granted
-                        document.getElementById('music-list').innerHTML = `<li style="color:#4caf50; font-size:0.8em; text-align:center; padding:10px;">Složka nalezena. Klikněte na 'Vybrat složku' pro obnovení přístupu.</li>`;
-                    }
-                });
+                if (typeof music !== 'undefined' && music.getHandle) {
+                    music.getHandle().then(h => {
+                        if (h) {
+                            directoryHandle = h;
+                            music.listTracks();
+                            const mList = document.getElementById('music-list');
+                            if (mList) mList.innerHTML = `<li style="color:#4caf50; font-size:0.8em; text-align:center; padding:10px;">Složka nalezena.</li>`;
+                        }
+                    });
+                }
+
+                // Ensure Rules are locked on load
+                const lockToggle = document.getElementById('rule-lock-toggle');
+                if (lockToggle) {
+                    lockToggle.checked = false;
+                    admin.toggleRulesLock();
+                }
+
+                state.isLoading = false;
             },
 
             openPublicView: (view) => {
@@ -5800,9 +6367,9 @@
         const exporter = {
             resolveName: (id, type) => {
                 if (!id) return "-";
-                const list = type === 'team' ? state.teams : state.referees;
-                const found = list.find(item => item.id === id);
-                return found ? found.name : id; // Fallback to ID if not found (legacy or manual)
+                if (type === 'ref') return admin.getRefName(id, true);
+                const team = state.teams.find(item => item.id === id);
+                return team ? team.name : id;
             },
             toXLSX: () => {
                 const wb = XLSX.utils.book_new();
@@ -5815,9 +6382,12 @@
                     ["Datum:", state.tournamentDate ? new Date(state.tournamentDate).toLocaleDateString('cs-CZ') : "-"],
                     ["Místo:", state.tournamentLocation || "-"],
                     ["Plocha:", state.pitchSize || "-"],
-                    ["Hlavní rozhodčí:", state.officialChiefReferee || "-"],
-                    ["Časoměřič:", state.officialTimekeeper || "-"],
-                    ["Zapisovatel:", state.officialRecorder || "-"],
+                    ["Hlavní rozhodčí:", admin.getRefName(state.officialChiefReferee, true)],
+                    ["Časoměřič:", admin.getRefName(state.officialTimekeeper, true)],
+                    ["Zapisovatel:", admin.getRefName(state.officialRecorder, true)],
+                    ["Pravidla (V/R/P):", `${state.rules.winPoints}/${state.rules.drawPoints}/${state.rules.lossPoints}`],
+                    ["Minitabulky:", state.rules.useMiniTables ? "Ano" : "Ne"],
+                    ["Časy (Hra/Přest./Úkl.):", `${state.times.play}/${state.times.break}/${state.times.setup}`],
                     ["Exportováno:", new Date().toLocaleString('cs-CZ')],
                     [] // divider row
                 ];
@@ -5838,12 +6408,56 @@
                 XLSX.utils.sheet_add_json(ws, scheduleData, { origin: "A13" });
                 XLSX.utils.book_append_sheet(wb, ws, "Rozpis");
 
-                const filename = (state.tournamentName || "Export") + "_Rozpis.xlsx";
+                const filename = (state.tournamentName || "Export") + " (OmS).xlsx";
+
+                // --- SECTIONS APPENDING ---
+
+                // 0. Standings
+                const standings = admin.calculateStandings();
+                const standingsStartRow = 13 + scheduleData.length + 2;
+                const standingsData = [["TABULKA TURNAJE", "Z", "V", "R", "P", "Skóre", "Rozdíl", "Body"]];
+                standings.forEach(s => {
+                    standingsData.push([s.name, s.gp, s.w, s.d, s.l, `${s.gf}:${s.ga}`, s.gd, s.pts]);
+                });
+                XLSX.utils.sheet_add_aoa(ws, standingsData, { origin: "A" + standingsStartRow });
+
+                // 1. Referees
+                const refStartRow = standingsStartRow + standingsData.length + 2;
+                const refData = [["SBOR ROZHODČÍCH"]];
+                state.referees.forEach(r => refData.push([admin.getRefName(r.id, true)]));
+                XLSX.utils.sheet_add_aoa(ws, refData, { origin: "A" + refStartRow });
+
+                // 2. Rosters (Teams + Players)
+                const rosterStartRow = refStartRow + refData.length + 2;
+                const rosterData = [["SOUPISKY DRUŽSTEV", "Hráč 1", "UCI-ID 1", "Hráč 2", "UCI-ID 2"]];
+                state.teams.forEach(t => {
+                    const idx1 = t.playerIds && t.playerIds[0];
+                    const idx2 = t.playerIds && t.playerIds[1];
+                    const p1 = idx1 ? state.players.find(p => p.id === idx1) : null;
+                    const p2 = idx2 ? state.players.find(p => p.id === idx2) : null;
+                    rosterData.push([
+                        t.name,
+                        p1 ? `${p1.surname} ${p1.firstName}` : "",
+                        p1 ? p1.uciId : "",
+                        p2 ? `${p2.surname} ${p2.firstName}` : "",
+                        p2 ? p2.uciId : ""
+                    ]);
+                });
+                XLSX.utils.sheet_add_aoa(ws, rosterData, { origin: "A" + rosterStartRow });
+
+                // 3. Misc
+                const miscStartRow = rosterStartRow + rosterData.length + 2;
+                const miscData = [["RŮZNÉ"]];
+                state.misc.forEach(m => {
+                    if (m.text) miscData.push([m.text]);
+                });
+                XLSX.utils.sheet_add_aoa(ws, miscData, { origin: "A" + miscStartRow });
+
                 XLSX.writeFile(wb, filename);
             },
             toPrintable: () => {
                 const win = window.open('', '_blank');
-                let html = `<html><head><title>Tisk rozpisu - ${state.tournamentName}</title>
+                let html = `<html><head><title>${state.tournamentName || "Turnaj"} (OmS)</title>
                 <style>
                     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
                     table { width: 100%; border-collapse: collapse; margin-top: 30px; box-shadow: 0 2px 3px rgba(0,0,0,0.1); }
@@ -5871,14 +6485,31 @@
                         <strong>Plocha:</strong> ${state.pitchSize || "-"}
                     </div>
                     <div>
-                        <strong>Hlavní rozhodčí:</strong> ${state.officialChiefReferee || "-"}<br>
-                        <strong>Časoměřič:</strong> ${state.officialTimekeeper || "-"}<br>
-                        <strong>Zapisovatel:</strong> ${state.officialRecorder || "-"}
+                        <strong>Hlavní rozhodčí:</strong> ${admin.getRefName(state.officialChiefReferee, true) || "-"}<br>
+                        <strong>Časoměřič:</strong> ${admin.getRefName(state.officialTimekeeper, true) || "-"}<br>
+                        <strong>Zapisovatel:</strong> ${admin.getRefName(state.officialRecorder, true) || "-"}
                     </div>
-                    <div style="grid-column: span 2; margin-top:5px; pt:5px; border-top:1px solid #ddd; font-size:0.8em; color:#888;">
+                    
+                    <div style="grid-column: span 2; margin-top:10px; padding:10px; background:#f1f1f1; border-radius:4px; font-size:0.85em; display:flex; gap:30px; border: 1px solid #ddd;">
+                        <div><strong>Bodování:</strong> Výhra ${state.rules.winPoints} / Remíza ${state.rules.drawPoints} / Prohra ${state.rules.lossPoints}</div>
+                        <div><strong>Minitabulky:</strong> ${state.rules.useMiniTables ? "Ano" : "Ne"}</div>
+                        <div><strong>Časy:</strong> Hra ${Math.floor(state.times.play / 60)}:${(state.times.play % 60).toString().padStart(2, '0')} | Přestávka ${Math.floor(state.times.break / 60)}:${(state.times.break % 60).toString().padStart(2, '0')}</div>
+                    </div>
+
+                    <div style="grid-column: span 2; margin-top:5px; padding-top:5px; border-top:1px solid #ddd; font-size:0.8em; color:#888;">
                         Exportováno: ${new Date().toLocaleString('cs-CZ')}
                     </div>
                 </div>`;
+
+                // --- NEW: Referee List ---
+                if (state.referees.length > 0) {
+                    html += `<h2 style="margin-top:20px;">Sbor rozhodčích</h2>`;
+                    html += `<ul style="list-style-type:none; padding:0; display:flex; flex-wrap:wrap; gap:15px;">`;
+                    state.referees.forEach(r => {
+                        html += `<li style="background:#f1f1f1; padding:5px 10px; border-radius:4px;">${r.name}</li>`;
+                    });
+                    html += `</ul>`;
+                }
 
                 // --- NEW: Team Roster Table ---
                 if (state.teams.length > 0) {
@@ -6025,7 +6656,9 @@
                 </body></html>`;
                 win.document.write(html);
                 win.document.close();
-            }
+            },
+
+
         };
 
         function openProjectionWindow() {
@@ -6420,7 +7053,7 @@
                     const currentVal = sel.value;
                     sel.innerHTML = '<option value="">-- Vyber Rozhodčího --</option>';
                     state.referees.forEach(r => {
-                        sel.innerHTML += `<option value="${r.id}">${r.name}</option>`;
+                        sel.innerHTML += `<option value="${r.id}">${admin.getRefName(r.id)}</option>`;
                     });
                     if (state.referees.some(r => r.id === currentVal) || currentVal === "") sel.value = currentVal;
                 });
@@ -6733,14 +7366,8 @@
                     const teams = usedState.teams || [];
                     const referees = usedState.referees || [];
 
-                    const getTName = (id) => {
-                        const t = teams.find(x => x.id === id);
-                        return t ? t.name : (id ? "XXX" : "Družstvo");
-                    };
-                    const getRName = (id) => {
-                        const r = referees.find(x => x.id === id);
-                        return r ? r.name : (id || "-");
-                    };
+                    const getTName = (id) => admin.getTeamName(id);
+                    const getRName = (id) => admin.getRefName(id);
 
                     // Update Theme
                     document.body.classList.toggle('theme-dark', usedState.theme === 'dark');
@@ -6782,17 +7409,18 @@
                         eventCont.style.display = isEventMode ? 'flex' : 'none';
                         if (isEventMode) {
                             let title = usedState.currentMatch.title || "Událost";
-                            if (title.length > 20) title = title.substring(0, 17) + "...";
+                            // CSS truncation is sufficient now
                             eventCont.innerText = title;
                             eventCont.classList.toggle('p-row-blink', isBlinking);
                         }
                     }
 
                     if (!isEventMode) {
+                        const truncate = (str, limit) => (str && str.length > limit) ? str.substring(0, limit - 3) + "..." : str;
                         const hn = document.getElementById('p-home-name');
-                        if (hn) hn.innerText = getTName(matchData.homeName);
+                        if (hn) hn.innerText = truncate(getTName(matchData.homeName), 20);
                         const gn = document.getElementById('p-guest-name');
-                        if (gn) gn.innerText = getTName(matchData.guestName);
+                        if (gn) gn.innerText = truncate(getTName(matchData.guestName), 20);
                         const hs = document.getElementById('p-home-score');
                         if (hs) hs.innerText = matchData.homeScore;
                         const gs = document.getElementById('p-guest-score');
@@ -6893,7 +7521,7 @@
                                 ui.qrCycleIntervalID = setInterval(() => {
                                     state.qrCyclingActive = !state.qrCyclingActive;
                                     ui.updateProjection();
-                                }, (state.qrCyclingInterval || 15) * 1000);
+                                }, (state.qrCyclingInterval || 8) * 1000);
                             }
                         } else {
                             if (ui.qrCycleIntervalID) {
@@ -6969,47 +7597,42 @@
             },
 
             renderScheduleView: () => {
-                const body = document.getElementById('pv-sched-body');
-                if (!body) return;
-                const prefix = state.tournamentName ? (state.tournamentName + " - ") : "";
-                const titleStr = prefix + "POŘADÍ ZÁPASŮ";
-                const tName = document.getElementById('pv-sched-tournament-name');
-                if (tName) tName.innerText = titleStr;
-                document.title = titleStr;
+                try {
+                    const body = document.getElementById('pv-sched-body');
+                    if (!body) return;
+                    const prefix = state.tournamentName ? (state.tournamentName + " - ") : "";
+                    const titleStr = prefix + "POŘADÍ ZÁPASŮ";
+                    const tName = document.getElementById('pv-sched-tournament-name');
+                    if (tName) tName.innerText = titleStr;
+                    document.title = titleStr;
 
-                const teams = state.teams || [];
-                const referees = state.referees || [];
-                const getTName = (id) => {
-                    const t = teams.find(x => x.id === id);
-                    return t ? t.name : (id ? "XXX" : "Družstvo");
-                };
-                const getRName = (id) => {
-                    const r = referees.find(x => x.id === id);
-                    return r ? r.name : (id || "-");
-                };
+                    const teams = state.teams || [];
+                    const referees = state.referees || [];
+                    const getTName = (id) => admin.getTeamName(id);
+                    const getRName = (id) => admin.getRefName(id);
 
-                body.innerHTML = "";
-                (state.schedule || []).forEach((match, idx) => {
-                    const tr = document.createElement('tr');
+                    body.innerHTML = "";
+                    (state.schedule || []).forEach((match, idx) => {
+                        const tr = document.createElement('tr');
 
-                    const isFinished = (match.homeScore !== undefined && match.homeScore !== null);
-                    if (idx === state.activeMatchIndex) tr.className = 'active';
+                        const isFinished = (match.homeScore !== undefined && match.homeScore !== null);
+                        if (idx === state.activeMatchIndex) tr.className = 'active';
 
-                    const isEvent = match.type === 'event';
-                    if (isEvent) {
-                        tr.innerHTML = `
+                        const isEvent = match.type === 'event';
+                        if (isEvent) {
+                            tr.innerHTML = `
                             <td>${idx + 1}</td>
                             <td colspan="3" style="color:var(--accent-blue); font-weight:700; text-transform:uppercase; text-align:center;">☕ ${match.title || "Událost"}</td>
                             <td>-</td>
                         `;
-                    } else {
-                        const hLogo = state.teamLogos[match.home];
-                        const gLogo = state.teamLogos[match.guest];
-                        const scoreText = (match.homeScore !== undefined && match.homeScore !== null)
-                            ? (match.homeScore + ' : ' + match.guestScore)
-                            : '- : -';
+                        } else {
+                            const hLogo = state.teamLogos[match.home];
+                            const gLogo = state.teamLogos[match.guest];
+                            const scoreText = (match.homeScore !== undefined && match.homeScore !== null)
+                                ? (match.homeScore + ' : ' + match.guestScore)
+                                : '- : -';
 
-                        tr.innerHTML = `
+                            tr.innerHTML = `
                             <td>${idx + 1}</td>
                             <td style="font-size: 0.9em; color: #aaa;">${match.title || "Zápas"}</td>
                             <td>
@@ -7024,30 +7647,36 @@
                             <td class="pv-score-cell ${isFinished ? 'played-score' : ''}" style="text-align:center;">${scoreText}</td>
                             <td>${getRName(match.referee)}</td>
                         `;
-                    }
-                    body.appendChild(tr);
-                });
+                        }
+                        body.appendChild(tr);
+                    });
+                    if (tName) tName.innerText = titleStr;
+                    document.title = titleStr;
+                } catch (err) {
+                    console.error("renderScheduleView Error:", err);
+                }
             },
 
             renderStandingsView: () => {
-                const prefix = state.tournamentName ? (state.tournamentName + " - ") : "";
-                const titleStr = prefix + "TABULKA POŘADÍ";
-                document.title = titleStr;
-                const tEl = document.getElementById('pv-stand-title');
-                if (tEl) tEl.innerText = titleStr;
-                const body = document.getElementById('pv-stand-body');
-                if (!body) return;
+                try {
+                    const prefix = state.tournamentName ? (state.tournamentName + " - ") : "";
+                    const titleStr = prefix + "TABULKA POŘADÍ";
+                    document.title = titleStr;
+                    const tEl = document.getElementById('pv-stand-title');
+                    if (tEl) tEl.innerText = titleStr;
+                    const body = document.getElementById('pv-stand-body');
+                    if (!body) return;
 
-                // Calculate standings (ensure we have latest data)
-                const standings = admin.calculateStandings();
-                body.innerHTML = "";
-                standings.forEach((s, idx) => {
-                    const tr = document.createElement('tr');
-                    const logo = state.teamLogos[s.id];
-                    const diffColor = s.gd > 0 ? '#4caf50' : (s.gd < 0 ? '#f44336' : '#888');
-                    const diffSign = s.gd > 0 ? '+' : '';
+                    // Calculate standings (ensure we have latest data)
+                    const standings = admin.calculateStandings();
+                    body.innerHTML = "";
+                    standings.forEach((s, idx) => {
+                        const tr = document.createElement('tr');
+                        const logo = state.teamLogos[s.id];
+                        const diffColor = s.gd > 0 ? '#4caf50' : (s.gd < 0 ? '#f44336' : '#888');
+                        const diffSign = s.gd > 0 ? '+' : '';
 
-                    tr.innerHTML = `
+                        tr.innerHTML = `
                         <td class="col-rank">${idx + 1}.</td>
                         <td>
                             <div class="pv-team-cell">
@@ -7056,93 +7685,102 @@
                             </div>
                         </td>
                         <td class="col-pts">${s.gp}</td>
+                        <td class="col-pts" style="color:var(--accent-blue); font-weight:900;">${s.pts}</td>
                         <td class="col-score" style="color:#aaa;">${s.gf}:${s.ga}</td>
                         <td class="col-pts" style="color:${diffColor}; font-weight:normal;">${diffSign}${s.gd}</td>
-                        <td class="col-pts" style="color:var(--accent-blue); font-weight:900;">${s.pts}</td>
                     `;
-                    body.appendChild(tr);
-                });
+                        body.appendChild(tr);
+                    });
+                    if (tEl) tEl.innerText = titleStr;
+                    // Removed duplicate body declaration
+                } catch (err) {
+                    console.error("renderStandingsView Error:", err);
+                }
             },
 
             renderCrossView: () => {
-                const prefix = state.tournamentName ? (state.tournamentName + " - ") : "";
-                const titleStr = prefix + "TABULKA KŘÍŽOVÁ";
-                document.title = titleStr;
-                const tEl = document.getElementById('pv-cross-title');
-                if (tEl) tEl.innerText = titleStr;
-                const container = document.getElementById('pv-cross-container');
-                if (!container) return;
+                try {
+                    const prefix = state.tournamentName ? (state.tournamentName + " - ") : "";
+                    const titleStr = prefix + "TABULKA KŘÍŽOVÁ";
+                    document.title = titleStr;
+                    const tEl = document.getElementById('pv-cross-title');
+                    if (tEl) tEl.innerText = titleStr;
+                    const container = document.getElementById('pv-cross-container');
+                    if (!container) return;
 
-                const standings = admin.calculateStandings();
-                const activeIds = new Set(standings.map(s => s.id));
-                const teams = (state.teams || []).filter(t => activeIds.has(t.id));
+                    const standings = admin.calculateStandings();
+                    const activeIds = new Set(standings.map(s => s.id));
+                    const teams = (state.teams || []).filter(t => activeIds.has(t.id));
 
-                if (teams.length === 0) {
-                    container.innerHTML = `<p style="text-align:center; color:#666; font-size:1.5vw; padding:5vh;">Žádná data pro křížovou tabulku.</p>`;
-                    return;
-                }
+                    if (teams.length === 0) {
+                        container.innerHTML = `<p style="text-align:center; color:#666; font-size:1.5vw; padding:5vh;">Žádná data pro křížovou tabulku.</p>`;
+                        return;
+                    }
 
-                let html = `<table class="pv-table cross-table" style="font-size: 1.4vw;">
+                    let html = `<table class="pv-table cross-table" style="font-size: 1.4vw;">
                     <thead><tr>
                         <th style="width:4vw; text-align:center;">#</th>
                         <th style="text-align:left;">Družstvo</th>`;
 
-                teams.forEach((t, i) => {
-                    html += `<th style="width:5vw; text-align:center; border-left:1px solid #333;">${i + 1}</th>`;
-                });
+                    teams.forEach((t, i) => {
+                        html += `<th style="width:5vw; text-align:center; border-left:1px solid #333;">${i + 1}</th>`;
+                    });
 
-                html += `<th style="width:4vw; text-align:center; border-left:2px solid #444;">B</th>
+                    html += `<th style="width:4vw; text-align:center; border-left:2px solid #444;">B</th>
                          <th style="width:6vw; text-align:center; border-left:1px solid #333;">S</th>
                          <th style="width:4vw; text-align:center; border-left:1px solid #333;">R</th>
                          <th style="width:4vw; text-align:center; border-left:1px solid #333;">M</th>
                     </tr></thead><tbody>`;
 
-                teams.forEach((tRow, i) => {
-                    html += `<tr>
+                    teams.forEach((tRow, i) => {
+                        html += `<tr>
                         <td style="text-align:center; color:#666;">${i + 1}.</td>
                         <td style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${tRow.name}</td>`;
 
-                    teams.forEach((tCol, j) => {
-                        let cellContent = "-";
-                        let cellStyle = "border-left:1px solid #333; text-align:center; color:#888;";
+                        teams.forEach((tCol, j) => {
+                            let cellContent = "-";
+                            let cellStyle = "border-left:1px solid #333; text-align:center; color:#888;";
 
-                        if (i === j) {
-                            cellStyle += "color:transparent;"; // Ensure it's empty but styled
-                            cellContent = "";
-                            html += `<td class="cross-self" style="${cellStyle}">${cellContent}</td>`;
-                        } else {
-                            const match = (state.schedule || []).find(m =>
-                                m.type === 'match' &&
-                                ((m.home === tRow.id && m.guest === tCol.id) || (m.home === tCol.id && m.guest === tRow.id)) &&
-                                m.homeScore !== null && m.homeScore !== undefined
-                            );
+                            if (i === j) {
+                                cellStyle += "color:transparent;"; // Ensure it's empty but styled
+                                cellContent = "";
+                                html += `<td class="cross-self" style="${cellStyle}">${cellContent}</td>`;
+                            } else {
+                                const match = (state.schedule || []).find(m =>
+                                    m.type === 'match' &&
+                                    ((m.home === tRow.id && m.guest === tCol.id) || (m.home === tCol.id && m.guest === tRow.id)) &&
+                                    m.homeScore !== null && m.homeScore !== undefined
+                                );
 
-                            if (match) {
-                                cellStyle = "border-left:1px solid #333; text-align:center; font-weight:700;";
-                                if (match.home === tRow.id) {
-                                    cellContent = `${match.homeScore}:${match.guestScore}`;
-                                } else {
-                                    cellContent = `${match.guestScore}:${match.homeScore}`;
+                                if (match) {
+                                    cellStyle = "border-left:1px solid #333; text-align:center; font-weight:700;";
+                                    if (match.home === tRow.id) {
+                                        cellContent = `${match.homeScore}:${match.guestScore}`;
+                                    } else {
+                                        cellContent = `${match.guestScore}:${match.homeScore}`;
+                                    }
                                 }
+                                html += `<td style="${cellStyle}">${cellContent}</td>`;
                             }
-                            html += `<td style="${cellStyle}">${cellContent}</td>`;
-                        }
-                    });
+                        });
 
-                    const s = standings.find(x => x.id === tRow.id) || { pts: 0, gf: 0, ga: 0, gd: 0 };
-                    const rank = standings.findIndex(x => x.id === tRow.id) + 1;
-                    const diffColor = s.gd > 0 ? '#4caf50' : (s.gd < 0 ? '#f44336' : '#888');
-                    const diffSign = s.gd > 0 ? '+' : '';
+                        const s = standings.find(x => x.id === tRow.id) || { pts: 0, gf: 0, ga: 0, gd: 0 };
+                        const rank = standings.findIndex(x => x.id === tRow.id) + 1;
+                        const diffColor = s.gd > 0 ? '#4caf50' : (s.gd < 0 ? '#f44336' : '#888');
+                        const diffSign = s.gd > 0 ? '+' : '';
 
-                    html += `<td style="border-left:2px solid #444; text-align:center; font-weight:900; color:var(--accent-blue);">${s.pts}</td>
+                        html += `<td style="border-left:2px solid #444; text-align:center; font-weight:900; color:var(--accent-blue);">${s.pts}</td>
                              <td style="border-left:1px solid #333; text-align:center; color:#aaa;">${s.gf}:${s.ga}</td>
                              <td style="border-left:1px solid #333; text-align:center; color:${diffColor};">${diffSign}${s.gd}</td>
                              <td style="border-left:1px solid #333; text-align:center; font-weight:bold;">${rank}.</td>
                      </tr>`;
-                });
+                    });
 
-                html += `</tbody></table>`;
-                container.innerHTML = html;
+                    html += `</tbody></table>`;
+                    container.innerHTML = html;
+                } catch (err) {
+                    console.error("renderCrossView Error:", err);
+                }
             },
         };
 
@@ -7177,8 +7815,8 @@
         // ===================================================================================
         // INICIALIZACE
         // ===================================================================================
-        // Initial Sync for Admin/Main view
-        game.syncProjection();
+        // Initial Sync for Admin/Main view (moved inside load handler or kept only if needed)
+        // game.syncProjection(); // Removed global call that was causing issues in projection
 
         // --- INIT ---
         window.addEventListener('load', game.init);
