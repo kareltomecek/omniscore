@@ -2213,8 +2213,8 @@
                         </div>
                         <div class="form-group">
                             <label>Délka prolínání (s)</label>
-                            <input type="number" id="input-qr-transition" value="2" min="1" max="5" step="1"
-                                oninput="admin.validateInputRange(this, 5)"
+                            <input type="number" id="input-qr-transition" value="2" min="1" max="8" step="1"
+                                oninput="admin.validateInputRange(this, 8)"
                                 onkeydown="return admin.restrictToNumbers(event)">
                         </div>
                     </div>
@@ -2675,12 +2675,16 @@
                         if (receivedState === 'REQUEST_SYNC') return;
 
 
-                        // Keep local window modes
+                        // Keep local window modes and local animation state
                         const modePO = state.isProjectionMode;
                         const modeView = state.viewMode;
+                        const qrActive = state.qrCyclingActive;
+
                         Object.assign(state, receivedState);
+
                         state.isProjectionMode = modePO;
                         state.viewMode = modeView;
+                        state.qrCyclingActive = qrActive;
 
                         state.isSynced = true;
                         ui.updateProjection();
@@ -3688,11 +3692,11 @@
                 };
                 state.officialTimekeeper = {
                     surname: document.getElementById('official-timekeeper-surname').value.trim(),
-                    firstName: document.getElementById('official-timekeeper-name').value.trim()
+                    firstName: document.getElementById('official-timekeeper-firstname').value.trim()
                 };
                 state.officialRecorder = {
                     surname: document.getElementById('official-recorder-surname').value.trim(),
-                    firstName: document.getElementById('official-recorder-name').value.trim()
+                    firstName: document.getElementById('official-recorder-firstname').value.trim()
                 };
 
                 state.qrCyclingEnabled = document.getElementById('input-qr-cycling').checked;
@@ -3863,9 +3867,13 @@
                 setVal('input-tournament-location', state.tournamentLocation);
                 setVal('input-tournament-organizer', state.tournamentOrganizer);
                 setVal('input-pitch-size', state.pitchSize);
-                setVal('official-chief-referee', state.officialChiefReferee);
-                setVal('official-timekeeper', state.officialTimekeeper);
-                setVal('official-recorder', state.officialRecorder);
+                // Official Officials
+                setVal('official-chief-referee-surname', state.officialChiefReferee?.surname || "");
+                setVal('official-chief-referee-firstname', state.officialChiefReferee?.firstName || "");
+                setVal('official-timekeeper-surname', state.officialTimekeeper?.surname || "");
+                setVal('official-timekeeper-firstname', state.officialTimekeeper?.firstName || "");
+                setVal('official-recorder-surname', state.officialRecorder?.surname || "");
+                setVal('official-recorder-firstname', state.officialRecorder?.firstName || "");
                 setVal('input-qr-cycling', state.qrCyclingEnabled);
                 setVal('input-qr-interval', state.qrCyclingInterval);
                 setVal('input-qr-transition', state.qrTransitionDuration);
@@ -6506,7 +6514,7 @@
                     html += `<h2 style="margin-top:20px;">Sbor rozhodčích</h2>`;
                     html += `<ul style="list-style-type:none; padding:0; display:flex; flex-wrap:wrap; gap:15px;">`;
                     state.referees.forEach(r => {
-                        html += `<li style="background:#f1f1f1; padding:5px 10px; border-radius:4px;">${r.name}</li>`;
+                        html += `<li style="background:#f1f1f1; padding:5px 10px; border-radius:4px;">${admin.getRefName(r, true)}</li>`;
                     });
                     html += `</ul>`;
                 }
@@ -7518,6 +7526,12 @@
                             if (!ui.qrCycleIntervalID || ui.qrCycleCurrentInterval !== state.qrCyclingInterval) {
                                 if (ui.qrCycleIntervalID) clearInterval(ui.qrCycleIntervalID);
                                 ui.qrCycleCurrentInterval = state.qrCyclingInterval;
+
+                                // Start immediately on first enablement
+                                if (!ui.qrCycleIntervalID) {
+                                    state.qrCyclingActive = true;
+                                }
+
                                 ui.qrCycleIntervalID = setInterval(() => {
                                     state.qrCyclingActive = !state.qrCyclingActive;
                                     ui.updateProjection();
