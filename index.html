@@ -6587,7 +6587,7 @@
                         <th style="width:30px">#</th>
                         <th style="text-align:left;">Družstvo</th>`;
                     state.teams.forEach((_, i) => html += `<th style="width:30px;">${i + 1}</th>`);
-                    html += `<th style="width:40px;">Body</th><th style="width:70px;">Skóre</th></tr></thead><tbody>`;
+                    html += `<th style="width:40px;">Body</th><th style="width:70px;">Skóre</th><th style="width:30px;">M</th></tr></thead><tbody>`;
 
                     const standings = admin.calculateStandings();
                     const statsMap = {};
@@ -6613,7 +6613,8 @@
                             }
                         });
                         const s = statsMap[tRow.id] || { pts: 0, gf: 0, ga: 0 };
-                        html += `<td style="font-weight:bold;">${s.pts}</td><td>${s.gf}:${s.ga}</td></tr>`;
+                        const rank = (standings.findIndex(st => st.id === tRow.id) + 1);
+                        html += `<td style="font-weight:bold;">${s.pts}</td><td>${s.gf}:${s.ga}</td><td style="font-weight:bold; background:#f9f9f9;">${rank || "-"}</td></tr>`;
                     });
                     html += `</tbody></table>`;
                 }
