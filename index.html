@@ -9,6 +9,8 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Lemon Squeezy for payments -->
+    <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
@@ -1526,22 +1528,48 @@
         <!-- RIGHT PANEL: Administration -->
         <div id="admin-panel" class="panel">
             <!-- Authentication Section -->
-            <div id="auth-section" style="margin-bottom: 20px; padding: 15px; background: rgba(33, 150, 243, 0.1); border: 1px solid var(--accent-blue); border-radius: var(--border-radius);">
+            <div id="auth-section"
+                style="margin-bottom: 20px; padding: 15px; background: rgba(33, 150, 243, 0.1); border: 1px solid var(--accent-blue); border-radius: var(--border-radius);">
                 <div id="auth-logged-out">
-                    <button class="btn-full btn-projection" onclick="auth.login()" style="background: var(--accent-blue); color: white;">
+                    <button class="btn-full btn-projection" onclick="auth.login()"
+                        style="background: var(--accent-blue); color: white;">
                         🔑 Přihlásit se přes Google
                     </button>
-                    <small style="display: block; margin-top: 8px; color: #888; text-align: center;">Pro uložení do cloudu a licenci.</small>
+                    <small style="display: block; margin-top: 8px; color: #888; text-align: center;">Pro uložení do
+                        cloudu a licenci.</small>
                 </div>
-                <div id="auth-logged-in" style="display: none; align-items: center; justify-content: space-between; gap: 10px;">
+                <div id="auth-logged-in"
+                    style="display: none; align-items: center; justify-content: space-between; gap: 10px;">
                     <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
-                        <img id="user-photo" src="" style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--accent-blue);">
+                        <img id="user-photo" src=""
+                            style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--accent-blue);">
                         <div style="overflow: hidden;">
-                            <div id="user-name" style="font-weight: bold; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Uživatel</div>
-                            <div id="license-status" style="font-size: 0.75em; color: var(--accent-yellow);">Ověřování licence...</div>
+                            <div id="user-name"
+                                style="font-weight: bold; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                Uživatel</div>
+                            <div id="license-status" style="font-size: 0.75em; color: var(--accent-yellow);">Ověřování
+                                licence...</div>
                         </div>
                     </div>
-                    <button class="small-btn btn-red" onclick="auth.logout()" style="padding: 5px 10px; font-size: 0.8em;">Odhlásit</button>
+                    <button class="small-btn btn-red" onclick="auth.logout()"
+                        style="padding: 5px 10px; font-size: 0.8em;">Odhlásit</button>
+                </div>
+                <!-- Buy License Section (Visible only in Dec 2-22) -->
+                <div id="buy-license-section"
+                    style="display: none; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                    <button id="buy-license-btn" class="btn-full" onclick="auth.buyLicense()"
+                        style="background: var(--accent-green); color: black; font-weight: bold;">
+                        💰 Načítání...
+                    </button>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px;">
+                        <small style="color: var(--accent-green); font-size: 0.7em;">
+                            Prodejní okno otevřeno do 22. 12.
+                        </small>
+                        <small
+                            style="color: var(--accent-orange); font-size: 0.65em; display: flex; align-items: center; gap: 4px; opacity: 0.8;">
+                            ⚠️ Pokud okno platby zamrzne, vypněte prosím AdBlock.
+                        </small>
+                    </div>
                 </div>
             </div>
 
@@ -2317,7 +2345,9 @@
 
 
     <div id="admin-footer">
-        <div style="text-align:left; font-size:0.85em; white-space:nowrap;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span id="admin-footer-license"
+                style="font-size:0.75em; padding:2px 6px; border-radius:4px; font-weight:bold; background:#333; color:#aaa; text-transform:uppercase;">...</span>
             <span id="admin-footer-session" style="font-weight:bold; color:var(--accent-blue);">---</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888;">&nbsp;&nbsp;&nbsp;&nbsp;-</span>
         </div>
@@ -2618,7 +2648,7 @@
         const auth = {
             currentUser: null,
             isVIP: false,
-            isPaid: false,
+            licenseData: null, // { isPaid: boolean, expiresAt: timestamp }
 
             init: () => {
                 firebase.auth().onAuthStateChanged((user) => {
@@ -2641,9 +2671,66 @@
             logout: () => {
                 firebase.auth().signOut().then(() => {
                     auth.isVIP = false;
-                    auth.isPaid = false;
+                    auth.licenseData = null;
                     auth.updateUI();
                 });
+            },
+
+            buyLicense: () => {
+                if (!auth.currentUser) {
+                    alert("Pro nákup licence se prosím nejprve přihlaste.");
+                    auth.login();
+                    return;
+                }
+
+                const uid = auth.currentUser.uid;
+                const email = auth.currentUser.email;
+                const checkoutUrl = `https://kareltomecek.lemonsqueezy.com/checkout/buy/5059a1e7-9f65-450c-9bb7-6ba39a0deec9?checkout[custom][uid]=${uid}&checkout[email]=${encodeURIComponent(email)}&embed=1`;
+
+                // Use Lemon Squeezy Overlay if available
+                if (window.createLemonSqueezy) {
+                    window.createLemonSqueezy();
+                }
+
+                if (typeof LemonSqueezy !== 'undefined') {
+                    LemonSqueezy.Url.Open(checkoutUrl);
+                } else {
+                    // Fallback to direct link if SDK failed to load
+                    window.open(checkoutUrl, '_blank');
+                }
+            },
+
+            getLicenseStatus: () => {
+                if (!auth.currentUser) return "not-logged-in";
+                if (auth.isVIP) return "vip";
+
+                const now = new Date();
+                const month = now.getMonth();
+                const day = now.getDate();
+                const isDec = (month === 11);
+                const isDecWindow = (isDec && day >= 2 && day <= 22);
+
+                if (auth.licenseData && auth.licenseData.isPaid) {
+                    if (isDec) return "paid-expires-soon";
+                    return "paid";
+                }
+
+                if (isDecWindow) return "december-window";
+                return "trial";
+            },
+
+            isLicensed: () => {
+                const status = auth.getLicenseStatus();
+                return status === 'paid' || status === 'vip' || status === 'paid-expires-soon';
+            },
+
+            checkTrialLimit: (newItemsCount = 1) => {
+                if (auth.isLicensed()) return true;
+                if ((state.schedule.length + newItemsCount) > 4) {
+                    alert("Režim TRIAL je omezen na maximálně 4 zápasy.\n\nPro neomezený počet zápasů si prosím zakupte roční licenci.");
+                    return false;
+                }
+                return true;
             },
 
             updateUI: () => {
@@ -2651,6 +2738,8 @@
                 const loggedIn = document.getElementById('auth-logged-in');
                 const nameEl = document.getElementById('user-name');
                 const photoEl = document.getElementById('user-photo');
+                const buySection = document.getElementById('buy-license-section');
+                const statusEl = document.getElementById('license-status');
 
                 if (auth.currentUser) {
                     loggedOut.style.display = 'none';
@@ -2658,38 +2747,118 @@
                     nameEl.innerText = auth.currentUser.displayName || auth.currentUser.email;
                     photoEl.src = auth.currentUser.photoURL || '';
                     photoEl.style.display = auth.currentUser.photoURL ? 'block' : 'none';
+
+                    const status = auth.getLicenseStatus();
+                    const now = new Date();
+                    const isDecWindow = (now.getMonth() === 11 && now.getDate() >= 2 && now.getDate() <= 22);
+
+                    if (status === 'vip') {
+                        statusEl.innerText = "⭐ VIP Přístup";
+                        statusEl.style.color = "var(--accent-green)";
+                    } else if (status.startsWith('paid')) {
+                        const dateStr = auth.licenseData && auth.licenseData.expiresAt
+                            ? new Date(auth.licenseData.expiresAt).toLocaleDateString()
+                            : "31. 12.";
+                        statusEl.innerText = `✅ Licence do ${dateStr}`;
+                        statusEl.style.color = "var(--accent-green)";
+                        if (status === 'paid-expires-soon') statusEl.style.color = "var(--accent-orange)";
+                    } else if (status === 'december-window') {
+                        statusEl.innerText = "🎁 Prodejní okno otevřeno!";
+                        statusEl.style.color = "var(--accent-yellow)";
+                    } else {
+                        statusEl.innerText = "📋 Trial verze (max 4 zápasy)";
+                        statusEl.style.color = "var(--accent-yellow)";
+                    }
+
+                    // Show "Buy License" for trial users anytime, or during December window for everyone
+                    if (buySection) {
+                        const shouldShowBuy = (status === 'trial' || isDecWindow);
+                        buySection.style.display = shouldShowBuy ? 'block' : 'none';
+                        const btn = buySection.querySelector('button');
+                        if (btn) {
+                            const buyYear = (now.getMonth() === 11) ? now.getFullYear() + 1 : now.getFullYear();
+                            btn.innerText = (status.startsWith('paid')) ? `🔄 Obnovit na rok ${buyYear}` : `💰 Koupit licenci na rok ${buyYear}`;
+                        }
+                    }
                 } else {
                     loggedOut.style.display = 'block';
                     loggedIn.style.display = 'none';
+                    if (buySection) buySection.style.display = 'none';
                 }
             },
 
             checkLicense: (user) => {
-                const statusEl = document.getElementById('license-status');
-                // 1. Check if user is in VIP list (simulated for now, would be in DB)
-                firebase.database().ref('vip_users').child(user.uid).once('value', snapshot => {
-                    if (snapshot.exists()) {
+                const now = Date.now();
+
+                // Sanitize email for Firebase key (replace dots with commas, force lowercase)
+                const sanitizedEmail = user.email ? user.email.toLowerCase().replace(/\./g, ',') : null;
+
+                // 1. Check if user is in VIP Email Whitelist
+                let vipCheckPromise;
+                if (sanitizedEmail) {
+                    vipCheckPromise = firebase.database().ref('vip_emails').child(sanitizedEmail).once('value');
+                } else {
+                    vipCheckPromise = Promise.resolve({ exists: () => false });
+                }
+
+                vipCheckPromise.then(vipSnapshot => {
+                    const vipVal = vipSnapshot.val();
+                    // Check if exists and is truthy (or object with valid:true)
+                    const isVipEmail = vipSnapshot.exists() && (vipVal === true || vipVal.valid === true);
+
+                    if (isVipEmail) {
                         auth.isVIP = true;
-                        statusEl.innerText = "⭐ VIP Přístup";
-                        statusEl.style.color = "var(--accent-green)";
-                    } else {
-                        // 2. Check Stripe status
+                        // Also check license just to have the data, but VIP takes precedence in UI
                         firebase.database().ref('users').child(user.uid).once('value', snap => {
                             const data = snap.val();
-                            if (data && data.isPaid && data.expiresAt > Date.now()) {
-                                auth.isPaid = true;
-                                const date = new Date(data.expiresAt).toLocaleDateString();
-                                statusEl.innerText = "✅ Aktivní do " + date;
-                                statusEl.style.color = "var(--accent-green)";
+                            if (data && data.isPaid && data.expiresAt > now) {
+                                auth.licenseData = data;
+                            }
+                        });
+                        auth.updateUI();
+                        ui.updateAdminFooter();
+                    } else {
+                        // Not in email whitelist -> Check Legacy VIP Users OR Standard License
+                        firebase.database().ref('vip_users').child(user.uid).once('value', legacyVipSnap => {
+                            if (legacyVipSnap.exists()) {
+                                auth.isVIP = true;
+                                auth.updateUI();
+                                ui.updateAdminFooter();
                             } else {
-                                auth.isPaid = false;
-                                statusEl.innerText = "❌ Demo verze (bez licence)";
-                                statusEl.style.color = "var(--accent-red)";
+                                auth.isVIP = false;
+                                // 2. Check Standard License status
+                                firebase.database().ref('users').child(user.uid).once('value', snap => {
+                                    const data = snap.val();
+                                    if (data && data.isPaid && data.expiresAt > now) {
+                                        auth.licenseData = data;
+                                    } else {
+                                        auth.licenseData = null;
+                                    }
+                                    auth.updateUI();
+                                    ui.updateAdminFooter();
+                                }).catch(e => {
+                                    console.warn("License check error:", e);
+                                    auth.updateUI();
+                                });
                             }
                         });
                     }
+                }).catch(e => {
+                    console.warn("VIP Email check error:", e);
+                    // Fallback to standard flow on error
+                    auth.isVIP = false;
+                    firebase.database().ref('users').child(user.uid).once('value', snap => {
+                        // ... same fallback logic ...
+                        const data = snap.val();
+                        if (data && data.isPaid && data.expiresAt > now) {
+                            auth.licenseData = data;
+                        } else {
+                            auth.licenseData = null;
+                        }
+                        auth.updateUI();
+                    });
                 });
-            }
+            },
         };
 
         // ===================================================================================
@@ -3259,7 +3428,7 @@
                 }
 
                 // Send to Firebase (Cross-Device)
-                if (typeof firebase !== 'undefined' && !state.isProjectionMode) {
+                if (typeof firebase !== 'undefined' && !state.isProjectionMode && auth.isLicensed()) {
                     try {
                         firebase.database().ref('sessions/' + state.sessionId).set(plainPayload);
                     } catch (e) {
@@ -4477,7 +4646,7 @@
 
             // BAKED-IN PASSWORD HASHES
             _targetHash: "39a2c54c5bdaad1c10d81f97243bc7c4c90dbb1ed7c6526886dc243259dd0310",
-            _fallbackHash: "fallback_5076cf47", // "KolovaOlomouc1962"
+            _fallbackHash: "fallback_5076cf47",
 
             // Reusable admin verification
             verifyAdminPassword: async () => {
@@ -4509,6 +4678,10 @@
             },
 
             updatePlayersFromCloud: async () => {
+                if (!auth.isLicensed()) {
+                    alert("Cloudová synchronizace je dostupná pouze v placené verzi.");
+                    return;
+                }
                 let fileId = state.cloudFileId;
                 if (!fileId) {
                     alert("Chybí Google Drive File ID v nastavení aplikace.");
@@ -4958,6 +5131,8 @@
                     return;
                 }
 
+                if (!auth.checkTrialLimit(template.matches.length)) return;
+
                 // Always replace
                 state.schedule = [];
                 state.activeMatchIndex = -1;
@@ -5031,6 +5206,7 @@
             },
 
             addMatch: () => {
+                if (!auth.checkTrialLimit(1)) return;
                 const type = document.getElementById('sched-type').value;
                 const isEvent = type === 'event';
                 const titleSel = document.getElementById('sched-title');
@@ -5273,6 +5449,11 @@
                         }
 
                         if (isBackup) {
+                            if (!auth.isLicensed()) {
+                                alert("Obnova ze zálohy je dostupná pouze v placené verzi.");
+                                input.value = "";
+                                return;
+                            }
                             if (confirm(`Detekována záloha turnaje "${json[0]?.[0] || 'Neznámý'}".\n\nChcete OBNOVIT celý turnaj ze zálohy?\n(Tato akce nahradí všechna data turnaje)`)) {
                                 admin._restoreTournamentFromBackup(json, backupHeaderRow);
                                 input.value = "";
@@ -5375,6 +5556,10 @@
                         });
 
                         // Always overwrite
+                        if (!auth.checkTrialLimit(newMatches.length - state.schedule.length)) {
+                            input.value = "";
+                            return;
+                        }
                         state.schedule = newMatches;
                         state.activeMatchIndex = -1;
 
@@ -6798,10 +6983,37 @@
                 const end = document.getElementById('admin-footer-end');
                 const time = document.getElementById('admin-footer-time');
                 const sess = document.getElementById('admin-footer-session');
+                const lic = document.getElementById('admin-footer-license');
+
                 if (prog) prog.innerText = `\u00A0\u00A0\u00A0\u00A0${telemetry.progress}`;
                 if (end) end.innerText = telemetry.end;
                 if (time) time.innerText = telemetry.time;
                 if (sess) sess.innerText = state.sessionId;
+
+                if (lic) {
+                    const status = auth.getLicenseStatus();
+                    if (status === 'vip') {
+                        lic.innerText = "VIP Access";
+                        lic.style.background = "var(--accent-green)";
+                        lic.style.color = "black";
+                    } else if (status === 'paid') {
+                        lic.innerText = "Licensed";
+                        lic.style.background = "var(--accent-blue)";
+                        lic.style.color = "white";
+                    } else if (status === 'december-window') {
+                        lic.innerText = "Trial (Sale Open)";
+                        lic.style.background = "var(--accent-yellow)";
+                        lic.style.color = "black";
+                    } else if (status === 'not-logged-in') {
+                        lic.innerText = "Offline/Trial";
+                        lic.style.background = "#333";
+                        lic.style.color = "#aaa";
+                    } else {
+                        lic.innerText = "Trial Mode";
+                        lic.style.background = "#444";
+                        lic.style.color = "#ccc";
+                    }
+                }
             },
             render: () => {
                 try {
