@@ -2613,6 +2613,7 @@
                 referee: "",
                 phaseIndex: 0, // 0-3
                 isEvent: false,
+                type: 'match',
                 duration: 600
             },
             audioData: null, // [DEPRECATED] Base64 string of the audio file. Now stored in IndexedDB.
@@ -3459,18 +3460,19 @@
                     : state.timer.timeLeft;
 
                 // Current item progress
-                if (currentIdx !== -1 && state.schedule[currentIdx]) {
-                    const m = state.schedule[currentIdx];
-                    if (m.type === 'match') {
-                        const curPhase = state.currentMatch.phaseIndex;
-                        // Ph 0 (Setup): + P1, B, P2
-                        if (curPhase === 0) remainingSeconds += (p * 2) + b + (avgLag * 0.8);
-                        // Ph 1 (P1): + B, P2
-                        else if (curPhase === 1) remainingSeconds += p + b + (avgLag * 0.5);
-                        // Ph 2 (Break): + P2
-                        else if (curPhase === 2) remainingSeconds += p + (avgLag * 0.2);
-                        // Ph 3 (P2): already covered by timer
-                    }
+                // If we are in "free play" (activeMatchIndex is -1 and schedule is empty), 
+                // we treat the currentMatch as the active one for prediction.
+                let mCurrent = (currentIdx !== -1) ? state.schedule[currentIdx] : (totalItems === 0 ? state.currentMatch : null);
+
+                if (mCurrent && (mCurrent.type === 'match' || (mCurrent.isEvent === false && !mCurrent.type))) {
+                    const curPhase = state.currentMatch.phaseIndex;
+                    // Ph 0 (Setup): + P1, B, P2
+                    if (curPhase === 0) remainingSeconds += (p * 2) + b + (avgLag * 0.8);
+                    // Ph 1 (P1): + B, P2
+                    else if (curPhase === 1) remainingSeconds += p + b + (avgLag * 0.5);
+                    // Ph 2 (Break): + P2
+                    else if (curPhase === 2) remainingSeconds += p + (avgLag * 0.2);
+                    // Ph 3 (P2): already covered by timer
                 }
 
                 // Upcoming items
