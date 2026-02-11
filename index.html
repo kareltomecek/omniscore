@@ -3002,7 +3002,7 @@
 
         const game = {
             init: () => {
-                if (state.isProjectionMode || state.viewMode) {
+                if (state.isProjectionMode || state.viewMode || isQR) {
                     if (state.isProjectionMode) document.body.classList.add('mode-projection');
                     if (state.viewMode) document.body.classList.add('mode-view-' + state.viewMode);
                     if (isQR) document.body.classList.add('mode-qr');
@@ -7722,7 +7722,7 @@
 
             updateProjection: () => {
                 try {
-                    if (!state.isProjectionMode && !state.viewMode) return;
+                    if (!state.isProjectionMode && !state.viewMode && !isQR) return;
 
                     // Apply CSS variable for QR transition duration
                     document.body.style.setProperty('--qr-transition-duration', (state.qrTransitionDuration || 1.5) + 's');
@@ -7816,8 +7816,8 @@
                                             }
 
                                             let poUrlParams = "";
-                                            if (v === 'all') poUrlParams = '&mode=qr-all';
-                                            else poUrlParams = (v ? '&view=' + v : '&projection');
+                                            if (v === 'all') poUrlParams = '&projection&mode=qr-all';
+                                            else poUrlParams = (v ? '&projection&view=' + v : '&projection');
 
                                             const poUrl = window.location.origin + window.location.pathname + '?session=' + state.sessionId + poUrlParams;
                                             new QRCode(container, {
