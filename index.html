@@ -2144,7 +2144,7 @@
                         <div class="form-group">
                             <label>Délka prolnutí: <span id="fade-dur-disp">1</span>s</label>
                             <input type="range" id="input-music-fade" min="0" max="5" step="0.5" value="1"
-                                oninput="music.setFadeDuration(this.value)">
+                                oninput="music.setFadeDuration(this.value); document.getElementById('fade-dur-disp').innerText = this.value;">
                         </div>
                     </div>
 
@@ -4168,38 +4168,69 @@
                     const el = document.getElementById(id);
                     if (el) {
                         if (el.type === 'checkbox') el.checked = !!val;
-                        else el.value = val;
+                        else el.value = (val !== undefined && val !== null) ? val : "";
                     }
                 };
 
                 setVal('input-tournament-name', state.tournamentName);
                 setVal('input-tournament-category', state.tournamentCategory);
-                setVal('time-setup', state.times.setup);
-                setVal('time-play', state.times.play);
-                setVal('time-break', state.times.break);
-                setVal('rule-win', state.rules.winPoints);
-                setVal('rule-draw', state.rules.drawPoints);
-                setVal('rule-loss', state.rules.lossPoints);
-                setVal('rule-mini-tables', state.rules.useMiniTables);
-                setVal('input-vol-signal', state.volSignal);
-                setVal('input-vol-anthem', state.volAnthem);
-                setVal('input-show-footer', state.showFooter);
-                setVal('input-theme', state.theme);
-                setVal('input-cloud-file-id', state.cloudFileId);
                 setVal('input-tournament-date', state.tournamentDate);
                 setVal('input-tournament-location', state.tournamentLocation);
                 setVal('input-tournament-organizer', state.tournamentOrganizer);
                 setVal('input-pitch-size', state.pitchSize);
-                // Official Officials
-                setVal('official-chief-referee-surname', state.officialChiefReferee?.surname || "");
-                setVal('official-chief-referee-firstname', state.officialChiefReferee?.firstName || "");
-                setVal('official-timekeeper-surname', state.officialTimekeeper?.surname || "");
-                setVal('official-timekeeper-firstname', state.officialTimekeeper?.firstName || "");
-                setVal('official-recorder-surname', state.officialRecorder?.surname || "");
-                setVal('official-recorder-firstname', state.officialRecorder?.firstName || "");
+
+                if (state.times) {
+                    setVal('time-setup', state.times.setup);
+                    setVal('time-play', state.times.play);
+                    setVal('time-break', state.times.break);
+                }
+
+                if (state.rules) {
+                    setVal('rule-win', state.rules.winPoints);
+                    setVal('rule-draw', state.rules.drawPoints);
+                    setVal('rule-loss', state.rules.lossPoints);
+                    setVal('rule-mini-tables', !!state.rules.useMiniTables);
+                }
+
+                setVal('input-vol-signal', state.volSignal);
+                setVal('input-vol-anthem', state.volAnthem);
+                setVal('input-show-footer', state.showFooter !== false);
+                setVal('input-theme', state.theme);
+                setVal('input-cloud-file-id', state.cloudFileId);
+                setVal('input-po-delay', state.poTransitionDelay || 10);
+
+                const populateOfficial = (prefix, val) => {
+                    if (val && typeof val === 'object') {
+                        setVal(prefix + '-surname', val.surname);
+                        setVal(prefix + '-firstname', val.firstName);
+                    } else if (typeof val === 'string') {
+                        const p = val.trim().split(' ');
+                        setVal(prefix + '-surname', p[0]);
+                        setVal(prefix + '-firstname', p.slice(1).join(' '));
+                    }
+                };
+                populateOfficial('official-chief-referee', state.officialChiefReferee);
+                populateOfficial('official-timekeeper', state.officialTimekeeper);
+                populateOfficial('official-recorder', state.officialRecorder);
+
                 setVal('input-qr-cycling', state.qrCyclingEnabled);
                 setVal('input-qr-interval', state.qrCyclingInterval);
                 setVal('input-qr-transition', state.qrTransitionDuration);
+
+                setVal('input-jingle-mode', state.jingleMode || "manual");
+                setVal('input-music-auto', !!state.musicAutoEnabled);
+                setVal('input-music-mode', state.musicMode || 'continuous');
+                setVal('input-music-fade', state.musicFadeDuration || 1);
+
+                // Update displays for sliders
+                const ud = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerText = Math.round((val || 0) * 100);
+                };
+                ud('vol-signal-disp', state.volSignal);
+                ud('vol-anthem-disp', state.volAnthem);
+                const fd = document.getElementById('fade-dur-disp');
+                if (fd) fd.innerText = (state.musicFadeDuration || 1);
             },
 
             renderMiscRow: (container, item, index) => {
@@ -6397,78 +6428,6 @@
                 }
             },
 
-            updateSettingsUI: () => {
-                const setVal = (id, val) => {
-                    const el = document.getElementById(id);
-                    if (el) el.value = val || "";
-                };
-                setVal('input-tournament-name', state.tournamentName);
-                setVal('input-tournament-date', state.tournamentDate);
-                setVal('input-tournament-location', state.tournamentLocation);
-                setVal('input-tournament-organizer', state.tournamentOrganizer);
-                setVal('input-pitch-size', state.pitchSize);
-
-                // Officials (handle objects or strings)
-                const populateOfficial = (prefix, val) => {
-                    if (val && typeof val === 'object') {
-                        setVal(prefix + '-surname', val.surname);
-                        setVal(prefix + '-firstname', val.firstName);
-                    } else if (typeof val === 'string') {
-                        // Migration-on-the-fly for UI display
-                        const p = val.trim().split(' ');
-                        setVal(prefix + '-surname', p[0]);
-                        setVal(prefix + '-firstname', p.slice(1).join(' '));
-                    }
-                };
-                populateOfficial('official-chief-referee', state.officialChiefReferee);
-                populateOfficial('official-timekeeper', state.officialTimekeeper);
-                populateOfficial('official-recorder', state.officialRecorder);
-                // Category needs special handling to match options
-                const catEl = document.getElementById('input-tournament-category');
-                if (catEl) catEl.value = state.tournamentCategory || "";
-
-                // Times
-                if (state.times) {
-                    setVal('time-play', state.times.play);
-                    setVal('time-break', state.times.break);
-                    setVal('time-setup', state.times.setup);
-                }
-
-                if (state.rules) {
-                    setVal('rule-win', state.rules.winPoints);
-                    setVal('rule-draw', state.rules.drawPoints);
-                    setVal('rule-loss', state.rules.lossPoints);
-                    const miniEl = document.getElementById('rule-mini-tables');
-                    if (miniEl) miniEl.checked = !!state.rules.useMiniTables;
-                }
-
-                setVal('input-cloud-file-id', state.cloudFileId);
-                setVal('input-vol-signal', state.volSignal || 1.0);
-                const vsDisp = document.getElementById('vol-signal-disp');
-                if (vsDisp) vsDisp.innerText = Math.round((state.volSignal || 1.0) * 100);
-
-                setVal('input-vol-anthem', state.volAnthem || 1.0);
-                const vaDisp = document.getElementById('vol-anthem-disp');
-                if (vaDisp) vaDisp.innerText = Math.round((state.volAnthem || 1.0) * 100);
-
-                setVal('input-theme', state.theme || "light");
-                setVal('input-po-delay', state.poTransitionDelay || 10);
-                const footerEl = document.getElementById('input-show-footer');
-                if (footerEl) footerEl.checked = (state.showFooter !== false);
-
-                const jingleEl = document.getElementById('input-jingle-mode');
-                if (jingleEl) jingleEl.value = state.jingleMode || "manual";
-
-                const musicAuto = document.getElementById('input-music-auto');
-                if (musicAuto) musicAuto.checked = !!state.musicAutoEnabled;
-                const musicMode = document.getElementById('input-music-mode');
-                if (musicMode) musicMode.value = state.musicMode || 'continuous';
-                const musicFade = document.getElementById('input-music-fade');
-                if (musicFade) musicFade.value = state.musicFadeDuration || 1;
-                const fadeDisp = document.getElementById('fade-dur-disp');
-                if (fadeDisp) fadeDisp.innerText = state.musicFadeDuration || 1;
-            },
-
             saveToStorage: () => {
                 localStorage.setItem('scoreboardState', JSON.stringify(state));
             },
@@ -6507,7 +6466,7 @@
                     if (parsed.currentMatch) state.currentMatch = parsed.currentMatch;
                     if (parsed.timer) state.timer = parsed.timer;
                     if (parsed.jingleMode) state.jingleMode = parsed.jingleMode;
-                    if (parsed.misc && parsed.misc.length > 0) {
+                    if (parsed.misc) {
                         state.misc = parsed.misc;
                     }
                     if (typeof parsed.qrCyclingEnabled !== 'undefined') state.qrCyclingEnabled = parsed.qrCyclingEnabled;
@@ -6546,13 +6505,7 @@
                     });
                     if (parsed.cloudFileId) state.cloudFileId = parsed.cloudFileId;
 
-                    // Fallback to default if empty or only empty rows exist
-                    const hasData = state.misc && state.misc.some(m => m.text && m.text.trim().length > 0);
-                    if (!hasData) {
-                        state.misc = [
-                            { id: "misc_default_1", text: "Startovné družstev bylo uhrazeno. Náhrady rozhodčím byly vyplaceny podle STS ČSC." }
-                        ];
-                    }
+
 
                     if (typeof parsed.tournamentStartTime !== 'undefined') state.tournamentStartTime = parsed.tournamentStartTime;
                     if (typeof parsed.playTimeAccumulated !== 'undefined') state.playTimeAccumulated = parsed.playTimeAccumulated;
@@ -7432,6 +7385,17 @@
                     });
                     if (state.referees.some(r => r.id === currentVal) || currentVal === "") sel.value = currentVal;
                 });
+
+                // Clubs (Organizers)
+                const orgSel = document.getElementById('input-tournament-organizer');
+                if (orgSel) {
+                    const currentVal = orgSel.value;
+                    orgSel.innerHTML = '<option value="">-- Vyber Oddíl --</option>';
+                    CLUBS.forEach(c => {
+                        orgSel.innerHTML += `<option value="${c}">${c}</option>`;
+                    });
+                    if (CLUBS.includes(currentVal) || currentVal === "") orgSel.value = currentVal;
+                }
             },
 
             renderSchedule: () => {
