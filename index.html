@@ -1554,20 +1554,37 @@
                     <button class="small-btn btn-red" onclick="auth.logout()"
                         style="padding: 5px 10px; font-size: 0.8em;">Odhlásit</button>
                 </div>
-                <!-- Buy License Section (Visible only in Dec 2-22) -->
+                <!-- Buy License Section -->
                 <div id="buy-license-section"
                     style="display: none; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
-                    <button id="buy-license-btn" class="btn-full" onclick="auth.buyLicense()"
-                        style="background: var(--accent-green); color: black; font-weight: bold;">
-                        💰 Načítání...
-                    </button>
-                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px;">
-                        <small style="color: var(--accent-green); font-size: 0.7em;">
-                            Prodejní okno otevřeno do 22. 12.
-                        </small>
+
+                    <!-- Controls for active sales window (Dec 2-22) -->
+                    <div id="buy-license-controls" style="display: none;">
+                        <button id="buy-license-btn" class="btn-full" onclick="auth.buyLicense()"
+                            style="background: var(--accent-green); color: black; font-weight: bold;">
+                            💰 Načítání...
+                        </button>
+                        <div
+                            style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px;">
+                            <small style="color: var(--accent-green); font-size: 0.7em;">
+                                Prodejní okno otevřeno do 22. 12.
+                            </small>
+                            <small
+                                style="color: var(--accent-orange); font-size: 0.65em; display: flex; align-items: center; gap: 4px; opacity: 0.8;">
+                                ⚠️ Pokud okno platby zamrzne, vypněte prosím AdBlock.
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Controls for outside sales window -->
+                    <div id="reminder-controls" style="display: none;">
+                        <button class="btn-full" onclick="auth.remindMe()"
+                            style="background: var(--accent-blue); color: white; font-weight: bold;">
+                            📅 Připomenout nákup licence
+                        </button>
                         <small
-                            style="color: var(--accent-orange); font-size: 0.65em; display: flex; align-items: center; gap: 4px; opacity: 0.8;">
-                            ⚠️ Pokud okno platby zamrzne, vypněte prosím AdBlock.
+                            style="display: block; margin-top: 8px; color: #888; text-align: center; font-size: 0.7em;">
+                            Prodejní okno se otevírá 2. prosince.
                         </small>
                     </div>
                 </div>
@@ -2677,6 +2694,14 @@
             },
 
             buyLicense: () => {
+                const now = new Date();
+                const isDecWindow = (now.getMonth() === 11 && now.getDate() >= 2 && now.getDate() <= 22);
+
+                if (!isDecWindow) {
+                    alert("Licenci lze zakoupit pouze v prodejním okně (2. 12. - 22. 12.).");
+                    return;
+                }
+
                 if (!auth.currentUser) {
                     alert("Pro nákup licence se prosím nejprve přihlaste.");
                     auth.login();
@@ -2698,6 +2723,23 @@
                     // Fallback to direct link if SDK failed to load
                     window.open(checkoutUrl, '_blank');
                 }
+            },
+
+            remindMe: () => {
+                const now = new Date();
+                let targetYear = now.getFullYear();
+                // If it's already after Dec 2nd, remind for next year
+                if (now.getMonth() === 11 && now.getDate() > 2) {
+                    targetYear++;
+                }
+
+                const title = encodeURIComponent("Nákup Licence OmniScore");
+                const details = encodeURIComponent("Otevírá se prodejní okno pro licenci OmniScore (2. 12. - 22. 12.). Web: " + window.location.origin);
+                const dateFrom = `${targetYear}1202T090000Z`;
+                const dateTo = `${targetYear}1202T100000Z`;
+
+                const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&dates=${dateFrom}/${dateTo}`;
+                window.open(googleCalendarUrl, '_blank');
             },
 
             getLicenseStatus: () => {
@@ -2726,8 +2768,8 @@
 
             checkTrialLimit: (newItemsCount = 1) => {
                 if (auth.isLicensed()) return true;
-                if ((state.schedule.length + newItemsCount) > 4) {
-                    alert("Režim TRIAL je omezen na maximálně 4 zápasy.\n\nPro neomezený počet zápasů si prosím zakupte roční licenci.");
+                if ((state.schedule.length + newItemsCount) > 10) {
+                    alert("Režim TRIAL je omezen na maximálně 10 zápasů.\n\nPro neomezený počet zápasů si prosím zakupte roční licenci.");
                     return false;
                 }
                 return true;
@@ -2766,18 +2808,31 @@
                         statusEl.innerText = "🎁 Prodejní okno otevřeno!";
                         statusEl.style.color = "var(--accent-yellow)";
                     } else {
-                        statusEl.innerText = "📋 Trial verze (max 4 zápasy)";
+                        statusEl.innerText = "📋 Trial verze (max 10 zápasů)";
                         statusEl.style.color = "var(--accent-yellow)";
                     }
 
-                    // Show "Buy License" for trial users anytime, or during December window for everyone
+                    // Show "Buy Licence" wrapper for trial users anytime, or during December window for everyone
                     if (buySection) {
-                        const shouldShowBuy = (status === 'trial' || isDecWindow);
-                        buySection.style.display = shouldShowBuy ? 'block' : 'none';
-                        const btn = buySection.querySelector('button');
-                        if (btn) {
-                            const buyYear = (now.getMonth() === 11) ? now.getFullYear() + 1 : now.getFullYear();
-                            btn.innerText = (status.startsWith('paid')) ? `🔄 Obnovit na rok ${buyYear}` : `💰 Koupit licenci na rok ${buyYear}`;
+                        const isLicensed = status.startsWith('paid') || status === 'vip';
+                        const shouldShowSection = !isLicensed || isDecWindow;
+                        buySection.style.display = shouldShowSection ? 'block' : 'none';
+
+                        const buyControls = document.getElementById('buy-license-controls');
+                        const reminderControls = document.getElementById('reminder-controls');
+
+                        if (isDecWindow) {
+                            if (buyControls) buyControls.style.display = 'block';
+                            if (reminderControls) reminderControls.style.display = 'none';
+
+                            const btn = buySection.querySelector('#buy-license-btn');
+                            if (btn) {
+                                const buyYear = (now.getMonth() === 11) ? now.getFullYear() + 1 : now.getFullYear();
+                                btn.innerText = (status.startsWith('paid')) ? `🔄 Obnovit na rok ${buyYear}` : `💰 Koupit licenci na rok ${buyYear}`;
+                            }
+                        } else {
+                            if (buyControls) buyControls.style.display = 'none';
+                            if (reminderControls) reminderControls.style.display = 'block';
                         }
                     }
                 } else {
