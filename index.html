@@ -5303,6 +5303,8 @@
             resetApp: () => {
                 if (confirm("Opravdu chcete vymazat všechna data aplikace (družstva, rozpis, zvuk, jingly)? Tuto akci nelze vzít zpět.")) {
                     localStorage.removeItem('scoreboardState');
+                    // Clear any other session-related items if they exist
+                    if (window.sessionStorage) sessionStorage.removeItem('oms_session_id');
 
                     const deleteDB = (name) => {
                         return new Promise((resolve) => {
@@ -5317,11 +5319,14 @@
                     let firebaseCleanup = Promise.resolve();
                     if (typeof firebase !== 'undefined' && !state.isProjectionMode) {
                         try {
-                            firebaseCleanup = firebase.database().ref('sessions/' + state.sessionId).remove();
-                        } catch (e) { console.warn("Firebase reset cleanup failed:", e); }
+                            // Ensure the promise resolves even if the network fails
+                            firebaseCleanup = firebase.database().ref('sessions/' + state.sessionId).remove()
+                                .catch(e => console.warn("Firebase reset cleanup failed:", e));
+                        } catch (e) { console.warn("Firebase reset cleanup failed (sync):", e); }
                     }
 
-                    Promise.all([deleteDB("MusicDB"), deleteDB("JingleDB"), firebaseCleanup]).then(() => {
+                    // Wait for cleanups, then reload
+                    Promise.all([deleteDB("MusicDB"), deleteDB("JingleDB"), firebaseCleanup]).finally(() => {
                         location.reload();
                     });
                 }
