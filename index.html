@@ -3444,14 +3444,14 @@
                 if (state.tournamentStartTime && state.activeMatchIndex > 0) {
                     const realElapsed = (Date.now() - state.tournamentStartTime) / 1000;
                     const playElapsed = state.playTimeAccumulated || 0;
-                    const totalOverhead = Math.max(0, realElapsed - playElapsed);
+                    const totalOverhead = realElapsed - playElapsed;
                     learnedOverhead = totalOverhead / state.activeMatchIndex;
 
-                    // Lag is the delay compared to theoretical plan
-                    avgLag = Math.max(0, learnedOverhead - plannedOverhead);
+                    // Lag is the delay compared to theoretical plan (can be negative if faster)
+                    avgLag = learnedOverhead - plannedOverhead;
 
-                    // Clamp to reasonable range (max 10 mins extra per match)
-                    avgLag = Math.min(600, avgLag);
+                    // Clamp to reasonable range (-5 mins to +10 mins extra per match)
+                    avgLag = Math.max(-300, Math.min(600, avgLag));
                 }
 
                 let remainingSeconds = state.timer.running
