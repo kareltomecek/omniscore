@@ -568,7 +568,9 @@
         }
 
         body.mode-projection #app-container,
-        body.mode-projection #admin-footer {
+        body.mode-projection #admin-footer,
+        body.mode-qr #app-container,
+        body.mode-qr #admin-footer {
             display: none !important;
         }
 
@@ -1077,7 +1079,10 @@
         body.mode-view-standings #projection-layout,
         body.mode-view-cross #app-container,
         body.mode-view-cross #admin-footer,
-        body.mode-view-cross #projection-layout {
+        body.mode-view-cross #projection-layout,
+        body.mode-qr #app-container,
+        body.mode-qr #admin-footer,
+        body.mode-qr #projection-layout {
             display: none !important;
         }
 
@@ -1554,20 +1559,37 @@
                     <button class="small-btn btn-red" onclick="auth.logout()"
                         style="padding: 5px 10px; font-size: 0.8em;">Odhlásit</button>
                 </div>
-                <!-- Buy License Section (Visible only in Dec 2-22) -->
+                <!-- Buy License Section -->
                 <div id="buy-license-section"
                     style="display: none; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
-                    <button id="buy-license-btn" class="btn-full" onclick="auth.buyLicense()"
-                        style="background: var(--accent-green); color: black; font-weight: bold;">
-                        💰 Načítání...
-                    </button>
-                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px;">
-                        <small style="color: var(--accent-green); font-size: 0.7em;">
-                            Prodejní okno otevřeno do 22. 12.
-                        </small>
+
+                    <!-- Controls for active sales window (Dec 2-22) -->
+                    <div id="buy-license-controls" style="display: none;">
+                        <button id="buy-license-btn" class="btn-full" onclick="auth.buyLicense()"
+                            style="background: var(--accent-green); color: black; font-weight: bold;">
+                            💰 Načítání...
+                        </button>
+                        <div
+                            style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px;">
+                            <small style="color: var(--accent-green); font-size: 0.7em;">
+                                Prodejní okno otevřeno do 22. 12.
+                            </small>
+                            <small
+                                style="color: var(--accent-orange); font-size: 0.65em; display: flex; align-items: center; gap: 4px; opacity: 0.8;">
+                                ⚠️ Pokud okno platby zamrzne, vypněte prosím AdBlock.
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Controls for outside sales window -->
+                    <div id="reminder-controls" style="display: none;">
+                        <button class="btn-full" onclick="auth.remindMe()"
+                            style="background: var(--accent-blue); color: white; font-weight: bold;">
+                            📅 Připomenout nákup licence
+                        </button>
                         <small
-                            style="color: var(--accent-orange); font-size: 0.65em; display: flex; align-items: center; gap: 4px; opacity: 0.8;">
-                            ⚠️ Pokud okno platby zamrzne, vypněte prosím AdBlock.
+                            style="display: block; margin-top: 8px; color: #888; text-align: center; font-size: 0.7em;">
+                            Prodejní okno se otevírá 2. prosince.
                         </small>
                     </div>
                 </div>
@@ -2127,7 +2149,7 @@
                         <div class="form-group">
                             <label>Délka prolnutí: <span id="fade-dur-disp">1</span>s</label>
                             <input type="range" id="input-music-fade" min="0" max="5" step="0.5" value="1"
-                                oninput="music.setFadeDuration(this.value)">
+                                oninput="music.setFadeDuration(this.value); document.getElementById('fade-dur-disp').innerText = this.value;">
                         </div>
                     </div>
 
@@ -2310,19 +2332,31 @@
                     <h4 style="margin: 20px 0 10px 0; border:none;">Zvuky a Hlasitost</h4>
                     <div class="form-group">
                         <label>Vlastní siréna</label>
-                        <input type="file" id="input-audio-file" accept="audio/*" onchange="admin.saveSettings(false)">
+                        <div style="display:flex; gap:5px; align-items:center;">
+                            <button class="btn-full" style="margin:0; flex:1; background:#444;"
+                                onclick="document.getElementById('input-audio-file').click()">Vybrat sirénu</button>
+                            <input type="file" id="input-audio-file" accept="audio/*"
+                                onchange="admin.saveSettings(false)" style="display:none;">
+                            <button class="small-btn btn-red" id="btn-clear-signal" onclick="jingles.clearSignal()"
+                                style="width: 40px; height: 35px; margin:0;" title="Vymazat zvuk sirény">x</button>
+                        </div>
+                        <div id="signal-file-status"
+                            style="font-size: 0.75em; color: #aaa; margin-top: 4px; padding-left: 2px;">Soubor nevybrán
+                        </div>
                     </div>
 
                     <div class="form-group">
                         <label>Hlasitost sirény: <span id="vol-signal-disp">50</span>%</label>
                         <input type="range" id="input-vol-signal" min="0" max="1" step="0.05" value="0.5"
-                            oninput="document.getElementById('vol-signal-disp').innerText = Math.round(this.value * 100); admin.saveSettings(false)">
+                            oninput="document.getElementById('vol-signal-disp').innerText = Math.round(this.value * 100); admin.saveSettings(false)"
+                            onchange="jingles.playPreview('signal')">
                     </div>
 
                     <div class="form-group">
                         <label>Hlasitost jinglů: <span id="vol-anthem-disp">50</span>%</label>
                         <input type="range" id="input-vol-anthem" min="0" max="1" step="0.05" value="0.5"
-                            oninput="document.getElementById('vol-anthem-disp').innerText = Math.round(this.value * 100); admin.saveSettings(false)">
+                            oninput="document.getElementById('vol-anthem-disp').innerText = Math.round(this.value * 100); admin.saveSettings(false)"
+                            onchange="jingles.playPreview('jingle')">
                     </div>
 
                     <div class="form-group" style="padding-top: 10px; margin-top: 10px; border-top: 1px solid #444;">
@@ -2584,9 +2618,10 @@
                 referee: "",
                 phaseIndex: 0, // 0-3
                 isEvent: false,
+                type: 'match',
                 duration: 600
             },
-            audioData: null, // Base64 string of the audio file
+            audioData: null, // [DEPRECATED] Base64 string of the audio file. Now stored in IndexedDB.
             timer: {
                 running: false,
                 timeLeft: 0,
@@ -2640,6 +2675,7 @@
         let currentAnthemAudio = null;
         let currentMusicIndex = -1;
         let directoryHandle = null;
+        let signalAudio = new Audio();
         let poTransitionTimeoutID = null;
 
         // ===================================================================================
@@ -2677,6 +2713,14 @@
             },
 
             buyLicense: () => {
+                const now = new Date();
+                const isDecWindow = (now.getMonth() === 11 && now.getDate() >= 2 && now.getDate() <= 22);
+
+                if (!isDecWindow) {
+                    alert("Licenci lze zakoupit pouze v prodejním okně (2. 12. - 22. 12.).");
+                    return;
+                }
+
                 if (!auth.currentUser) {
                     alert("Pro nákup licence se prosím nejprve přihlaste.");
                     auth.login();
@@ -2698,6 +2742,23 @@
                     // Fallback to direct link if SDK failed to load
                     window.open(checkoutUrl, '_blank');
                 }
+            },
+
+            remindMe: () => {
+                const now = new Date();
+                let targetYear = now.getFullYear();
+                // If it's already after Dec 2nd, remind for next year
+                if (now.getMonth() === 11 && now.getDate() > 2) {
+                    targetYear++;
+                }
+
+                const title = encodeURIComponent("Nákup Licence OmniScore");
+                const details = encodeURIComponent("Otevírá se prodejní okno pro licenci OmniScore (2. 12. - 22. 12.). Web: " + window.location.origin);
+                const dateFrom = `${targetYear}1202T090000Z`;
+                const dateTo = `${targetYear}1202T100000Z`;
+
+                const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&dates=${dateFrom}/${dateTo}`;
+                window.open(googleCalendarUrl, '_blank');
             },
 
             getLicenseStatus: () => {
@@ -2726,8 +2787,8 @@
 
             checkTrialLimit: (newItemsCount = 1) => {
                 if (auth.isLicensed()) return true;
-                if ((state.schedule.length + newItemsCount) > 4) {
-                    alert("Režim TRIAL je omezen na maximálně 4 zápasy.\n\nPro neomezený počet zápasů si prosím zakupte roční licenci.");
+                if ((state.schedule.length + newItemsCount) > 10) {
+                    alert("Režim TRIAL je omezen na maximálně 10 zápasů.\n\nPro neomezený počet zápasů si prosím zakupte roční licenci.");
                     return false;
                 }
                 return true;
@@ -2766,18 +2827,31 @@
                         statusEl.innerText = "🎁 Prodejní okno otevřeno!";
                         statusEl.style.color = "var(--accent-yellow)";
                     } else {
-                        statusEl.innerText = "📋 Trial verze (max 4 zápasy)";
+                        statusEl.innerText = "📋 Trial verze (max 10 zápasů)";
                         statusEl.style.color = "var(--accent-yellow)";
                     }
 
-                    // Show "Buy License" for trial users anytime, or during December window for everyone
+                    // Show "Buy Licence" wrapper for trial users anytime, or during December window for everyone
                     if (buySection) {
-                        const shouldShowBuy = (status === 'trial' || isDecWindow);
-                        buySection.style.display = shouldShowBuy ? 'block' : 'none';
-                        const btn = buySection.querySelector('button');
-                        if (btn) {
-                            const buyYear = (now.getMonth() === 11) ? now.getFullYear() + 1 : now.getFullYear();
-                            btn.innerText = (status.startsWith('paid')) ? `🔄 Obnovit na rok ${buyYear}` : `💰 Koupit licenci na rok ${buyYear}`;
+                        const isLicensed = status.startsWith('paid') || status === 'vip';
+                        const shouldShowSection = !isLicensed || isDecWindow;
+                        buySection.style.display = shouldShowSection ? 'block' : 'none';
+
+                        const buyControls = document.getElementById('buy-license-controls');
+                        const reminderControls = document.getElementById('reminder-controls');
+
+                        if (isDecWindow) {
+                            if (buyControls) buyControls.style.display = 'block';
+                            if (reminderControls) reminderControls.style.display = 'none';
+
+                            const btn = buySection.querySelector('#buy-license-btn');
+                            if (btn) {
+                                const buyYear = (now.getMonth() === 11) ? now.getFullYear() + 1 : now.getFullYear();
+                                btn.innerText = (status.startsWith('paid')) ? `🔄 Obnovit na rok ${buyYear}` : `💰 Koupit licenci na rok ${buyYear}`;
+                            }
+                        } else {
+                            if (buyControls) buyControls.style.display = 'none';
+                            if (reminderControls) reminderControls.style.display = 'block';
                         }
                     }
                 } else {
@@ -2894,6 +2968,15 @@
         }
 
         const syncChannel = new BroadcastChannel('oms_sync_' + sessionId);
+        // ==== ONLINE/OFFLINE HANDLING ==== //
+        window.addEventListener('online', () => {
+            console.log('[Sync] Connection restored – requesting sync');
+            // Po obnovení spojení požádáme o synchronizaci všech oken.
+            syncChannel.postMessage('REQUEST_SYNC');
+        });
+        window.addEventListener('offline', () => {
+            console.warn('[Sync] Offline – will resync when back online');
+        });
 
         // Update state with session info
         state.isProjectionMode = isPO;
@@ -2928,7 +3011,7 @@
 
         const game = {
             init: () => {
-                if (state.isProjectionMode || state.viewMode) {
+                if (state.isProjectionMode || state.viewMode || isQR) {
                     if (state.isProjectionMode) document.body.classList.add('mode-projection');
                     if (state.viewMode) document.body.classList.add('mode-view-' + state.viewMode);
                     if (isQR) document.body.classList.add('mode-qr');
@@ -3062,10 +3145,13 @@
                 }
                 state.timer.lastTick = now;
 
-                if (newTimeLeft !== state.timer.timeLeft) {
-                    state.timer.timeLeft = newTimeLeft;
+                const oldTimeLeft = state.timer.timeLeft;
 
-                    if (state.timer.timeLeft <= 0) {
+                // Update UI only if the second changed or we hit zero
+                if (newTimeLeft !== Math.floor(oldTimeLeft) || remainingMs <= 0) {
+                    state.timer.timeLeft = Math.max(0, remainingMs / 1000);
+
+                    if (remainingMs <= 0) {
                         state.timer.timeLeft = 0;
                         game.toggleTimer(); // Stop at 0
 
@@ -3078,6 +3164,8 @@
                     ui.updateTimer();
                     game.syncProjection();
                     ui.updateAdminFooter();
+                } else {
+                    state.timer.timeLeft = Math.max(0, remainingMs / 1000);
                 }
             },
 
@@ -3085,7 +3173,23 @@
                 state.timer.running = !state.timer.running;
                 if (state.timer.running) {
                     state.timer.lastTick = Date.now();
+                    // User preference: -1ms offset for "snappy" immediate second change
                     state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000) - 1;
+
+                    const isVoulat = (state.currentMatch.phaseIndex === 1 || state.currentMatch.phaseIndex === 3);
+
+                    // Prime signal audio for background playback (user interaction context)
+                    if (signalAudio && signalAudio.getAttribute('src')) {
+                        const oldVol = signalAudio.volume;
+                        signalAudio.volume = 0;
+                        signalAudio.play().then(() => {
+                            signalAudio.pause();
+                            signalAudio.volume = state.volSignal || 1.0;
+                        }).catch(e => console.warn("Signal audio priming failed:", e));
+                    } else if (isVoulat) {
+                        alert("Upozornění: Není nastaven zvuk sirény pro konec poločasu.");
+                    }
+
                     // Set tournament start time if not already set
                     if (state.tournamentStartTime === null) {
                         state.tournamentStartTime = Date.now();
@@ -3093,10 +3197,9 @@
                     // Immediate first tick to reflect visual change (e.g. 7:00 -> 6:59)
                     game.tick();
                 } else {
-                    // When pausing, state.timer.timeLeft is already up to date from tick()
-                    // but we capture the exact remaining time (float) to preserve precision for resume
+                    // When pausing, store the exact remaining time (plus the 1ms offset to avoid drift on resume)
                     const remainingMs = state.timer.targetEndTime - Date.now();
-                    state.timer.timeLeft = Math.max(0, remainingMs / 1000);
+                    state.timer.timeLeft = Math.max(0, (remainingMs + 1) / 1000);
                 }
                 ui.updateTimerBtn();
                 game.syncProjection();
@@ -3212,17 +3315,31 @@
                 }
             },
 
+            // ==== PO TRANSITION LOGIC ==== //
+            // Spustí prodlevu po přechodu na další PO (Public View) pokud je nastavena.
             triggerPoTransition: (snapshot) => {
-                if (poTransitionTimeoutID) clearTimeout(poTransitionTimeoutID);
-
+                // Zruší existující timeout, aby nedošlo k překrytí.
+                if (poTransitionTimeoutID) {
+                    clearTimeout(poTransitionTimeoutID);
+                    poTransitionTimeoutID = null;
+                }
                 state.poTransitionData = snapshot;
                 state.poTransitionActive = true;
-
-                poTransitionTimeoutID = setTimeout(() => {
+                // Pokud je prodleva 0, okamžitě deaktivujeme a synchronizujeme.
+                const delaySec = state.poTransitionDelay || 0;
+                if (delaySec > 0) {
+                    poTransitionTimeoutID = setTimeout(() => {
+                        state.poTransitionActive = false;
+                        state.poTransitionData = null;
+                        poTransitionTimeoutID = null;
+                        game.syncProjection();
+                    }, delaySec * 1000);
+                } else {
+                    // Bez prodlevy – okamžitě ukončíme.
                     state.poTransitionActive = false;
                     state.poTransitionData = null;
                     game.syncProjection();
-                }, (state.poTransitionDelay || 10) * 1000);
+                }
             },
 
             step: (direction) => {
@@ -3264,10 +3381,14 @@
                 }
             },
 
+            // Přechod na novou fázi – zruší případnou aktivní PO prodlevu.
             setPhase: (index, resetTime) => {
                 // Přerušit prodlevu/blikání, pokud začíná poločas (index 1 nebo 3)
                 if ((index === 1 || index === 3) && state.poTransitionActive) {
-                    if (poTransitionTimeoutID) clearTimeout(poTransitionTimeoutID);
+                    if (poTransitionTimeoutID) {
+                        clearTimeout(poTransitionTimeoutID);
+                        poTransitionTimeoutID = null;
+                    }
                     state.poTransitionActive = false;
                     state.poTransitionData = null;
                 }
@@ -3356,14 +3477,14 @@
                 if (state.tournamentStartTime && state.activeMatchIndex > 0) {
                     const realElapsed = (Date.now() - state.tournamentStartTime) / 1000;
                     const playElapsed = state.playTimeAccumulated || 0;
-                    const totalOverhead = Math.max(0, realElapsed - playElapsed);
+                    const totalOverhead = realElapsed - playElapsed;
                     learnedOverhead = totalOverhead / state.activeMatchIndex;
 
-                    // Lag is the delay compared to theoretical plan
-                    avgLag = Math.max(0, learnedOverhead - plannedOverhead);
+                    // Lag is the delay compared to theoretical plan (can be negative if faster)
+                    avgLag = learnedOverhead - plannedOverhead;
 
-                    // Clamp to reasonable range (max 10 mins extra per match)
-                    avgLag = Math.min(600, avgLag);
+                    // Clamp to reasonable range (-5 mins to +10 mins extra per match)
+                    avgLag = Math.max(-300, Math.min(600, avgLag));
                 }
 
                 let remainingSeconds = state.timer.running
@@ -3371,18 +3492,19 @@
                     : state.timer.timeLeft;
 
                 // Current item progress
-                if (currentIdx !== -1 && state.schedule[currentIdx]) {
-                    const m = state.schedule[currentIdx];
-                    if (m.type === 'match') {
-                        const curPhase = state.currentMatch.phaseIndex;
-                        // Ph 0 (Setup): + P1, B, P2
-                        if (curPhase === 0) remainingSeconds += (p * 2) + b + (avgLag * 0.8);
-                        // Ph 1 (P1): + B, P2
-                        else if (curPhase === 1) remainingSeconds += p + b + (avgLag * 0.5);
-                        // Ph 2 (Break): + P2
-                        else if (curPhase === 2) remainingSeconds += p + (avgLag * 0.2);
-                        // Ph 3 (P2): already covered by timer
-                    }
+                // If we are in "free play" (activeMatchIndex is -1 and schedule is empty), 
+                // we treat the currentMatch as the active one for prediction.
+                let mCurrent = (currentIdx !== -1) ? state.schedule[currentIdx] : (totalItems === 0 ? state.currentMatch : null);
+
+                if (mCurrent && (mCurrent.type === 'match' || (mCurrent.isEvent === false && !mCurrent.type))) {
+                    const curPhase = state.currentMatch.phaseIndex;
+                    // Ph 0 (Setup): + P1, B, P2
+                    if (curPhase === 0) remainingSeconds += (p * 2) + b + (avgLag * 0.8);
+                    // Ph 1 (P1): + B, P2
+                    else if (curPhase === 1) remainingSeconds += p + b + (avgLag * 0.5);
+                    // Ph 2 (Break): + P2
+                    else if (curPhase === 2) remainingSeconds += p + (avgLag * 0.2);
+                    // Ph 3 (P2): already covered by timer
                 }
 
                 // Upcoming items
@@ -3465,11 +3587,11 @@
                     music.fadeInterval = null;
                 }
 
-                if (state.audioData) {
+                if (signalAudio && signalAudio.getAttribute('src')) {
                     try {
-                        const snd = new Audio(state.audioData);
-                        snd.volume = state.volSignal || 1.0;
-                        snd.play().catch(e => console.error("Audio play failed:", e));
+                        signalAudio.currentTime = 0;
+                        signalAudio.volume = state.volSignal || 1.0;
+                        signalAudio.play().catch(e => console.error("Signal audio play failed:", e));
                     } catch (err) {
                         console.error("Invalid audio data", err);
                     }
@@ -3836,7 +3958,7 @@
                     const req = store.getAllKeys();
 
                     req.onsuccess = () => {
-                        const keys = req.result;
+                        const keys = req.result.filter(k => k !== '__SYSTEM_SIGNAL__');
                         state.jinglePool = keys;
                         const countEl = document.getElementById('jingle-pool-count');
                         if (countEl) countEl.innerText = `Počet jinglů: ${keys.length}`;
@@ -3850,11 +3972,115 @@
                     console.error("Jingle list error:", e);
                 }
             },
-            async clear() {
-                if (!confirm("Opravdu chcete vymazat celý zásobník jinglů?")) return;
+            async saveSignal(file) {
+                if (!file) return;
                 const db = await jingles.openDB();
                 const tx = db.transaction("files", "readwrite");
-                tx.objectStore("files").clear();
+                const store = tx.objectStore("files");
+                tx.objectStore("files").put({ name: '__SYSTEM_SIGNAL__', data: file, fileName: file.name });
+                tx.oncomplete = () => {
+                    jingles.loadSignal(); // Reload to prime the signalAudio object
+                };
+            },
+            async loadSignal() {
+                try {
+                    const db = await jingles.openDB();
+                    const tx = db.transaction("files", "readonly");
+                    const store = tx.objectStore("files");
+                    const req = store.get('__SYSTEM_SIGNAL__');
+                    req.onsuccess = () => {
+                        const statusEl = document.getElementById('signal-file-status');
+                        // Revoke old URL if it exists to prevent memory leaks and ensure refresh
+                        if (signalAudio.src && signalAudio.src.startsWith('blob:')) {
+                            URL.revokeObjectURL(signalAudio.src);
+                        }
+
+                        if (req.result && req.result.data) {
+                            const url = URL.createObjectURL(req.result.data);
+                            signalAudio.src = url;
+                            if (statusEl) {
+                                statusEl.innerText = "Nastaveno: " + (req.result.fileName || "systémový zvuk");
+                                statusEl.style.color = "var(--accent-green)";
+                            }
+                        } else {
+                            signalAudio.removeAttribute('src');
+                            signalAudio.load(); // Reset the audio element
+                            if (statusEl) {
+                                statusEl.innerText = "Soubor nevybrán";
+                                statusEl.style.color = "#aaa";
+                            }
+                        }
+                    };
+                } catch (e) {
+                    console.error("Load signal error:", e);
+                }
+            },
+            async playPreview(type) {
+                if (type === 'signal') {
+                    if (signalAudio && signalAudio.getAttribute('src')) {
+                        const originalVol = signalAudio.volume;
+                        signalAudio.volume = state.volSignal || 1.0;
+                        signalAudio.currentTime = 0;
+                        signalAudio.play().then(() => {
+                            setTimeout(() => {
+                                signalAudio.pause();
+                                signalAudio.volume = originalVol;
+                            }, 1500); // 1.5s preview
+                        }).catch(e => console.warn("Signal preview failed:", e));
+                    }
+                } else if (type === 'jingle') {
+                    if (state.jinglePool.length > 0) {
+                        const randomKey = state.jinglePool[Math.floor(Math.random() * state.jinglePool.length)];
+                        try {
+                            const db = await jingles.openDB();
+                            const tx = db.transaction("files", "readonly");
+                            const store = tx.objectStore("files");
+                            const req = store.get(randomKey);
+                            req.onsuccess = () => {
+                                if (req.result && req.result.data) {
+                                    const previewAudio = new Audio(URL.createObjectURL(req.result.data));
+                                    previewAudio.volume = state.volAnthem || 1.0;
+                                    previewAudio.play().then(() => {
+                                        setTimeout(() => {
+                                            previewAudio.pause();
+                                        }, 2000); // 2s preview
+                                    }).catch(e => console.warn("Jingle preview failed:", e));
+                                }
+                            };
+                        } catch (e) {
+                            console.error("Jingle preview error:", e);
+                        }
+                    }
+                }
+            },
+            async clearSignal() {
+                if (!confirm("Opravdu chcete vymazat zvuk sirény?")) return;
+                const db = await jingles.openDB();
+                const tx = db.transaction("files", "readwrite");
+                tx.objectStore("files").delete('__SYSTEM_SIGNAL__');
+                tx.oncomplete = () => {
+                    const fileInput = document.getElementById('input-audio-file');
+                    if (fileInput) fileInput.value = ""; // Clear the file input
+                    jingles.loadSignal();
+                };
+            },
+            async clear() {
+                if (!confirm("Opravdu chcete vymazat celý zásobník jinglů (siréna zůstane)?")) return;
+                const db = await jingles.openDB();
+                const tx = db.transaction("files", "readwrite");
+                const store = tx.objectStore("files");
+
+                // Only clear non-system keys
+                const req = store.getAllKeys();
+                req.onsuccess = () => {
+                    const keys = req.result;
+                    keys.forEach(k => {
+                        if (k !== '__SYSTEM_SIGNAL__') {
+                            store.delete(k);
+                        }
+                    });
+                };
+
                 tx.oncomplete = () => {
                     jingles.list();
                 };
@@ -3974,16 +4200,13 @@
                 const fileInput = document.getElementById('input-audio-file');
                 if (fileInput.files.length > 0) {
                     const file = fileInput.files[0];
-                    if (file.size > 2 * 1024 * 1024) { // 2MB limit check
-                        alert("Soubor je příliš velký (>2MB). Zvolte menší MP3.");
+                    if (file.size > 5 * 1024 * 1024) { // Increased to 5MB for better flexibility
+                        alert("Soubor je příliš velký (>5MB). Zvolte menší MP3.");
                         return;
                     }
-                    const reader = new FileReader();
-                    reader.onload = function (e) {
-                        state.audioData = e.target.result;
+                    jingles.saveSignal(file).then(() => {
                         finishSave();
-                    };
-                    reader.readAsDataURL(file);
+                    });
                 } else {
                     finishSave();
                 }
@@ -4113,38 +4336,69 @@
                     const el = document.getElementById(id);
                     if (el) {
                         if (el.type === 'checkbox') el.checked = !!val;
-                        else el.value = val;
+                        else el.value = (val !== undefined && val !== null) ? val : "";
                     }
                 };
 
                 setVal('input-tournament-name', state.tournamentName);
                 setVal('input-tournament-category', state.tournamentCategory);
-                setVal('time-setup', state.times.setup);
-                setVal('time-play', state.times.play);
-                setVal('time-break', state.times.break);
-                setVal('rule-win', state.rules.winPoints);
-                setVal('rule-draw', state.rules.drawPoints);
-                setVal('rule-loss', state.rules.lossPoints);
-                setVal('rule-mini-tables', state.rules.useMiniTables);
-                setVal('input-vol-signal', state.volSignal);
-                setVal('input-vol-anthem', state.volAnthem);
-                setVal('input-show-footer', state.showFooter);
-                setVal('input-theme', state.theme);
-                setVal('input-cloud-file-id', state.cloudFileId);
                 setVal('input-tournament-date', state.tournamentDate);
                 setVal('input-tournament-location', state.tournamentLocation);
                 setVal('input-tournament-organizer', state.tournamentOrganizer);
                 setVal('input-pitch-size', state.pitchSize);
-                // Official Officials
-                setVal('official-chief-referee-surname', state.officialChiefReferee?.surname || "");
-                setVal('official-chief-referee-firstname', state.officialChiefReferee?.firstName || "");
-                setVal('official-timekeeper-surname', state.officialTimekeeper?.surname || "");
-                setVal('official-timekeeper-firstname', state.officialTimekeeper?.firstName || "");
-                setVal('official-recorder-surname', state.officialRecorder?.surname || "");
-                setVal('official-recorder-firstname', state.officialRecorder?.firstName || "");
+
+                if (state.times) {
+                    setVal('time-setup', state.times.setup);
+                    setVal('time-play', state.times.play);
+                    setVal('time-break', state.times.break);
+                }
+
+                if (state.rules) {
+                    setVal('rule-win', state.rules.winPoints);
+                    setVal('rule-draw', state.rules.drawPoints);
+                    setVal('rule-loss', state.rules.lossPoints);
+                    setVal('rule-mini-tables', !!state.rules.useMiniTables);
+                }
+
+                setVal('input-vol-signal', state.volSignal);
+                setVal('input-vol-anthem', state.volAnthem);
+                setVal('input-show-footer', state.showFooter !== false);
+                setVal('input-theme', state.theme);
+                setVal('input-cloud-file-id', state.cloudFileId);
+                setVal('input-po-delay', state.poTransitionDelay || 10);
+
+                const populateOfficial = (prefix, val) => {
+                    if (val && typeof val === 'object') {
+                        setVal(prefix + '-surname', val.surname);
+                        setVal(prefix + '-firstname', val.firstName);
+                    } else if (typeof val === 'string') {
+                        const p = val.trim().split(' ');
+                        setVal(prefix + '-surname', p[0]);
+                        setVal(prefix + '-firstname', p.slice(1).join(' '));
+                    }
+                };
+                populateOfficial('official-chief-referee', state.officialChiefReferee);
+                populateOfficial('official-timekeeper', state.officialTimekeeper);
+                populateOfficial('official-recorder', state.officialRecorder);
+
                 setVal('input-qr-cycling', state.qrCyclingEnabled);
                 setVal('input-qr-interval', state.qrCyclingInterval);
                 setVal('input-qr-transition', state.qrTransitionDuration);
+
+                setVal('input-jingle-mode', state.jingleMode || "manual");
+                setVal('input-music-auto', !!state.musicAutoEnabled);
+                setVal('input-music-mode', state.musicMode || 'continuous');
+                setVal('input-music-fade', state.musicFadeDuration || 1);
+
+                // Update displays for sliders
+                const ud = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerText = Math.round((val || 0) * 100);
+                };
+                ud('vol-signal-disp', state.volSignal);
+                ud('vol-anthem-disp', state.volAnthem);
+                const fd = document.getElementById('fade-dur-disp');
+                if (fd) fd.innerText = (state.musicFadeDuration || 1);
             },
 
             renderMiscRow: (container, item, index) => {
@@ -4550,7 +4804,7 @@
 
             getTeamName: (id) => {
                 const team = state.teams.find(t => t.id === id);
-                return team ? team.name : (id ? "XXX" : "Tým");
+                return team ? team.name : (id ? "OmS" : "Tým");
             },
 
             getRefName: (inp, full = false) => {
@@ -5081,6 +5335,8 @@
             resetApp: () => {
                 if (confirm("Opravdu chcete vymazat všechna data aplikace (družstva, rozpis, zvuk, jingly)? Tuto akci nelze vzít zpět.")) {
                     localStorage.removeItem('scoreboardState');
+                    // Clear any other session-related items if they exist
+                    if (window.sessionStorage) sessionStorage.removeItem('oms_session_id');
 
                     const deleteDB = (name) => {
                         return new Promise((resolve) => {
@@ -5095,11 +5351,14 @@
                     let firebaseCleanup = Promise.resolve();
                     if (typeof firebase !== 'undefined' && !state.isProjectionMode) {
                         try {
-                            firebaseCleanup = firebase.database().ref('sessions/' + state.sessionId).remove();
-                        } catch (e) { console.warn("Firebase reset cleanup failed:", e); }
+                            // Ensure the promise resolves even if the network fails
+                            firebaseCleanup = firebase.database().ref('sessions/' + state.sessionId).remove()
+                                .catch(e => console.warn("Firebase reset cleanup failed:", e));
+                        } catch (e) { console.warn("Firebase reset cleanup failed (sync):", e); }
                     }
 
-                    Promise.all([deleteDB("MusicDB"), deleteDB("JingleDB"), firebaseCleanup]).then(() => {
+                    // Wait for cleanups, then reload
+                    Promise.all([deleteDB("MusicDB"), deleteDB("JingleDB"), firebaseCleanup]).finally(() => {
                         location.reload();
                     });
                 }
@@ -6342,78 +6601,6 @@
                 }
             },
 
-            updateSettingsUI: () => {
-                const setVal = (id, val) => {
-                    const el = document.getElementById(id);
-                    if (el) el.value = val || "";
-                };
-                setVal('input-tournament-name', state.tournamentName);
-                setVal('input-tournament-date', state.tournamentDate);
-                setVal('input-tournament-location', state.tournamentLocation);
-                setVal('input-tournament-organizer', state.tournamentOrganizer);
-                setVal('input-pitch-size', state.pitchSize);
-
-                // Officials (handle objects or strings)
-                const populateOfficial = (prefix, val) => {
-                    if (val && typeof val === 'object') {
-                        setVal(prefix + '-surname', val.surname);
-                        setVal(prefix + '-firstname', val.firstName);
-                    } else if (typeof val === 'string') {
-                        // Migration-on-the-fly for UI display
-                        const p = val.trim().split(' ');
-                        setVal(prefix + '-surname', p[0]);
-                        setVal(prefix + '-firstname', p.slice(1).join(' '));
-                    }
-                };
-                populateOfficial('official-chief-referee', state.officialChiefReferee);
-                populateOfficial('official-timekeeper', state.officialTimekeeper);
-                populateOfficial('official-recorder', state.officialRecorder);
-                // Category needs special handling to match options
-                const catEl = document.getElementById('input-tournament-category');
-                if (catEl) catEl.value = state.tournamentCategory || "";
-
-                // Times
-                if (state.times) {
-                    setVal('time-play', state.times.play);
-                    setVal('time-break', state.times.break);
-                    setVal('time-setup', state.times.setup);
-                }
-
-                if (state.rules) {
-                    setVal('rule-win', state.rules.winPoints);
-                    setVal('rule-draw', state.rules.drawPoints);
-                    setVal('rule-loss', state.rules.lossPoints);
-                    const miniEl = document.getElementById('rule-mini-tables');
-                    if (miniEl) miniEl.checked = !!state.rules.useMiniTables;
-                }
-
-                setVal('input-cloud-file-id', state.cloudFileId);
-                setVal('input-vol-signal', state.volSignal || 1.0);
-                const vsDisp = document.getElementById('vol-signal-disp');
-                if (vsDisp) vsDisp.innerText = Math.round((state.volSignal || 1.0) * 100);
-
-                setVal('input-vol-anthem', state.volAnthem || 1.0);
-                const vaDisp = document.getElementById('vol-anthem-disp');
-                if (vaDisp) vaDisp.innerText = Math.round((state.volAnthem || 1.0) * 100);
-
-                setVal('input-theme', state.theme || "light");
-                setVal('input-po-delay', state.poTransitionDelay || 10);
-                const footerEl = document.getElementById('input-show-footer');
-                if (footerEl) footerEl.checked = (state.showFooter !== false);
-
-                const jingleEl = document.getElementById('input-jingle-mode');
-                if (jingleEl) jingleEl.value = state.jingleMode || "manual";
-
-                const musicAuto = document.getElementById('input-music-auto');
-                if (musicAuto) musicAuto.checked = !!state.musicAutoEnabled;
-                const musicMode = document.getElementById('input-music-mode');
-                if (musicMode) musicMode.value = state.musicMode || 'continuous';
-                const musicFade = document.getElementById('input-music-fade');
-                if (musicFade) musicFade.value = state.musicFadeDuration || 1;
-                const fadeDisp = document.getElementById('fade-dur-disp');
-                if (fadeDisp) fadeDisp.innerText = state.musicFadeDuration || 1;
-            },
-
             saveToStorage: () => {
                 localStorage.setItem('scoreboardState', JSON.stringify(state));
             },
@@ -6441,7 +6628,7 @@
                     if (parsed.players) state.players = parsed.players;
                     if (parsed.masterPlayers) state.masterPlayers = parsed.masterPlayers;
                     if (parsed.schedule) state.schedule = parsed.schedule;
-                    if (parsed.audioData) state.audioData = parsed.audioData;
+                    if (parsed.audioData) state.audioData = parsed.audioData; // Legacy support, will be cleaned on next save
                     if (parsed.theme) state.theme = parsed.theme;
                     if (typeof parsed.musicAutoEnabled !== 'undefined') state.musicAutoEnabled = parsed.musicAutoEnabled;
                     if (parsed.musicMode) state.musicMode = parsed.musicMode;
@@ -6452,7 +6639,7 @@
                     if (parsed.currentMatch) state.currentMatch = parsed.currentMatch;
                     if (parsed.timer) state.timer = parsed.timer;
                     if (parsed.jingleMode) state.jingleMode = parsed.jingleMode;
-                    if (parsed.misc && parsed.misc.length > 0) {
+                    if (parsed.misc) {
                         state.misc = parsed.misc;
                     }
                     if (typeof parsed.qrCyclingEnabled !== 'undefined') state.qrCyclingEnabled = parsed.qrCyclingEnabled;
@@ -6491,13 +6678,7 @@
                     });
                     if (parsed.cloudFileId) state.cloudFileId = parsed.cloudFileId;
 
-                    // Fallback to default if empty or only empty rows exist
-                    const hasData = state.misc && state.misc.some(m => m.text && m.text.trim().length > 0);
-                    if (!hasData) {
-                        state.misc = [
-                            { id: "misc_default_1", text: "Startovné družstev bylo uhrazeno. Náhrady rozhodčím byly vyplaceny podle STS ČSC." }
-                        ];
-                    }
+
 
                     if (typeof parsed.tournamentStartTime !== 'undefined') state.tournamentStartTime = parsed.tournamentStartTime;
                     if (typeof parsed.playTimeAccumulated !== 'undefined') state.playTimeAccumulated = parsed.playTimeAccumulated;
@@ -6588,6 +6769,7 @@
 
                 admin.updateSettingsUI();
                 jingles.list();
+                jingles.loadSignal();
 
                 state.isLoading = false;
 
@@ -7322,8 +7504,9 @@
             },
 
             updateTimer: () => {
-                const m = Math.floor(state.timer.timeLeft / 60).toString().padStart(2, '0');
-                const s = Math.floor(state.timer.timeLeft % 60).toString().padStart(2, '0');
+                const timeLeft = Math.floor(state.timer.timeLeft);
+                const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
                 document.getElementById('main-timer').textContent = `${m}:${s}`;
             },
 
@@ -7377,6 +7560,17 @@
                     });
                     if (state.referees.some(r => r.id === currentVal) || currentVal === "") sel.value = currentVal;
                 });
+
+                // Clubs (Organizers)
+                const orgSel = document.getElementById('input-tournament-organizer');
+                if (orgSel) {
+                    const currentVal = orgSel.value;
+                    orgSel.innerHTML = '<option value="">-- Vyber Oddíl --</option>';
+                    CLUBS.forEach(c => {
+                        orgSel.innerHTML += `<option value="${c}">${c}</option>`;
+                    });
+                    if (CLUBS.includes(currentVal) || currentVal === "") orgSel.value = currentVal;
+                }
             },
 
             renderSchedule: () => {
@@ -7555,7 +7749,7 @@
 
             updateProjection: () => {
                 try {
-                    if (!state.isProjectionMode && !state.viewMode) return;
+                    if (!state.isProjectionMode && !state.viewMode && !isQR) return;
 
                     // Apply CSS variable for QR transition duration
                     document.body.style.setProperty('--qr-transition-duration', (state.qrTransitionDuration || 1.5) + 's');
@@ -7649,8 +7843,8 @@
                                             }
 
                                             let poUrlParams = "";
-                                            if (v === 'all') poUrlParams = '&mode=qr-all';
-                                            else poUrlParams = (v ? '&view=' + v : '&projection');
+                                            if (v === 'all') poUrlParams = '&projection&mode=qr-all';
+                                            else poUrlParams = (v ? '&projection&view=' + v : '&projection');
 
                                             const poUrl = window.location.origin + window.location.pathname + '?session=' + state.sessionId + poUrlParams;
                                             new QRCode(container, {
@@ -7716,8 +7910,9 @@
 
                     const timerEl = document.getElementById('p-timer');
                     if (timerEl) {
-                        const m = Math.floor(usedState.timer.timeLeft / 60).toString().padStart(2, '0');
-                        const s = Math.floor(usedState.timer.timeLeft % 60).toString().padStart(2, '0');
+                        const timeLeft = Math.floor(usedState.timer.timeLeft);
+                        const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                        const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
                         timerEl.innerText = m + ":" + s;
                     }
 
