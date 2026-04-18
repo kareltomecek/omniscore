@@ -2315,7 +2315,15 @@
                             ID získáte z odkazu pro sdílení (např. 19QC...e1f3). Nastaveno správcem.
                         </small>
                     </div>
-                    <div class="form-group" style="margin-top: 10px;">
+                    <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
+                        <label>Ruční nahrání databáze (JSON)</label>
+                        <input type="file" id="input-manual-cloud-json" accept=".json" style="margin-bottom: 5px;">
+                        <button class="btn-full" onclick="admin.uploadManualCloudData()" style="background:var(--accent-blue); margin-top:0;">Nahrát vybraný soubor k synchronizaci</button>
+                        <small style="color:#888; font-size:0.75em; display:block; margin-top:4px;">
+                            Použijte, pokud automatická synchronizace nefunguje. Databáze se ověří úplně stejně jako z cloudu.
+                        </small>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
                         <button class="btn-full" onclick="admin.exportPlayersWithPassword()"
                             title="Vytvoří zálohu vaší aktuální databáze hráčů do souboru. Vyžaduje heslo."
                             style="background:#555;">📥 Export hlavní databáze hráčů</button>
@@ -4961,24 +4969,24 @@
                     const exportUrl = `https://drive.google.com/uc?export=download&id=${cleanFileId}`;
 
                     const methods = [
-                        // Method 1: Direct fetch (works if same-origin or CORS headers allow - rare for Drive)
-                        exportUrl,
-                        // Method 2: AllOrigins Proxy (reliable free proxy)
-                        `https://api.allorigins.win/raw?url=${encodeURIComponent(exportUrl)}`,
-                        // Method 3: CORSProxy.io (another reliable proxy)
-                        `https://corsproxy.io/?${encodeURIComponent(exportUrl)}`,
-                        // Method 4: Fallback alternate Drive URL (sometimes works differently)
-                        `https://drive.usercontent.google.com/download?id=${cleanFileId}&export=download`
+                        // Method 1: Direct fetch
+                        { url: exportUrl, type: 'direct' },
+                        // Method 2: AllOrigins JSON GET (bypasses redirect CORS issue)
+                        { url: `https://api.allorigins.win/get?url=${encodeURIComponent(exportUrl)}`, type: 'allorigins-get' },
+                        // Method 3: CodeTabs Proxy
+                        { url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(exportUrl)}`, type: 'direct' },
+                        // Method 4: CORSProxy.io
+                        { url: `https://corsproxy.io/?${encodeURIComponent(exportUrl)}`, type: 'direct' }
                     ];
 
                     let lastError = null;
                     let imported = null;
 
                     for (let i = 0; i < methods.length; i++) {
-                        const url = methods[i];
+                        const method = methods[i];
                         try {
-                            console.log(`Cloud Sync: Zkouším metodu ${i + 1}/${methods.length}...`);
-                            const resp = await fetch(url);
+                            console.log(`Cloud Sync: Zkouším metodu ${i + 1}/${methods.length} (${method.type})...`);
+                            const resp = await fetch(method.url);
 
                             if (!resp.ok) {
                                 // If 403/401, it's definitely a permission issue
@@ -4988,7 +4996,20 @@
                                 throw new Error(`HTTP ${resp.status}`);
                             }
 
-                            const text = await resp.text();
+                            let text = await resp.text();
+
+                            if (method.type === 'allorigins-get') {
+                                try {
+                                    const parsedOuter = JSON.parse(text);
+                                    if (parsedOuter.contents) {
+                                        text = parsedOuter.contents;
+                                    } else {
+                                        throw new Error("Proxy nevrátila žádná data (chybí parametr contents).");
+                                    }
+                                } catch (e) {
+                                    throw new Error("Chyba při parsování obálky z AllOrigins: " + e.message);
+                                }
+                            }
 
                             // Google Drive sometimes returns an HTML login page instead of the file
                             if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
@@ -5058,6 +5079,59 @@
                     btn.innerText = originalText;
                     btn.disabled = false;
                 }
+            },
+
+            uploadManualCloudData: async () => {
+                const input = document.getElementById('input-manual-cloud-json');
+                if (!input.files || input.files.length === 0) {
+                    alert("Vyberte prosím JSON soubor s databází.");
+                    return;
+                }
+
+                const file = input.files[0];
+                const reader = new FileReader();
+
+                reader.onload = async (e) => {
+                    let text = e.target.result;
+                    let imported = null;
+
+                    try {
+                        const rawData = JSON.parse(text);
+                        if (!Array.isArray(rawData)) throw new Error("Nahraný JSON není pole hráčů.");
+
+                        // VALIDATION & SANITIZATION (Identical to Cloud Sync)
+                        imported = rawData.map(item => {
+                            if (typeof item !== 'object' || item === null) return null;
+
+                            const sanitize = (str) => {
+                                if (typeof str !== 'string') return "";
+                                return str.replace(/[<>]/g, "").trim().substring(0, 100);
+                            };
+
+                            return {
+                                id: sanitize(item.id) || ("player_" + Math.random().toString(36).substr(2, 9)),
+                                firstName: sanitize(item.firstName),
+                                surname: sanitize(item.surname),
+                                uciId: sanitize(item.uciId)
+                            };
+                        }).filter(item => item && item.surname.length > 0);
+
+                        if (imported.length === 0) throw new Error("JSON neobsahuje žádné platné záznamy o hráčích.");
+
+                        // Reuse the existing conflict logic
+                        admin.importPlayersData(imported);
+                        input.value = ""; // Reset input after success
+
+                    } catch (err) {
+                        alert("Chyba při zpracování nahraného JSON souboru: " + err.message);
+                    }
+                };
+
+                reader.onerror = () => {
+                    alert("Chyba při čtení souboru.");
+                };
+
+                reader.readAsText(file);
             },
 
             // Helper to handle data without File object
