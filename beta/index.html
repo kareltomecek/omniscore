@@ -2701,6 +2701,11 @@
                     auth.updateUI();
                     if (user) {
                         auth.checkLicense(user);
+
+                        // ÚKLID STARÝCH RELACÍ (Pouze v režimu Admin)
+                        if (!isPO && !viewMode && !isQR) {
+                            setTimeout(() => admin.cleanupOldSessions(168), 3000); // Mírná prodleva po přihlášení
+                        }
                     }
                 });
             },
@@ -2966,14 +2971,14 @@
         let sessionId = urlParams.get('session');
 
         if (!sessionId) {
-            sessionId = sessionStorage.getItem('oms_session_id');
+            sessionId = localStorage.getItem('oms_session_id');
             if (!sessionId) {
                 sessionId = Math.random().toString(36).substring(2, 7).toUpperCase();
             }
         }
 
         if (!isPO && !viewMode) {
-            sessionStorage.setItem('oms_session_id', sessionId);
+            localStorage.setItem('oms_session_id', sessionId);
         }
 
         const syncChannel = new BroadcastChannel('oms_sync_' + sessionId);
@@ -3007,13 +3012,7 @@
                     // Initialize Auth logic
                     auth.init();
 
-                    // Schedule cleanup on disconnect (Only for Admin window)
-                    if (!isPO) {
-                        const sessionRef = firebase.database().ref('sessions/' + sessionId);
-                        sessionRef.onDisconnect().remove().then(() => {
-                            console.log("%c[Firebase] onDisconnect cleanup scheduled for session:", "color: #2196f3;", sessionId);
-                        }).catch(e => console.error("[Firebase] onDisconnect failed to schedule:", e));
-                    }
+                    // [ODSTRANĚNO] Automatické mazání při odpojení bylo nahrazeno Garbage Collectorem a ručním resetem pro vyšší bezpečnost dat.
                 }
             } catch (e) { console.error("[Firebase] Initialization failed:", e); }
         }
@@ -3129,6 +3128,15 @@
 
                     ui.renderSchedule();
                     ui.render();
+
+                    // Ochrana před nechtěným zavřením okna (Admin)
+                    window.addEventListener('beforeunload', (e) => {
+                        // Varování zobrazíme pouze pokud turnaj obsahuje nějaká data
+                        if (state.schedule && state.schedule.length > 0) {
+                            e.preventDefault();
+                            e.returnValue = ''; // Standardní požadavek prohlížečů pro zobrazení dialogu
+                        }
+                    });
 
                     // Force broadcast state immediately after load so opened windows get data
                     game.syncProjection();
@@ -6927,6 +6935,43 @@
                 const url = baseUrl + '?projection&mode=qr-all&session=' + state.sessionId;
                 qrWindow = window.open(url, "ScoreboardQR_ALL_" + state.sessionId, "width=1000,height=900");
                 if (!qrWindow) alert("Vyskakovací okno bylo zablokováno.");
+            },
+
+            // --- GARBAGE COLLECTOR ---
+            cleanupOldSessions: async (maxHours = 168) => {
+                if (typeof firebase === 'undefined' || !auth.currentUser) return;
+                
+                console.log(`%c[Cleanup] Spouštím kontrolu starých relací (limit ${maxHours}h)...`, "color: #ff9800;");
+                const cutoff = Date.now() - (maxHours * 3600 * 1000);
+                
+                try {
+                    // Vyhledáme relace starší než limit pomocí indexu lastUpdate
+                    const snapshot = await firebase.database().ref('sessions')
+                        .orderByChild('lastUpdate')
+                        .endAt(cutoff)
+                        .once('value');
+                    
+                    const oldSessions = snapshot.val();
+                    if (!oldSessions) {
+                        console.log("[Cleanup] Žádné staré relace k odstranění.");
+                        return;
+                    }
+                    
+                    const keys = Object.keys(oldSessions);
+                    console.log(`[Cleanup] Nalezeno ${keys.length} expirovaných relací. Odstraňuji...`);
+                    
+                    let deletedCount = 0;
+                    for (const key of keys) {
+                        // Nikdy nemažeme vlastní aktuální relaci!
+                        if (key === state.sessionId) continue;
+                        
+                        await firebase.database().ref('sessions/' + key).remove();
+                        deletedCount++;
+                    }
+                    console.log(`%c[Cleanup] Hotovo. Odstraněno ${deletedCount} relací.`, "color: #4caf50;");
+                } catch (e) {
+                    console.error("[Cleanup] Chyba při úklidu:", e);
+                }
             },
         };
 
