@@ -2599,6 +2599,7 @@
         // GLOBÁLNÍ STAV (STATE)
         // ===================================================================================
         let state = {
+            lastUpdate: 0,
             isProjectionMode: false, // Will be set in KOMUNIKACE
             sessionId: "", // Will be set in KOMUNIKACE
             isLoading: false,
@@ -3033,6 +3034,11 @@
                         if (!receivedState || typeof receivedState !== 'object') return;
                         if (receivedState === 'REQUEST_SYNC') return;
 
+                        // --- Timestamp check to ignore old/lagging state updates (Fixes flickering) ---
+                        if (receivedState.lastUpdate && state.lastUpdate && receivedState.lastUpdate < state.lastUpdate) {
+                            console.log("[Sync] Ignoring stale update", { received: receivedState.lastUpdate, current: state.lastUpdate });
+                            return;
+                        }
 
                         // Keep local window modes and local animation state
                         const modePO = state.isProjectionMode;
@@ -3095,6 +3101,9 @@
                 }
 
                 try {
+                    // Extra safety: Stop Admin initialization if we are actually in a projection/public/QR tab
+                    if (state.isProjectionMode || state.viewMode || isQR) return;
+
                     // Reset session ID display colors (branding removed)
                     const footerSess = document.getElementById('admin-footer-session');
                     if (footerSess) footerSess.style.color = 'var(--accent-blue)';
@@ -3170,7 +3179,7 @@
                     }
 
                     ui.updateTimer();
-                    game.syncProjection();
+                    game.syncProjection(false); // Throttle periodic updates
                     ui.updateAdminFooter();
                 } else {
                     state.timer.timeLeft = Math.max(0, remainingMs / 1000);
@@ -3210,7 +3219,7 @@
                     state.timer.timeLeft = Math.max(0, (remainingMs + 1) / 1000);
                 }
                 ui.updateTimerBtn();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             getPhaseCount: () => {
@@ -3229,7 +3238,7 @@
 
                 ui.updateTimer();
                 ui.updateTimerBtn();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             adjustTime: (seconds) => {
@@ -3239,7 +3248,7 @@
                     state.timer.targetEndTime += (seconds * 1000);
                 }
                 ui.updateTimer();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             manualTimeEntry: () => {
@@ -3257,7 +3266,7 @@
                     }
                 }
                 ui.updateTimer();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             adjustScore: (team, delta, playSound = false) => {
@@ -3277,7 +3286,7 @@
                 }
 
                 ui.updateScores();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             playGoalCelebration: async (teamId, teamName) => {
@@ -3417,7 +3426,7 @@
                 }
 
                 ui.renderPhase();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             // Returns true if match change was successful
@@ -3535,12 +3544,16 @@
                 };
             },
 
-            syncProjection: () => {
+            syncProjection: (forceFirebase = false) => {
                 // IMPORTANT: Prevent projection/public windows from broadcasting their (empty) state
                 if (state.isProjectionMode || state.viewMode) {
                     console.log("syncProjection: Skipping broadcast (not in admin mode)");
                     return;
                 }
+
+                // --- TIMESTAMP GENERATION ---
+                state.lastUpdate = Date.now();
+
                 const payload = { ...state, telemetry: game.getTelemetry() };
                 const plainPayload = JSON.parse(JSON.stringify(payload));
 
@@ -3552,12 +3565,20 @@
                     projectionWindow.postMessage(plainPayload, '*');
                 }
 
-                // Send to Firebase (Cross-Device)
+                // --- THROTTLED FIREBASE SYNC ---
+                const now = Date.now();
+                const timeSinceLastSync = now - (game._lastFirebaseSync || 0);
+
                 if (typeof firebase !== 'undefined' && !state.isProjectionMode && auth.isLicensed()) {
-                    try {
-                        firebase.database().ref('sessions/' + state.sessionId).set(plainPayload);
-                    } catch (e) {
-                        console.error("Firebase write failed:", e);
+                    // Send to Firebase immediately if forceFirebase=true OR if it has been more than 1s
+                    if (forceFirebase || timeSinceLastSync >= 1000) {
+                        try {
+                            firebase.database().ref('sessions/' + state.sessionId).set(plainPayload);
+                            game._lastFirebaseSync = now;
+                            // console.log("[Sync] Firebase updated", { force: forceFirebase });
+                        } catch (e) {
+                            console.error("Firebase write failed:", e);
+                        }
                     }
                 }
 
@@ -4220,13 +4241,13 @@
                 }
 
                 function finishSave() {
-                    admin.saveToStorage(); game.syncProjection();
+                    admin.saveToStorage(); 
+                    game.syncProjection(true);
                     ui.fillSelects();
                     ui.renderSchedule();
                     admin.renderIdentityInputs(); // Refresh labels
                     ui.updateFooterVisibility();
 
-                    game.syncProjection();
                     if (showAlert) alert("Nastavení uloženo.");
                 }
             },
@@ -6303,7 +6324,7 @@
                         if (count > 0) {
                             admin.renderLogoSettings();
                             ui.updateLogos();
-                            game.syncProjection();
+                            game.syncProjection(true);
                             admin.saveToStorage();
                             alert(`Logo přiřazeno ${count} družstvům.`);
                         } else {
@@ -6361,7 +6382,7 @@
                     game.setPhase(0, true);
                 } else {
                     // Force sync even if phase is not reset
-                    game.syncProjection();
+                    game.syncProjection(true);
                 }
             },
 
@@ -8398,7 +8419,8 @@
         }
 
         function openProjectionWindow() {
-            const url = window.location.origin + window.location.pathname + '?projection&session=' + state.sessionId;
+            // Explicitly construct URL and ensure ?projection is first, with cache-buster
+            const url = window.location.origin + window.location.pathname + '?projection&session=' + state.sessionId + '&v=' + Date.now();
             projectionWindow = window.open(url, "ScoreboardProjection_" + state.sessionId, "width=800,height=600");
             if (!projectionWindow) {
                 alert("Vyskakovací okno bylo zablokováno. Prosím povolte jej pro tuto stránku.");
