@@ -2315,7 +2315,15 @@
                             ID získáte z odkazu pro sdílení (např. 19QC...e1f3). Nastaveno správcem.
                         </small>
                     </div>
-                    <div class="form-group" style="margin-top: 10px;">
+                    <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
+                        <label>Ruční nahrání databáze (JSON)</label>
+                        <input type="file" id="input-manual-cloud-json" accept=".json" style="margin-bottom: 5px;">
+                        <button class="btn-full" onclick="admin.uploadManualCloudData()" style="background:var(--accent-blue); margin-top:0;">Nahrát vybraný soubor k synchronizaci</button>
+                        <small style="color:#888; font-size:0.75em; display:block; margin-top:4px;">
+                            Použijte, pokud automatická synchronizace nefunguje. Databáze se ověří úplně stejně jako z cloudu.
+                        </small>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
                         <button class="btn-full" onclick="admin.exportPlayersWithPassword()"
                             title="Vytvoří zálohu vaší aktuální databáze hráčů do souboru. Vyžaduje heslo."
                             style="background:#555;">📥 Export hlavní databáze hráčů</button>
@@ -2591,6 +2599,7 @@
         // GLOBÁLNÍ STAV (STATE)
         // ===================================================================================
         let state = {
+            lastUpdate: 0,
             isProjectionMode: false, // Will be set in KOMUNIKACE
             sessionId: "", // Will be set in KOMUNIKACE
             isLoading: false,
@@ -2968,6 +2977,15 @@
         }
 
         const syncChannel = new BroadcastChannel('oms_sync_' + sessionId);
+        // ==== ONLINE/OFFLINE HANDLING ==== //
+        window.addEventListener('online', () => {
+            console.log('[Sync] Connection restored – requesting sync');
+            // Po obnovení spojení požádáme o synchronizaci všech oken.
+            syncChannel.postMessage('REQUEST_SYNC');
+        });
+        window.addEventListener('offline', () => {
+            console.warn('[Sync] Offline – will resync when back online');
+        });
 
         // Update state with session info
         state.isProjectionMode = isPO;
@@ -3016,6 +3034,11 @@
                         if (!receivedState || typeof receivedState !== 'object') return;
                         if (receivedState === 'REQUEST_SYNC') return;
 
+                        // --- Timestamp check to ignore old/lagging state updates (Fixes flickering) ---
+                        if (receivedState.lastUpdate && state.lastUpdate && receivedState.lastUpdate < state.lastUpdate) {
+                            console.log("[Sync] Ignoring stale update", { received: receivedState.lastUpdate, current: state.lastUpdate });
+                            return;
+                        }
 
                         // Keep local window modes and local animation state
                         const modePO = state.isProjectionMode;
@@ -3078,6 +3101,9 @@
                 }
 
                 try {
+                    // Extra safety: Stop Admin initialization if we are actually in a projection/public/QR tab
+                    if (state.isProjectionMode || state.viewMode || isQR) return;
+
                     // Reset session ID display colors (branding removed)
                     const footerSess = document.getElementById('admin-footer-session');
                     if (footerSess) footerSess.style.color = 'var(--accent-blue)';
@@ -3153,7 +3179,7 @@
                     }
 
                     ui.updateTimer();
-                    game.syncProjection();
+                    game.syncProjection(false); // Throttle periodic updates
                     ui.updateAdminFooter();
                 } else {
                     state.timer.timeLeft = Math.max(0, remainingMs / 1000);
@@ -3193,7 +3219,7 @@
                     state.timer.timeLeft = Math.max(0, (remainingMs + 1) / 1000);
                 }
                 ui.updateTimerBtn();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             getPhaseCount: () => {
@@ -3212,7 +3238,7 @@
 
                 ui.updateTimer();
                 ui.updateTimerBtn();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             adjustTime: (seconds) => {
@@ -3222,7 +3248,7 @@
                     state.timer.targetEndTime += (seconds * 1000);
                 }
                 ui.updateTimer();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             manualTimeEntry: () => {
@@ -3240,7 +3266,7 @@
                     }
                 }
                 ui.updateTimer();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             adjustScore: (team, delta, playSound = false) => {
@@ -3260,7 +3286,7 @@
                 }
 
                 ui.updateScores();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             playGoalCelebration: async (teamId, teamName) => {
@@ -3306,17 +3332,31 @@
                 }
             },
 
+            // ==== PO TRANSITION LOGIC ==== //
+            // Spustí prodlevu po přechodu na další PO (Public View) pokud je nastavena.
             triggerPoTransition: (snapshot) => {
-                if (poTransitionTimeoutID) clearTimeout(poTransitionTimeoutID);
-
+                // Zruší existující timeout, aby nedošlo k překrytí.
+                if (poTransitionTimeoutID) {
+                    clearTimeout(poTransitionTimeoutID);
+                    poTransitionTimeoutID = null;
+                }
                 state.poTransitionData = snapshot;
                 state.poTransitionActive = true;
-
-                poTransitionTimeoutID = setTimeout(() => {
+                // Pokud je prodleva 0, okamžitě deaktivujeme a synchronizujeme.
+                const delaySec = state.poTransitionDelay || 0;
+                if (delaySec > 0) {
+                    poTransitionTimeoutID = setTimeout(() => {
+                        state.poTransitionActive = false;
+                        state.poTransitionData = null;
+                        poTransitionTimeoutID = null;
+                        game.syncProjection();
+                    }, delaySec * 1000);
+                } else {
+                    // Bez prodlevy – okamžitě ukončíme.
                     state.poTransitionActive = false;
                     state.poTransitionData = null;
                     game.syncProjection();
-                }, (state.poTransitionDelay || 10) * 1000);
+                }
             },
 
             step: (direction) => {
@@ -3358,10 +3398,14 @@
                 }
             },
 
+            // Přechod na novou fázi – zruší případnou aktivní PO prodlevu.
             setPhase: (index, resetTime) => {
                 // Přerušit prodlevu/blikání, pokud začíná poločas (index 1 nebo 3)
                 if ((index === 1 || index === 3) && state.poTransitionActive) {
-                    if (poTransitionTimeoutID) clearTimeout(poTransitionTimeoutID);
+                    if (poTransitionTimeoutID) {
+                        clearTimeout(poTransitionTimeoutID);
+                        poTransitionTimeoutID = null;
+                    }
                     state.poTransitionActive = false;
                     state.poTransitionData = null;
                 }
@@ -3382,7 +3426,7 @@
                 }
 
                 ui.renderPhase();
-                game.syncProjection();
+                game.syncProjection(true);
             },
 
             // Returns true if match change was successful
@@ -3500,12 +3544,16 @@
                 };
             },
 
-            syncProjection: () => {
+            syncProjection: (forceFirebase = false) => {
                 // IMPORTANT: Prevent projection/public windows from broadcasting their (empty) state
                 if (state.isProjectionMode || state.viewMode) {
                     console.log("syncProjection: Skipping broadcast (not in admin mode)");
                     return;
                 }
+
+                // --- TIMESTAMP GENERATION ---
+                state.lastUpdate = Date.now();
+
                 const payload = { ...state, telemetry: game.getTelemetry() };
                 const plainPayload = JSON.parse(JSON.stringify(payload));
 
@@ -3517,12 +3565,20 @@
                     projectionWindow.postMessage(plainPayload, '*');
                 }
 
-                // Send to Firebase (Cross-Device)
+                // --- THROTTLED FIREBASE SYNC ---
+                const now = Date.now();
+                const timeSinceLastSync = now - (game._lastFirebaseSync || 0);
+
                 if (typeof firebase !== 'undefined' && !state.isProjectionMode && auth.isLicensed()) {
-                    try {
-                        firebase.database().ref('sessions/' + state.sessionId).set(plainPayload);
-                    } catch (e) {
-                        console.error("Firebase write failed:", e);
+                    // Send to Firebase immediately if forceFirebase=true OR if it has been more than 1s
+                    if (forceFirebase || timeSinceLastSync >= 1000) {
+                        try {
+                            firebase.database().ref('sessions/' + state.sessionId).set(plainPayload);
+                            game._lastFirebaseSync = now;
+                            // console.log("[Sync] Firebase updated", { force: forceFirebase });
+                        } catch (e) {
+                            console.error("Firebase write failed:", e);
+                        }
                     }
                 }
 
@@ -4185,13 +4241,13 @@
                 }
 
                 function finishSave() {
-                    admin.saveToStorage(); game.syncProjection();
+                    admin.saveToStorage(); 
+                    game.syncProjection(true);
                     ui.fillSelects();
                     ui.renderSchedule();
                     admin.renderIdentityInputs(); // Refresh labels
                     ui.updateFooterVisibility();
 
-                    game.syncProjection();
                     if (showAlert) alert("Nastavení uloženo.");
                 }
             },
@@ -4934,24 +4990,24 @@
                     const exportUrl = `https://drive.google.com/uc?export=download&id=${cleanFileId}`;
 
                     const methods = [
-                        // Method 1: Direct fetch (works if same-origin or CORS headers allow - rare for Drive)
-                        exportUrl,
-                        // Method 2: AllOrigins Proxy (reliable free proxy)
-                        `https://api.allorigins.win/raw?url=${encodeURIComponent(exportUrl)}`,
-                        // Method 3: CORSProxy.io (another reliable proxy)
-                        `https://corsproxy.io/?${encodeURIComponent(exportUrl)}`,
-                        // Method 4: Fallback alternate Drive URL (sometimes works differently)
-                        `https://drive.usercontent.google.com/download?id=${cleanFileId}&export=download`
+                        // Method 1: Direct fetch
+                        { url: exportUrl, type: 'direct' },
+                        // Method 2: AllOrigins JSON GET (bypasses redirect CORS issue)
+                        { url: `https://api.allorigins.win/get?url=${encodeURIComponent(exportUrl)}`, type: 'allorigins-get' },
+                        // Method 3: CodeTabs Proxy
+                        { url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(exportUrl)}`, type: 'direct' },
+                        // Method 4: CORSProxy.io
+                        { url: `https://corsproxy.io/?${encodeURIComponent(exportUrl)}`, type: 'direct' }
                     ];
 
                     let lastError = null;
                     let imported = null;
 
                     for (let i = 0; i < methods.length; i++) {
-                        const url = methods[i];
+                        const method = methods[i];
                         try {
-                            console.log(`Cloud Sync: Zkouším metodu ${i + 1}/${methods.length}...`);
-                            const resp = await fetch(url);
+                            console.log(`Cloud Sync: Zkouším metodu ${i + 1}/${methods.length} (${method.type})...`);
+                            const resp = await fetch(method.url);
 
                             if (!resp.ok) {
                                 // If 403/401, it's definitely a permission issue
@@ -4961,7 +5017,20 @@
                                 throw new Error(`HTTP ${resp.status}`);
                             }
 
-                            const text = await resp.text();
+                            let text = await resp.text();
+
+                            if (method.type === 'allorigins-get') {
+                                try {
+                                    const parsedOuter = JSON.parse(text);
+                                    if (parsedOuter.contents) {
+                                        text = parsedOuter.contents;
+                                    } else {
+                                        throw new Error("Proxy nevrátila žádná data (chybí parametr contents).");
+                                    }
+                                } catch (e) {
+                                    throw new Error("Chyba při parsování obálky z AllOrigins: " + e.message);
+                                }
+                            }
 
                             // Google Drive sometimes returns an HTML login page instead of the file
                             if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
@@ -5031,6 +5100,59 @@
                     btn.innerText = originalText;
                     btn.disabled = false;
                 }
+            },
+
+            uploadManualCloudData: async () => {
+                const input = document.getElementById('input-manual-cloud-json');
+                if (!input.files || input.files.length === 0) {
+                    alert("Vyberte prosím JSON soubor s databází.");
+                    return;
+                }
+
+                const file = input.files[0];
+                const reader = new FileReader();
+
+                reader.onload = async (e) => {
+                    let text = e.target.result;
+                    let imported = null;
+
+                    try {
+                        const rawData = JSON.parse(text);
+                        if (!Array.isArray(rawData)) throw new Error("Nahraný JSON není pole hráčů.");
+
+                        // VALIDATION & SANITIZATION (Identical to Cloud Sync)
+                        imported = rawData.map(item => {
+                            if (typeof item !== 'object' || item === null) return null;
+
+                            const sanitize = (str) => {
+                                if (typeof str !== 'string') return "";
+                                return str.replace(/[<>]/g, "").trim().substring(0, 100);
+                            };
+
+                            return {
+                                id: sanitize(item.id) || ("player_" + Math.random().toString(36).substr(2, 9)),
+                                firstName: sanitize(item.firstName),
+                                surname: sanitize(item.surname),
+                                uciId: sanitize(item.uciId)
+                            };
+                        }).filter(item => item && item.surname.length > 0);
+
+                        if (imported.length === 0) throw new Error("JSON neobsahuje žádné platné záznamy o hráčích.");
+
+                        // Reuse the existing conflict logic
+                        admin.importPlayersData(imported);
+                        input.value = ""; // Reset input after success
+
+                    } catch (err) {
+                        alert("Chyba při zpracování nahraného JSON souboru: " + err.message);
+                    }
+                };
+
+                reader.onerror = () => {
+                    alert("Chyba při čtení souboru.");
+                };
+
+                reader.readAsText(file);
             },
 
             // Helper to handle data without File object
@@ -6202,7 +6324,7 @@
                         if (count > 0) {
                             admin.renderLogoSettings();
                             ui.updateLogos();
-                            game.syncProjection();
+                            game.syncProjection(true);
                             admin.saveToStorage();
                             alert(`Logo přiřazeno ${count} družstvům.`);
                         } else {
@@ -6260,7 +6382,7 @@
                     game.setPhase(0, true);
                 } else {
                     // Force sync even if phase is not reset
-                    game.syncProjection();
+                    game.syncProjection(true);
                 }
             },
 
@@ -8297,7 +8419,8 @@
         }
 
         function openProjectionWindow() {
-            const url = window.location.origin + window.location.pathname + '?projection&session=' + state.sessionId;
+            // Explicitly construct URL and ensure ?projection is first, with cache-buster
+            const url = window.location.origin + window.location.pathname + '?projection&session=' + state.sessionId + '&v=' + Date.now();
             projectionWindow = window.open(url, "ScoreboardProjection_" + state.sessionId, "width=800,height=600");
             if (!projectionWindow) {
                 alert("Vyskakovací okno bylo zablokováno. Prosím povolte jej pro tuto stránku.");
