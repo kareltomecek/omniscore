@@ -2280,12 +2280,14 @@
                             <label>Interval střídání (s)</label>
                             <input type="number" id="input-qr-interval" value="8" min="5" max="60"
                                 oninput="admin.validateInputRange(this, 60)"
+                                onchange="admin.saveSettings(false); game.syncProjection()"
                                 onkeydown="return admin.restrictToNumbers(event)">
                         </div>
                         <div class="form-group">
                             <label>Délka prolínání (s)</label>
                             <input type="number" id="input-qr-transition" value="2" min="1" max="8" step="1"
                                 oninput="admin.validateInputRange(this, 8)"
+                                onchange="admin.saveSettings(false); game.syncProjection()"
                                 onkeydown="return admin.restrictToNumbers(event)">
                         </div>
                     </div>
@@ -3020,6 +3022,9 @@
         const game = {
             init: () => {
                 if (state.isProjectionMode || state.viewMode || isQR) {
+                    // Reset mode classes to prevent layout overlap when switching views without full reload
+                    document.body.classList.remove('mode-projection', 'mode-qr', 'mode-view-schedule', 'mode-view-standings', 'mode-view-cross');
+
                     if (state.isProjectionMode) document.body.classList.add('mode-projection');
                     if (state.viewMode) document.body.classList.add('mode-view-' + state.viewMode);
                     if (isQR) document.body.classList.add('mode-qr');
@@ -3044,11 +3049,27 @@
                         const modeView = state.viewMode;
                         const qrActive = state.qrCyclingActive;
 
+                        // If qrCyclingEnabled was just toggled, ensure we pick it up immediately
+                        const qrEnabledChanged = (state.qrCyclingEnabled !== receivedState.qrCyclingEnabled);
+
                         Object.assign(state, receivedState);
 
                         state.isProjectionMode = modePO;
                         state.viewMode = modeView;
                         state.qrCyclingActive = qrActive;
+
+                        // Force restart cycle if enabled changed
+                        if (qrEnabledChanged) {
+                            if (state.qrCyclingEnabled) {
+                                // Will be picked up by updateProjection
+                            } else {
+                                state.qrCyclingActive = false;
+                                if (ui.qrCycleIntervalID) {
+                                    clearInterval(ui.qrCycleIntervalID);
+                                    ui.qrCycleIntervalID = null;
+                                }
+                            }
+                        }
 
                         state.isSynced = true;
                         ui.updateProjection();
@@ -7287,6 +7308,7 @@
         // UI ENGINE
         // ===================================================================================
         const ui = {
+            qrTransitionInProgress: false,
             updateFooterVisibility: () => {
                 const footer = document.getElementById('admin-footer');
                 if (footer) {
@@ -8195,9 +8217,9 @@
                         const upcomingCont = document.getElementById('p-upcoming-container');
                         const qrProjCont = document.getElementById('p-qr-projection-container');
 
-                        if (upcomingCont && qrProjCont) {
+                        if (upcomingCont && qrProjCont && !ui.qrTransitionInProgress) {
                             if (state.qrCyclingActive) {
-                                // Generate QR codes if showing the QR container
+                                // 1. Ensure QR codes are generated
                                 const configs = [
                                     { id: 'p-qr-grid-projection', param: 'projection' },
                                     { id: 'p-qr-grid-schedule', param: 'view=schedule' },
@@ -8227,24 +8249,43 @@
                                     }
                                 });
 
+                                // 2. Handle Transition
                                 if (qrProjCont.style.display === 'none') {
+                                    ui.qrTransitionInProgress = true;
                                     upcomingCont.style.opacity = '0';
+                                    
                                     setTimeout(() => {
+                                        // Re-check after timeout to ensure state is still valid
                                         if (state.qrCyclingActive) {
                                             upcomingCont.style.display = 'none';
                                             qrProjCont.style.display = 'flex';
-                                            setTimeout(() => { qrProjCont.style.opacity = '1'; }, 50);
+                                            setTimeout(() => { 
+                                                qrProjCont.style.opacity = '1'; 
+                                                ui.qrTransitionInProgress = false;
+                                            }, 50);
+                                        } else {
+                                            ui.qrTransitionInProgress = false;
+                                            ui.updateProjection(); // Correct state if it changed during timeout
                                         }
                                     }, (state.qrTransitionDuration || 1.5) * 1000);
                                 }
                             } else {
+                                // CASE: Transitioning back to Upcoming Matches
                                 if (upcomingCont.style.display === 'none') {
+                                    ui.qrTransitionInProgress = true;
                                     qrProjCont.style.opacity = '0';
+                                    
                                     setTimeout(() => {
                                         if (!state.qrCyclingActive) {
                                             qrProjCont.style.display = 'none';
                                             upcomingCont.style.display = 'block';
-                                            setTimeout(() => { upcomingCont.style.opacity = '1'; }, 50);
+                                            setTimeout(() => { 
+                                                upcomingCont.style.opacity = '1'; 
+                                                ui.qrTransitionInProgress = false;
+                                            }, 50);
+                                        } else {
+                                            ui.qrTransitionInProgress = false;
+                                            ui.updateProjection();
                                         }
                                     }, (state.qrTransitionDuration || 1.5) * 1000);
                                 }
