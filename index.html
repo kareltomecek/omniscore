@@ -2280,12 +2280,14 @@
                             <label>Interval střídání (s)</label>
                             <input type="number" id="input-qr-interval" value="8" min="5" max="60"
                                 oninput="admin.validateInputRange(this, 60)"
+                                onchange="admin.saveSettings(false); game.syncProjection()"
                                 onkeydown="return admin.restrictToNumbers(event)">
                         </div>
                         <div class="form-group">
                             <label>Délka prolínání (s)</label>
                             <input type="number" id="input-qr-transition" value="2" min="1" max="8" step="1"
                                 oninput="admin.validateInputRange(this, 8)"
+                                onchange="admin.saveSettings(false); game.syncProjection()"
                                 onkeydown="return admin.restrictToNumbers(event)">
                         </div>
                     </div>
@@ -2688,6 +2690,29 @@
         let poTransitionTimeoutID = null;
 
         // ===================================================================================
+        // SYSTEM & WAKE LOCK (Ochrana před uspáním)
+        // ===================================================================================
+        let screenWakeLock = null;
+        async function requestScreenWakeLock() {
+            try {
+                if ('wakeLock' in navigator && !screenWakeLock) {
+                    screenWakeLock = await navigator.wakeLock.request('screen');
+                    screenWakeLock.addEventListener('release', () => {
+                        screenWakeLock = null;
+                    });
+                }
+            } catch (err) {
+                // Wake lock může selhat např. při nízkém stavu baterie nebo nepodpoře prohlížeče
+            }
+        }
+        function releaseScreenWakeLock() {
+            if (screenWakeLock) {
+                screenWakeLock.release().catch(() => {});
+                screenWakeLock = null;
+            }
+        }
+
+        // ===================================================================================
         // AUTHENTICATION LOGIC
         // ===================================================================================
         const auth = {
@@ -3020,6 +3045,9 @@
         const game = {
             init: () => {
                 if (state.isProjectionMode || state.viewMode || isQR) {
+                    // Reset mode classes to prevent layout overlap when switching views without full reload
+                    document.body.classList.remove('mode-projection', 'mode-qr', 'mode-view-schedule', 'mode-view-standings', 'mode-view-cross');
+
                     if (state.isProjectionMode) document.body.classList.add('mode-projection');
                     if (state.viewMode) document.body.classList.add('mode-view-' + state.viewMode);
                     if (isQR) document.body.classList.add('mode-qr');
@@ -3044,11 +3072,27 @@
                         const modeView = state.viewMode;
                         const qrActive = state.qrCyclingActive;
 
+                        // If qrCyclingEnabled was just toggled, ensure we pick it up immediately
+                        const qrEnabledChanged = (state.qrCyclingEnabled !== receivedState.qrCyclingEnabled);
+
                         Object.assign(state, receivedState);
 
                         state.isProjectionMode = modePO;
                         state.viewMode = modeView;
                         state.qrCyclingActive = qrActive;
+
+                        // Force restart cycle if enabled changed
+                        if (qrEnabledChanged) {
+                            if (state.qrCyclingEnabled) {
+                                // Will be picked up by updateProjection
+                            } else {
+                                state.qrCyclingActive = false;
+                                if (ui.qrCycleIntervalID) {
+                                    clearInterval(ui.qrCycleIntervalID);
+                                    ui.qrCycleIntervalID = null;
+                                }
+                            }
+                        }
 
                         state.isSynced = true;
                         ui.updateProjection();
@@ -3094,6 +3138,24 @@
                             }
                         });
                     }, 1000);
+
+                    // Lokální plynulý odpočet zápasového času v PO (zcela nezávislý na zatížení či uspání ZO)
+                    setInterval(() => {
+                        const usedState = (state.poTransitionActive && state.poTransitionData) ? state.poTransitionData : state;
+                        if (usedState && usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
+                            const timerEl = document.getElementById('p-timer');
+                            if (timerEl) {
+                                const remMs = usedState.timer.targetEndTime - Date.now();
+                                const timeLeft = Math.max(0, Math.floor(remMs / 1000));
+                                const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                                const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
+                                const timeFormatted = m + ":" + s;
+                                if (timerEl.innerText !== timeFormatted) {
+                                    timerEl.innerText = timeFormatted;
+                                }
+                            }
+                        }
+                    }, 200);
 
                     ui.updateProjection();
                     return;
@@ -3148,9 +3210,61 @@
                         }
                     };
 
-                    // Start periodic Firebase sync
-                    setInterval(() => game.tick(), 100);
+                    // --- NEZÁVISLÝ ČASOVAČ NA POZADÍ (WEB WORKER) ---
+                    // Web Worker běží na vlastním systémovém vlákně, které Chrome neškrtí ani při přepnutí do Excelu / jiného okna
+                    try {
+                        const tickerBlob = new Blob([`
+                            let intervalId = null;
+                            self.onmessage = function(e) {
+                                if (e.data === 'start') {
+                                    if (!intervalId) {
+                                        intervalId = setInterval(function() {
+                                            self.postMessage('tick');
+                                        }, 100);
+                                    }
+                                } else if (e.data === 'stop') {
+                                    if (intervalId) {
+                                        clearInterval(intervalId);
+                                        intervalId = null;
+                                    }
+                                }
+                            };
+                        `], { type: 'application/javascript' });
+                        game._tickerWorker = new Worker(URL.createObjectURL(tickerBlob));
+                        game._tickerWorker.onmessage = function(e) {
+                            if (e.data === 'tick') {
+                                game.tick();
+                            }
+                        };
+                        game._tickerWorker.postMessage('start');
+                    } catch (workerErr) {
+                        console.warn("Web Worker timer nelze spustit, použije se záložní setInterval:", workerErr);
+                    }
+
+                    // Záložní interval pro případ, kdyby Web Worker nebyl v daném prostředí podporován
+                    if (!game._tickerWorker) {
+                        setInterval(() => game.tick(), 100);
+                    }
+
                     setInterval(() => ui.updateAdminFooter(), 1000);
+
+                    // Okamžitá reaktivace a vykreslení při návratu do okna (např. přepnutí z Excelu)
+                    window.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) {
+                            if (state.timer.running) {
+                                game.tick();
+                                if (!screenWakeLock) requestScreenWakeLock();
+                            }
+                            ui.updateAdminFooter();
+                        }
+                    });
+                    window.addEventListener('focus', () => {
+                        if (state.timer.running) {
+                            game.tick();
+                            if (!screenWakeLock) requestScreenWakeLock();
+                        }
+                        ui.updateAdminFooter();
+                    });
                 } catch (e) {
                     console.error("Initialization error:", e);
                 }
@@ -3197,6 +3311,7 @@
             toggleTimer: () => {
                 state.timer.running = !state.timer.running;
                 if (state.timer.running) {
+                    requestScreenWakeLock();
                     state.timer.lastTick = Date.now();
                     // User preference: -1ms offset for "snappy" immediate second change
                     state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000) - 1;
@@ -3222,6 +3337,7 @@
                     // Immediate first tick to reflect visual change (e.g. 7:00 -> 6:59)
                     game.tick();
                 } else {
+                    releaseScreenWakeLock();
                     // When pausing, store the exact remaining time (plus the 1ms offset to avoid drift on resume)
                     const remainingMs = state.timer.targetEndTime - Date.now();
                     state.timer.timeLeft = Math.max(0, (remainingMs + 1) / 1000);
@@ -3236,6 +3352,7 @@
 
             resetTimer: () => {
                 state.timer.running = false;
+                releaseScreenWakeLock();
                 if (state.currentMatch.isEvent) {
                     state.timer.timeLeft = state.currentMatch.duration || 600;
                 } else {
@@ -3562,7 +3679,11 @@
                 // --- TIMESTAMP GENERATION ---
                 state.lastUpdate = Date.now();
 
-                const payload = { ...state, telemetry: game.getTelemetry() };
+                // --- ODLEHČENÝ SYNCHRONIZAČNÍ PAYLOAD PRO PO A CLOUD ---
+                // Vyřadíme objemná data, která PO ani veřejná zobrazení nepotřebují (MP3 znělky v base64, globální databázi hráčů apod.)
+                // Tím se objem dat zmenší z desítek megabajtů na jednotky kilobajtů a zamezí se zasekávání hlavního vlákna a tlačítek gólů.
+                const { teamAnthems, masterPlayers, musicPlaylist, ...lightState } = state;
+                const payload = { ...lightState, telemetry: game.getTelemetry() };
                 const plainPayload = JSON.parse(JSON.stringify(payload));
 
                 // Send to BroadcastChannel for all listeners (OBS, other tabs)
@@ -7287,6 +7408,7 @@
         // UI ENGINE
         // ===================================================================================
         const ui = {
+            qrTransitionInProgress: false,
             updateFooterVisibility: () => {
                 const footer = document.getElementById('admin-footer');
                 if (footer) {
@@ -8050,7 +8172,11 @@
 
                     const timerEl = document.getElementById('p-timer');
                     if (timerEl) {
-                        const timeLeft = Math.floor(usedState.timer.timeLeft);
+                        let timeLeft = Math.floor(usedState.timer.timeLeft);
+                        if (usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
+                            const remMs = usedState.timer.targetEndTime - Date.now();
+                            timeLeft = Math.max(0, Math.floor(remMs / 1000));
+                        }
                         const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                         const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
                         timerEl.innerText = m + ":" + s;
@@ -8195,9 +8321,9 @@
                         const upcomingCont = document.getElementById('p-upcoming-container');
                         const qrProjCont = document.getElementById('p-qr-projection-container');
 
-                        if (upcomingCont && qrProjCont) {
+                        if (upcomingCont && qrProjCont && !ui.qrTransitionInProgress) {
                             if (state.qrCyclingActive) {
-                                // Generate QR codes if showing the QR container
+                                // 1. Ensure QR codes are generated
                                 const configs = [
                                     { id: 'p-qr-grid-projection', param: 'projection' },
                                     { id: 'p-qr-grid-schedule', param: 'view=schedule' },
@@ -8227,24 +8353,43 @@
                                     }
                                 });
 
+                                // 2. Handle Transition
                                 if (qrProjCont.style.display === 'none') {
+                                    ui.qrTransitionInProgress = true;
                                     upcomingCont.style.opacity = '0';
+                                    
                                     setTimeout(() => {
+                                        // Re-check after timeout to ensure state is still valid
                                         if (state.qrCyclingActive) {
                                             upcomingCont.style.display = 'none';
                                             qrProjCont.style.display = 'flex';
-                                            setTimeout(() => { qrProjCont.style.opacity = '1'; }, 50);
+                                            setTimeout(() => { 
+                                                qrProjCont.style.opacity = '1'; 
+                                                ui.qrTransitionInProgress = false;
+                                            }, 50);
+                                        } else {
+                                            ui.qrTransitionInProgress = false;
+                                            ui.updateProjection(); // Correct state if it changed during timeout
                                         }
                                     }, (state.qrTransitionDuration || 1.5) * 1000);
                                 }
                             } else {
+                                // CASE: Transitioning back to Upcoming Matches
                                 if (upcomingCont.style.display === 'none') {
+                                    ui.qrTransitionInProgress = true;
                                     qrProjCont.style.opacity = '0';
+                                    
                                     setTimeout(() => {
                                         if (!state.qrCyclingActive) {
                                             qrProjCont.style.display = 'none';
                                             upcomingCont.style.display = 'block';
-                                            setTimeout(() => { upcomingCont.style.opacity = '1'; }, 50);
+                                            setTimeout(() => { 
+                                                upcomingCont.style.opacity = '1'; 
+                                                ui.qrTransitionInProgress = false;
+                                            }, 50);
+                                        } else {
+                                            ui.qrTransitionInProgress = false;
+                                            ui.updateProjection();
                                         }
                                     }, (state.qrTransitionDuration || 1.5) * 1000);
                                 }
