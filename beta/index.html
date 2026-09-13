@@ -3440,7 +3440,7 @@
                 }
 
                 if (totalSeconds !== null && totalSeconds >= 0) {
-                    state.timer.timeLeft = totalSeconds;
+                    state.timer.timeLeft = Math.min(3599, totalSeconds); // Max 59:59
                     if (state.timer.running) {
                         state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
                     }
@@ -4584,11 +4584,18 @@
                     (e.keyCode >= 35 && e.keyCode <= 39)) {
                     return true;
                 }
-                // Allow digits (0-9 on main keyboard and numpad)
-                if ((!e.shiftKey && e.keyCode >= 48 && e.keyCode <= 57) || (e.keyCode >= 96 && e.keyCode <= 105)) {
+                // Check if it's a digit key
+                const isDigit = (!e.shiftKey && e.keyCode >= 48 && e.keyCode <= 57) || (e.keyCode >= 96 && e.keyCode <= 105);
+                if (isDigit) {
+                    // Limit to max 4 digit characters in the field
+                    const currentDigits = (e.target.textContent || '').replace(/\D/g, '');
+                    if (currentDigits.length >= 4) {
+                        e.preventDefault();
+                        return false;
+                    }
                     return true;
                 }
-                // Allow colon : (Shift+; on Czech/EN keyboard = keyCode 186 or 59)
+                // Allow colon : 
                 if (e.key === ':') { return true; }
                 // Allow period/dot (numpad decimal = 110, main = 190)
                 if (e.keyCode === 110 || e.keyCode === 190) { return true; }
