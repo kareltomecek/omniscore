@@ -615,10 +615,19 @@
         }
 
         #p-timer {
-            font-size: 6vw;
+            font-size: 7.5vw;
             font-family: 'Courier New', monospace;
             text-align: right;
             font-weight: bold;
+            white-space: nowrap;
+        }
+
+        body.timer-small #p-timer {
+            font-size: 6vw;
+        }
+
+        body.timer-large #p-timer {
+            font-size: 9vw;
         }
 
         #p-row-mid {
@@ -2263,6 +2272,14 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label for="input-po-timer-size">Velikost času v projekci (PO)</label>
+                            <select id="input-po-timer-size" onchange="admin.saveSettings(false)">
+                                <option value="small">Menší (-20 %)</option>
+                                <option value="standard" selected>Standardní (100 %)</option>
+                                <option value="large">Větší (+20 %)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Zpoždění 1. kroku (s) v Projekci Skóre</label>
                             <input type="number" id="input-po-delay" value="10" min="1" max="20"
                                 oninput="admin.validateInputRange(this, 20)"
@@ -2665,6 +2682,7 @@
             tournamentStartTime: null, // Timestamp when first timer starts
             playTimeAccumulated: 0, // Seconds of actual play time (halves) completed
             showFooter: true,
+            poTimerSize: 'standard', // 'standard', 'large', 'max'
             rules: {
                 winPoints: 3,
                 drawPoints: 1,
@@ -4411,6 +4429,8 @@
                 state.volSignal = parseFloat(document.getElementById('input-vol-signal').value);
                 state.volAnthem = parseFloat(document.getElementById('input-vol-anthem').value);
                 state.showFooter = document.getElementById('input-show-footer').checked;
+                const poTimerSizeEl = document.getElementById('input-po-timer-size');
+                if (poTimerSizeEl) state.poTimerSize = poTimerSizeEl.value;
                 state.theme = document.getElementById('input-theme').value;
                 state.cloudFileId = document.getElementById('input-cloud-file-id').value.trim();
 
@@ -4602,6 +4622,7 @@
                 setVal('input-vol-signal', state.volSignal);
                 setVal('input-vol-anthem', state.volAnthem);
                 setVal('input-show-footer', state.showFooter !== false);
+                setVal('input-po-timer-size', state.poTimerSize || 'standard');
                 setVal('input-theme', state.theme);
                 setVal('input-cloud-file-id', state.cloudFileId);
                 setVal('input-po-delay', state.poTransitionDelay || 10);
@@ -8253,9 +8274,13 @@
                     const getTName = (id) => admin.getTeamName(id);
                     const getRName = (id) => admin.getRefName(id);
 
-                    // Update Theme
+                    // Update Theme & PO Sizing
                     document.body.classList.toggle('theme-dark', usedState.theme === 'dark');
                     document.body.classList.toggle('theme-light', usedState.theme !== 'dark');
+
+                    const timerSize = usedState.poTimerSize || 'standard';
+                    document.body.classList.toggle('timer-small', timerSize === 'small');
+                    document.body.classList.toggle('timer-large', timerSize === 'large');
 
                     // Update Top Row
                     const titleEl = document.getElementById('p-match-title');
