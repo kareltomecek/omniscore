@@ -2265,10 +2265,11 @@
                         Nastavení zobrazení</h4>
                     <div style="display:grid; grid-template-columns:1fr; gap:10px;">
                         <div class="form-group">
-                            <label>Téma (Vzhled)</label>
-                            <select id="input-theme" onchange="admin.saveSettings(false); game.syncProjection()">
-                                <option value="light">Světlý režim</option>
-                                <option value="dark">Tmavý režim</option>
+                            <label for="input-po-timer-size">Velikost času v projekci (PO)</label>
+                            <select id="input-po-timer-size" onchange="admin.saveSettings(false)">
+                                <option value="standard">Standardní (100 %)</option>
+                                <option value="large">Větší (+25 %)</option>
+                                <option value="max">Maximální (+45 %)</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -2379,11 +2380,10 @@
                     </div>
 
                     <div class="form-group" style="padding-top: 10px; margin-top: 10px; border-top: 1px solid #444;">
-                        <label for="input-po-timer-size">Velikost času v projekci (PO)</label>
-                        <select id="input-po-timer-size" onchange="admin.saveSettings(false)">
-                            <option value="standard">Standardní (100 %)</option>
-                            <option value="large">Větší (+25 %)</option>
-                            <option value="max">Maximální (+45 %)</option>
+                        <label>Téma (Vzhled)</label>
+                        <select id="input-theme" onchange="admin.saveSettings(false); game.syncProjection()">
+                            <option value="light">Světlý režim</option>
+                            <option value="dark">Tmavý režim</option>
                         </select>
                     </div>
 
