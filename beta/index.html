@@ -3657,8 +3657,19 @@
                 const fullTimeStr = `${dateStr}\u00A0\u00A0\u00A0\u00A0${timeStr}`;
 
                 const currentIdx = state.activeMatchIndex;
-                const totalItems = (state.schedule || []).length;
-                const progressStr = `Právě se hraje: ${currentIdx + 1} z ${totalItems}`;
+                const totalMatches = admin.getTotalMatchesCount(state.schedule);
+                let progressStr = `Zápasy: - / ${totalMatches}`;
+                if (currentIdx > -1 && state.schedule && state.schedule[currentIdx]) {
+                    const curItem = state.schedule[currentIdx];
+                    const curMatchNum = admin.getMatchNumber(currentIdx, state.schedule);
+                    if (curMatchNum !== null) {
+                        progressStr = `Právě se hraje: ${curMatchNum}. z ${totalMatches}`;
+                    } else {
+                        progressStr = `Probíhá: ${curItem.title || "Událost"} (${totalMatches} zápasů)`;
+                    }
+                } else if (totalMatches > 0) {
+                    progressStr = `Zápasů celkem: ${totalMatches}`;
+                }
 
                 // --- VÝPOČET PŘEDPOKLÁDANÉHO KONCE TURNAJE ---
                 const p = state.times.play || 420; // délka 1 poločasu v sekundách
@@ -5054,6 +5065,26 @@
                     // UI view: Surname only (or fallback to shared name)
                     return ref.surname || ref.name || "-";
                 }
+            },
+
+            // --- ČÍSLOVÁNÍ ZÁPASŮ (pouze pro zápasy, události vrací null) ---
+            getMatchNumber: (index, sched = state.schedule) => {
+                if (!sched || index < 0 || index >= sched.length) return null;
+                const item = sched[index];
+                if (!item || item.type === 'event' || item.isEvent) return null;
+                let count = 0;
+                for (let i = 0; i <= index; i++) {
+                    const it = sched[i];
+                    if (it && it.type !== 'event' && !it.isEvent) {
+                        count++;
+                    }
+                }
+                return count;
+            },
+
+            getTotalMatchesCount: (sched = state.schedule) => {
+                if (!sched) return 0;
+                return sched.filter(it => it && it.type !== 'event' && !it.isEvent).length;
             },
 
             getTeamPlayers: (teamId) => {
@@ -7773,7 +7804,10 @@
                 const infoDiv = document.getElementById('match-info-display');
                 if (state.activeMatchIndex > -1 && state.schedule[state.activeMatchIndex]) {
                     const m = state.schedule[state.activeMatchIndex];
-                    let html = `<div style="font-weight:bold;">${state.activeMatchIndex + 1}. ${m.title || ""}</div>`;
+                    const isEv = (m.type === 'event' || m.isEvent);
+                    const mNum = isEv ? null : admin.getMatchNumber(state.activeMatchIndex, state.schedule);
+                    const prefix = mNum !== null ? `${mNum}. ` : "";
+                    let html = `<div style="font-weight:bold;">${prefix}${m.title || (isEv ? "Událost" : "")}</div>`;
 
                     const refName = admin.getRefName(m.referee);
                     if (refName && refName !== "-") {
@@ -8028,16 +8062,17 @@
                         const durMin = Math.floor((m.duration || 600) / 60);
                         li.innerHTML = `
                             <div style="flex:1; display:grid; grid-template-columns: 120px 1fr 15px 1fr 60px 1fr; align-items:center; font-size:0.85em; gap:5px; padding-right:10px; overflow:hidden;">
-                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${idx + 1}.</b> ${m.title || "Událost"}</div>
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.title || "Událost"}</div>
                                 <div style="grid-column: 2 / 5; text-align:center; color:#aaa; white-space:nowrap;">⏱ ${durMin}m</div>
                                 <div></div>
                                 <div></div>
                             </div>
                         `;
                     } else {
+                        const matchNum = admin.getMatchNumber(idx, state.schedule);
                         li.innerHTML = `
                             <div style="flex:1; display:grid; grid-template-columns: 120px 1fr 15px 1fr 60px 1fr; align-items:center; font-size:0.85em; gap:5px; padding-right:10px; overflow:hidden;">
-                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${idx + 1}.</b> ${m.title}</div>
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${matchNum !== null ? matchNum + '.' : ''}</b> ${m.title}</div>
                                 <div style="text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     ${admin.getTeamName(m.home)}
                                 </div>
@@ -8225,7 +8260,14 @@
                     // Update Top Row
                     const titleEl = document.getElementById('p-match-title');
                     if (titleEl) {
-                        let titleHtml = `<div>${matchData.title || ""}</div>`;
+                        let displayTitle = matchData.title || "";
+                        if (usedState.activeMatchIndex > -1 && usedState.schedule) {
+                            const curMatchNum = admin.getMatchNumber(usedState.activeMatchIndex, usedState.schedule);
+                            if (curMatchNum !== null) {
+                                displayTitle = `${curMatchNum}. ${matchData.title || "Zápas"}`;
+                            }
+                        }
+                        let titleHtml = `<div>${displayTitle}</div>`;
                         // Only add referee if it's a match and has a referee assigned
                         if (matchData.referee && matchData.referee !== "") {
                             const refName = getRName(matchData.referee);
@@ -8303,23 +8345,26 @@
                         nextItems.forEach((match, idx) => {
                             const tr = document.createElement('tr');
                             tr.className = 'p-sched-row';
-                            const isItemEvent = match.type === 'event';
+                            const schedIndex = usedState.activeMatchIndex + 1 + idx;
+                            const isItemEvent = (match.type === 'event' || match.isEvent);
 
                             if (isItemEvent) {
                                 const durMin = Math.floor((match.duration || 600) / 60);
                                 tr.innerHTML = `
-                                    <td class="p-sched-col-match">${usedState.activeMatchIndex + 1 + idx + 1}. ${match.title || "Událost"}</td>
+                                    <td class="p-sched-col-match">${match.title || "Událost"}</td>
                                     <td class="p-sched-col-teams" style="text-align:center; color:var(--accent-blue);">
                                         <div style="font-weight:900; letter-spacing:1px; text-transform:uppercase;">⏱ ${durMin} min</div>
                                     </td>
                                     <td class="p-sched-col-refs"></td>
                                 `;
                             } else {
+                                const mNum = admin.getMatchNumber(schedIndex, usedState.schedule);
+                                const prefix = mNum !== null ? `${mNum}. ` : "";
                                 const hLogo = teamLogos[match.home];
                                 const gLogo = teamLogos[match.guest];
 
                                 tr.innerHTML = `
-                                    <td class="p-sched-col-match">${usedState.activeMatchIndex + 1 + idx + 1}. ${match.title || "Zápas"}</td>
+                                    <td class="p-sched-col-match">${prefix}${match.title || "Zápas"}</td>
                                     <td class="p-sched-col-teams">
                                         <div class="p-teams-flex">
                                             <div class="p-teams-side-home">
@@ -8497,14 +8542,15 @@
                         const isFinished = (match.homeScore !== undefined && match.homeScore !== null);
                         if (idx === state.activeMatchIndex) tr.className = 'active';
 
-                        const isEvent = match.type === 'event';
+                        const isEvent = (match.type === 'event' || match.isEvent);
                         if (isEvent) {
                             tr.innerHTML = `
-                            <td>${idx + 1}</td>
+                            <td></td>
                             <td colspan="3" style="color:var(--accent-blue); font-weight:700; text-transform:uppercase; text-align:center;">☕ ${match.title || "Událost"}</td>
                             <td>-</td>
                         `;
                         } else {
+                            const matchNum = admin.getMatchNumber(idx, state.schedule);
                             const hLogo = state.teamLogos[match.home];
                             const gLogo = state.teamLogos[match.guest];
                             const scoreText = (match.homeScore !== undefined && match.homeScore !== null)
@@ -8512,7 +8558,7 @@
                                 : '- : -';
 
                             tr.innerHTML = `
-                            <td>${idx + 1}</td>
+                            <td>${matchNum !== null ? matchNum : ''}</td>
                             <td style="font-size: 0.9em; color: #aaa;">${match.title || "Zápas"}</td>
                             <td>
                                 <div class="pv-team-cell">
