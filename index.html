@@ -2528,13 +2528,18 @@
         /*
           Aplikace OmniScore (OmS) pro řízení sportovních turnajů.
           
+          ZÁVAZNÁ TERMINOLOGIE A ZKRATKY OKEN:
+          - OO: Ovládací okno (hlavní administrační rozhraní pro správu a časomíru)
+          - PO: Projekční okno (zobrazení pro projektor / obrazovku do haly)
+          - OPG: Ovládací panel gólů (rychlé zadávání branek a střelců)
+          
           Základní komponenty:
           - state: Jednotný zdroj pravdy pro data (tournament, teams, players, schedule, timers).
           - game: Logické jádro (běh času, skóre, přepínání fází).
-          - admin: Správa dat, výpočty tabulek, importy/exporty, persistence (localStorage).
-          - ui: Vykreslovací vrstva pro ovládací okno i projekci.
+          - admin: Správa dat pro OO, výpočty tabulek, importy/exporty, persistence (localStorage).
+          - ui: Vykreslovací vrstva pro OO i PO.
           - music/jingles: Moduly pro práci s audio soubory (FileSystem API, IndexedDB).
-          - syncChannel: Synchronizace dat mezi hlavním oknem a projekčním oknem (BroadcastChannel).
+          - syncChannel: Synchronizace dat mezi OO a PO (BroadcastChannel).
         */
 
         // ===================================================================================
@@ -3139,7 +3144,7 @@
                         });
                     }, 1000);
 
-                    // Lokální plynulý odpočet zápasového času v PO (zcela nezávislý na zatížení či uspání ZO)
+                    // Lokální plynulý odpočet zápasového času v PO (zcela nezávislý na zatížení či uspání OO)
                     setInterval(() => {
                         const usedState = (state.poTransitionActive && state.poTransitionData) ? state.poTransitionData : state;
                         if (usedState && usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
@@ -3298,6 +3303,10 @@
                         if (state.currentMatch.phaseIndex === 1 || state.currentMatch.phaseIndex === 3) {
                             game.playSignal();
                         }
+                        // Pokud vypršel čas 2. poločasu zápasu, zaznamenat konec zápasu pro telemetrii
+                        if (state.currentMatch.phaseIndex === 3 && !state.currentMatch.isEvent) {
+                            game.recordMatchEnd();
+                        }
                     }
 
                     ui.updateTimer();
@@ -3334,6 +3343,9 @@
                     if (state.tournamentStartTime === null) {
                         state.tournamentStartTime = Date.now();
                     }
+                    // Zaznamenat začátek zápasu pro telemetrii
+                    game.recordMatchStart();
+
                     // Immediate first tick to reflect visual change (e.g. 7:00 -> 6:59)
                     game.tick();
                 } else {
@@ -3490,6 +3502,7 @@
 
                 // Moving Forward past last phase -> Next Match
                 if (newPhaseIndex >= phaseCount) {
+                    game.recordMatchEnd();
                     if (game.loadMatchByRelativeIndex(1)) {
                         // Match loaded, transition handled inside loadMatchByRelativeIndex
                         return;
@@ -3499,6 +3512,7 @@
                         if (!state.currentMatch.isEvent && state.activeMatchIndex !== -1 && state.schedule[state.activeMatchIndex]) {
                             state.schedule[state.activeMatchIndex].homeScore = state.currentMatch.homeScore;
                             state.schedule[state.activeMatchIndex].guestScore = state.currentMatch.guestScore;
+                            game.recordMatchEnd(state.activeMatchIndex);
                             ui.renderSchedule();
                             ui.renderStandings(); // UPDATE STANDINGS
                             admin.saveToStorage(); game.syncProjection();
@@ -3536,6 +3550,9 @@
                 }
 
                 state.currentMatch.phaseIndex = index;
+                if (index === 0 || index === 1) {
+                    game.recordMatchStart();
+                }
                 if (resetTime) {
                     game.resetTimer();
                 }
@@ -3562,6 +3579,9 @@
                     if (currentMatchInSched && currentMatchInSched.type === 'match') {
                         currentMatchInSched.homeScore = state.currentMatch.homeScore;
                         currentMatchInSched.guestScore = state.currentMatch.guestScore;
+                        if (offset > 0) {
+                            game.recordMatchEnd(state.activeMatchIndex);
+                        }
                     }
                 }
 
@@ -3596,6 +3616,40 @@
                 return false;
             },
 
+            // ===================================================================================
+            // TELEMETRIE & VÝPOČET PŘEDPOKLÁDANÉHO KONCE
+            // ===================================================================================
+            recordMatchStart: (targetIdx = -1) => {
+                const idx = (targetIdx !== -1) ? targetIdx : state.activeMatchIndex;
+                if (idx !== -1 && state.schedule && state.schedule[idx]) {
+                    const m = state.schedule[idx];
+                    if ((m.type === 'match' || (!m.type && !m.isEvent)) && !m.realStartTime) {
+                        m.realStartTime = Date.now();
+                    }
+                }
+            },
+
+            recordMatchEnd: (targetIdx = -1) => {
+                const idx = (targetIdx !== -1) ? targetIdx : state.activeMatchIndex;
+                if (idx !== -1 && state.schedule && state.schedule[idx]) {
+                    const m = state.schedule[idx];
+                    if (m.type === 'match' || (!m.type && !m.isEvent)) {
+                        // Pokud zápas ještě neměl zaznamenaný realStartTime, ale proběhl:
+                        if (!m.realStartTime && state.tournamentStartTime) {
+                            m.realStartTime = Math.max(state.tournamentStartTime, Date.now() - (((state.times.play || 420) * 2 + 60) * 1000));
+                        }
+                        if (m.realStartTime && !m.realDuration) {
+                            m.realEndTime = Date.now();
+                            const durationSec = Math.round((m.realEndTime - m.realStartTime) / 1000);
+                            // Validace reálné délky (alespoň 3 minuty a max 90 minut, aby se nezapočítávaly omyly/rychlé prokliknutí)
+                            if (durationSec >= 180 && durationSec <= 5400) {
+                                m.realDuration = durationSec;
+                            }
+                        }
+                    }
+                }
+            },
+
             getTelemetry: () => {
                 const now = new Date();
                 const timeStr = now.toLocaleTimeString('cs-CZ');
@@ -3603,59 +3657,86 @@
                 const fullTimeStr = `${dateStr}\u00A0\u00A0\u00A0\u00A0${timeStr}`;
 
                 const currentIdx = state.activeMatchIndex;
-                const totalItems = (state.schedule || []).length;
-                const progressStr = `Právě se hraje: ${currentIdx + 1} z ${totalItems}`;
-
-                // Average "Planned" overhead per match (Setup + Break)
-                const s = state.times.setup || 0;
-                const b = state.times.break || 0;
-                const p = state.times.play || 0;
-                const plannedOverhead = s + b;
-
-                let avgLag = 0;
-                let learnedOverhead = 0;
-
-                // Adjust based on real performance if tournament started
-                if (state.tournamentStartTime && state.activeMatchIndex > 0) {
-                    const realElapsed = (Date.now() - state.tournamentStartTime) / 1000;
-                    const playElapsed = state.playTimeAccumulated || 0;
-                    const totalOverhead = realElapsed - playElapsed;
-                    learnedOverhead = totalOverhead / state.activeMatchIndex;
-
-                    // Lag is the delay compared to theoretical plan (can be negative if faster)
-                    avgLag = learnedOverhead - plannedOverhead;
-
-                    // Clamp to reasonable range (-5 mins to +10 mins extra per match)
-                    avgLag = Math.max(-300, Math.min(600, avgLag));
-                }
-
-                let remainingSeconds = state.timer.running
-                    ? (state.timer.targetEndTime - Date.now()) / 1000
-                    : state.timer.timeLeft;
-
-                // Current item progress
-                // If we are in "free play" (activeMatchIndex is -1 and schedule is empty), 
-                // we treat the currentMatch as the active one for prediction.
-                let mCurrent = (currentIdx !== -1) ? state.schedule[currentIdx] : (totalItems === 0 ? state.currentMatch : null);
-
-                if (mCurrent && (mCurrent.type === 'match' || (mCurrent.isEvent === false && !mCurrent.type))) {
-                    const curPhase = state.currentMatch.phaseIndex;
-                    // Ph 0 (Setup): + P1, B, P2
-                    if (curPhase === 0) remainingSeconds += (p * 2) + b + (avgLag * 0.8);
-                    // Ph 1 (P1): + B, P2
-                    else if (curPhase === 1) remainingSeconds += p + b + (avgLag * 0.5);
-                    // Ph 2 (Break): + P2
-                    else if (curPhase === 2) remainingSeconds += p + (avgLag * 0.2);
-                    // Ph 3 (P2): already covered by timer
-                }
-
-                // Upcoming items
-                (state.schedule || []).slice(currentIdx + 1).forEach(m => {
-                    if (m.type === 'event') {
-                        remainingSeconds += (m.duration || 600);
-                        remainingSeconds += (avgLag * 0.5); // Add partial lag for events too
+                const totalMatches = admin.getTotalMatchesCount(state.schedule);
+                let progressStr = `Zápasy: - / ${totalMatches}`;
+                if (currentIdx > -1 && state.schedule && state.schedule[currentIdx]) {
+                    const curItem = state.schedule[currentIdx];
+                    const curMatchNum = admin.getMatchNumber(currentIdx, state.schedule);
+                    if (curMatchNum !== null) {
+                        progressStr = `Právě se hraje: ${curMatchNum}. z ${totalMatches}`;
                     } else {
-                        remainingSeconds += (p * 2) + plannedOverhead + avgLag;
+                        progressStr = `Probíhá: ${curItem.title || "Událost"} (${totalMatches} zápasů)`;
+                    }
+                } else if (totalMatches > 0) {
+                    progressStr = `Zápasů celkem: ${totalMatches}`;
+                }
+
+                // --- VÝPOČET PŘEDPOKLÁDANÉHO KONCE TURNAJE ---
+                const p = state.times.play || 420; // délka 1 poločasu v sekundách
+                // 1. Absolutní plánovaná délka 1 zápasu: 2 poločasy + 1 minuta celkem na režii (kroky Nastupuje a Přestávka)
+                const fixedMatchDuration = (p * 2) + 60;
+
+                // 2. Skutečně dokončené zápasy s validní reálnou délkou (min 3 min, max 90 min)
+                const completedMatches = (state.schedule || []).filter(m =>
+                    (m.type === 'match' || (!m.type && !m.isEvent)) &&
+                    typeof m.realDuration === 'number' &&
+                    m.realDuration >= 180 &&
+                    m.realDuration <= 5400
+                );
+
+                // 3. Prahová hodnota pro adaptivní průměrování
+                const allMatches = (state.schedule || []).filter(m => m.type === 'match' || (!m.type && !m.isEvent));
+                const totalMatchesCount = allMatches.length;
+                // Pro malé turnaje (< 10 zápasů) začínáme dříve, standardně po 8 odehraných zápasech
+                const requiredMatchesForAvg = (totalMatchesCount < 10 && totalMatchesCount > 0)
+                    ? Math.min(8, Math.max(3, Math.floor(totalMatchesCount / 2)))
+                    : 8;
+
+                let matchDurationToUse = fixedMatchDuration;
+                if (completedMatches.length >= requiredMatchesForAvg) {
+                    const sumDuration = completedMatches.reduce((acc, m) => acc + m.realDuration, 0);
+                    matchDurationToUse = Math.round(sumDuration / completedMatches.length);
+                }
+
+                // 4. Zbývající čas v aktuálně rozběhnuté položce
+                let remainingSeconds = 0;
+                const currentTimerSeconds = state.timer.running
+                    ? Math.max(0, (state.timer.targetEndTime - Date.now()) / 1000)
+                    : Math.max(0, state.timer.timeLeft || 0);
+
+                const mCurrent = (currentIdx !== -1) ? state.schedule[currentIdx] : (totalItems === 0 ? state.currentMatch : null);
+
+                if (mCurrent) {
+                    if (mCurrent.type === 'event' || mCurrent.isEvent) {
+                        // Běžící událost: zbývá zbytek jejího odpočtu
+                        remainingSeconds += currentTimerSeconds;
+                    } else {
+                        // Běžící zápas: zbývající čas aktuálního kroku + zbývající budoucí kroky v tomto zápase
+                        const curPhase = (typeof state.currentMatch.phaseIndex === 'number') ? state.currentMatch.phaseIndex : 0;
+                        remainingSeconds += currentTimerSeconds;
+                        if (curPhase === 0) {
+                            // Fáze 0 (Nastupuje): zbývá 1. poločas + přestávka (30 s) + 2. poločas
+                            remainingSeconds += (p * 2) + 30;
+                        } else if (curPhase === 1) {
+                            // Fáze 1 (1. poločas): zbývá přestávka (30 s) + 2. poločas
+                            remainingSeconds += p + 30;
+                        } else if (curPhase === 2) {
+                            // Fáze 2 (Přestávka): zbývá 2. poločas
+                            remainingSeconds += p;
+                        }
+                        // Fáze 3 (2. poločas): zbývající čas je plně pokryt v currentTimerSeconds
+                    }
+                }
+
+                // 5. Budoucí položky v playlistu (od currentIdx + 1 do konce)
+                const startIndex = (currentIdx === -1) ? 0 : (currentIdx + 1);
+                (state.schedule || []).slice(startIndex).forEach(m => {
+                    if (m.type === 'event' || m.isEvent) {
+                        // Událost: přičte se její zadaná délka (default 600 s)
+                        remainingSeconds += (m.duration || 600);
+                    } else {
+                        // Zápas: fixní čas (2*p + 60s), nebo dynamický průměr po dosažení prahu zápasů
+                        remainingSeconds += matchDurationToUse;
                     }
                 });
 
@@ -4984,6 +5065,26 @@
                     // UI view: Surname only (or fallback to shared name)
                     return ref.surname || ref.name || "-";
                 }
+            },
+
+            // --- ČÍSLOVÁNÍ ZÁPASŮ (pouze pro zápasy, události vrací null) ---
+            getMatchNumber: (index, sched = state.schedule) => {
+                if (!sched || index < 0 || index >= sched.length) return null;
+                const item = sched[index];
+                if (!item || item.type === 'event' || item.isEvent) return null;
+                let count = 0;
+                for (let i = 0; i <= index; i++) {
+                    const it = sched[i];
+                    if (it && it.type !== 'event' && !it.isEvent) {
+                        count++;
+                    }
+                }
+                return count;
+            },
+
+            getTotalMatchesCount: (sched = state.schedule) => {
+                if (!sched) return 0;
+                return sched.filter(it => it && it.type !== 'event' && !it.isEvent).length;
             },
 
             getTeamPlayers: (teamId) => {
@@ -6472,6 +6573,9 @@
                     if (currentMatchInSched && currentMatchInSched.type === 'match') {
                         currentMatchInSched.homeScore = state.currentMatch.homeScore;
                         currentMatchInSched.guestScore = state.currentMatch.guestScore;
+                        if (index > state.activeMatchIndex || state.currentMatch.phaseIndex >= 3) {
+                            game.recordMatchEnd(state.activeMatchIndex);
+                        }
                         admin.saveToStorage(); // ENSURE STORAGE IS UPDATED
                     }
                 }
@@ -7700,7 +7804,10 @@
                 const infoDiv = document.getElementById('match-info-display');
                 if (state.activeMatchIndex > -1 && state.schedule[state.activeMatchIndex]) {
                     const m = state.schedule[state.activeMatchIndex];
-                    let html = `<div style="font-weight:bold;">${state.activeMatchIndex + 1}. ${m.title || ""}</div>`;
+                    const isEv = (m.type === 'event' || m.isEvent);
+                    const mNum = isEv ? null : admin.getMatchNumber(state.activeMatchIndex, state.schedule);
+                    const prefix = mNum !== null ? `${mNum}. ` : "";
+                    let html = `<div style="font-weight:bold;">${prefix}${m.title || (isEv ? "Událost" : "")}</div>`;
 
                     const refName = admin.getRefName(m.referee);
                     if (refName && refName !== "-") {
@@ -7955,16 +8062,17 @@
                         const durMin = Math.floor((m.duration || 600) / 60);
                         li.innerHTML = `
                             <div style="flex:1; display:grid; grid-template-columns: 120px 1fr 15px 1fr 60px 1fr; align-items:center; font-size:0.85em; gap:5px; padding-right:10px; overflow:hidden;">
-                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${idx + 1}.</b> ${m.title || "Událost"}</div>
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.title || "Událost"}</div>
                                 <div style="grid-column: 2 / 5; text-align:center; color:#aaa; white-space:nowrap;">⏱ ${durMin}m</div>
                                 <div></div>
                                 <div></div>
                             </div>
                         `;
                     } else {
+                        const matchNum = admin.getMatchNumber(idx, state.schedule);
                         li.innerHTML = `
                             <div style="flex:1; display:grid; grid-template-columns: 120px 1fr 15px 1fr 60px 1fr; align-items:center; font-size:0.85em; gap:5px; padding-right:10px; overflow:hidden;">
-                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${idx + 1}.</b> ${m.title}</div>
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${matchNum !== null ? matchNum + '.' : ''}</b> ${m.title}</div>
                                 <div style="text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     ${admin.getTeamName(m.home)}
                                 </div>
@@ -8152,7 +8260,14 @@
                     // Update Top Row
                     const titleEl = document.getElementById('p-match-title');
                     if (titleEl) {
-                        let titleHtml = `<div>${matchData.title || ""}</div>`;
+                        let displayTitle = matchData.title || "";
+                        if (usedState.activeMatchIndex > -1 && usedState.schedule) {
+                            const curMatchNum = admin.getMatchNumber(usedState.activeMatchIndex, usedState.schedule);
+                            if (curMatchNum !== null) {
+                                displayTitle = `${curMatchNum}. ${matchData.title || "Zápas"}`;
+                            }
+                        }
+                        let titleHtml = `<div>${displayTitle}</div>`;
                         // Only add referee if it's a match and has a referee assigned
                         if (matchData.referee && matchData.referee !== "") {
                             const refName = getRName(matchData.referee);
@@ -8230,23 +8345,26 @@
                         nextItems.forEach((match, idx) => {
                             const tr = document.createElement('tr');
                             tr.className = 'p-sched-row';
-                            const isItemEvent = match.type === 'event';
+                            const schedIndex = usedState.activeMatchIndex + 1 + idx;
+                            const isItemEvent = (match.type === 'event' || match.isEvent);
 
                             if (isItemEvent) {
                                 const durMin = Math.floor((match.duration || 600) / 60);
                                 tr.innerHTML = `
-                                    <td class="p-sched-col-match">${usedState.activeMatchIndex + 1 + idx + 1}. ${match.title || "Událost"}</td>
+                                    <td class="p-sched-col-match">${match.title || "Událost"}</td>
                                     <td class="p-sched-col-teams" style="text-align:center; color:var(--accent-blue);">
                                         <div style="font-weight:900; letter-spacing:1px; text-transform:uppercase;">⏱ ${durMin} min</div>
                                     </td>
                                     <td class="p-sched-col-refs"></td>
                                 `;
                             } else {
+                                const mNum = admin.getMatchNumber(schedIndex, usedState.schedule);
+                                const prefix = mNum !== null ? `${mNum}. ` : "";
                                 const hLogo = teamLogos[match.home];
                                 const gLogo = teamLogos[match.guest];
 
                                 tr.innerHTML = `
-                                    <td class="p-sched-col-match">${usedState.activeMatchIndex + 1 + idx + 1}. ${match.title || "Zápas"}</td>
+                                    <td class="p-sched-col-match">${prefix}${match.title || "Zápas"}</td>
                                     <td class="p-sched-col-teams">
                                         <div class="p-teams-flex">
                                             <div class="p-teams-side-home">
@@ -8424,14 +8542,15 @@
                         const isFinished = (match.homeScore !== undefined && match.homeScore !== null);
                         if (idx === state.activeMatchIndex) tr.className = 'active';
 
-                        const isEvent = match.type === 'event';
+                        const isEvent = (match.type === 'event' || match.isEvent);
                         if (isEvent) {
                             tr.innerHTML = `
-                            <td>${idx + 1}</td>
+                            <td></td>
                             <td colspan="3" style="color:var(--accent-blue); font-weight:700; text-transform:uppercase; text-align:center;">☕ ${match.title || "Událost"}</td>
                             <td>-</td>
                         `;
                         } else {
+                            const matchNum = admin.getMatchNumber(idx, state.schedule);
                             const hLogo = state.teamLogos[match.home];
                             const gLogo = state.teamLogos[match.guest];
                             const scoreText = (match.homeScore !== undefined && match.homeScore !== null)
@@ -8439,7 +8558,7 @@
                                 : '- : -';
 
                             tr.innerHTML = `
-                            <td>${idx + 1}</td>
+                            <td>${matchNum !== null ? matchNum : ''}</td>
                             <td style="font-size: 0.9em; color: #aaa;">${match.title || "Zápas"}</td>
                             <td>
                                 <div class="pv-team-cell">
