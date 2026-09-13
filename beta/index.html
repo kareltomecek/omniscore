@@ -3160,7 +3160,7 @@
                             const timerEl = document.getElementById('p-timer');
                             if (timerEl) {
                                 const remMs = usedState.timer.targetEndTime - Date.now();
-                                const timeLeft = Math.max(0, Math.floor(remMs / 1000));
+                                const timeLeft = Math.max(0, Math.ceil(remMs / 1000));
                                 const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                                 const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
                                 const timeFormatted = m + ":" + s;
@@ -3289,7 +3289,7 @@
 
                 const now = Date.now();
                 const remainingMs = state.timer.targetEndTime - now;
-                const newTimeLeft = Math.max(0, Math.floor(remainingMs / 1000));
+                const newTimeLeft = Math.max(0, Math.ceil(remainingMs / 1000));
 
                 // Track play time accumulation
                 if (state.currentMatch.phaseIndex === 1 || state.currentMatch.phaseIndex === 3) {
@@ -3301,7 +3301,7 @@
                 const oldTimeLeft = state.timer.timeLeft;
 
                 // Update UI only if the second changed or we hit zero
-                if (newTimeLeft !== Math.floor(oldTimeLeft) || remainingMs <= 0) {
+                if (newTimeLeft !== Math.ceil(oldTimeLeft) || remainingMs <= 0) {
                     state.timer.timeLeft = Math.max(0, remainingMs / 1000);
 
                     if (remainingMs <= 0) {
@@ -3331,8 +3331,7 @@
                 if (state.timer.running) {
                     requestScreenWakeLock();
                     state.timer.lastTick = Date.now();
-                    // User preference: -1ms offset for "snappy" immediate second change
-                    state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000) - 1;
+                    state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
 
                     const isVoulat = (state.currentMatch.phaseIndex === 1 || state.currentMatch.phaseIndex === 3);
 
@@ -7875,7 +7874,7 @@
             },
 
             updateTimer: () => {
-                const timeLeft = Math.floor(state.timer.timeLeft);
+                const timeLeft = Math.ceil(state.timer.timeLeft);
                 const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                 const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
                 document.getElementById('main-timer').textContent = `${m}:${s}`;
@@ -8293,10 +8292,10 @@
 
                     const timerEl = document.getElementById('p-timer');
                     if (timerEl) {
-                        let timeLeft = Math.floor(usedState.timer.timeLeft);
+                        let timeLeft = Math.ceil(usedState.timer.timeLeft);
                         if (usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
                             const remMs = usedState.timer.targetEndTime - Date.now();
-                            timeLeft = Math.max(0, Math.floor(remMs / 1000));
+                            timeLeft = Math.max(0, Math.ceil(remMs / 1000));
                         }
                         const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                         const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
