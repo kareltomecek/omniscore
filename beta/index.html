@@ -1493,7 +1493,7 @@
                     <div id="match-info-display" style="color:#aaa; margin-bottom:5px; font-weight:bold;">-</div>
                     <div class="timer-display">
                         <span id="main-timer" onblur="game.manualTimeEntry()"
-                            onkeydown="if(event.key==='Enter'){this.blur(); event.preventDefault();} else { return admin.restrictToNumbers(event); }">00:00</span>
+                            onkeydown="if(event.key==='Enter'){this.blur(); event.preventDefault();} else { return admin.restrictToTime(event); }">00:00</span>
                         <div class="timer-arrows">
                             <button class="arrow-btn" id="btn-time-up" onclick="game.adjustTime(1)">▲</button>
                             <button class="arrow-btn" id="btn-time-down" onclick="game.adjustTime(-1)">▼</button>
@@ -3403,18 +3403,49 @@
 
             manualTimeEntry: () => {
                 const el = document.getElementById('main-timer');
-                const val = el.textContent.trim();
-                const parts = val.split(':');
-                if (parts.length === 2) {
-                    const m = parseInt(parts[0]);
-                    const s = parseInt(parts[1]);
-                    if (!isNaN(m) && !isNaN(s)) {
-                        state.timer.timeLeft = (m * 60) + s;
-                        if (state.timer.running) {
-                            state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
-                        }
+                const raw = el.textContent.trim();
+
+                let totalSeconds = null;
+
+                // Normalize: replace dot with colon as separator
+                const normalized = raw.replace('.', ':');
+
+                if (normalized.includes(':')) {
+                    // Format: MM:SS or M:SS
+                    const parts = normalized.split(':');
+                    const m = parseInt(parts[0]) || 0;
+                    const s = parseInt(parts[1]) || 0;
+                    if (!isNaN(m) && !isNaN(s) && s < 60) {
+                        totalSeconds = (m * 60) + s;
+                    }
+                } else {
+                    // Pure digits only
+                    const digits = raw.replace(/\D/g, '');
+                    if (digits.length === 0) {
+                        // Nothing valid typed – restore display
+                    } else if (digits.length <= 2) {
+                        // 1-2 digits → whole minutes, e.g. "7" → 7:00, "15" → 15:00
+                        totalSeconds = parseInt(digits) * 60;
+                    } else if (digits.length === 3) {
+                        // 3 digits → M:SS, e.g. "730" → 7:30
+                        const m = parseInt(digits[0]);
+                        const s = parseInt(digits.slice(1));
+                        if (s < 60) totalSeconds = (m * 60) + s;
+                    } else {
+                        // 4+ digits → MM:SS, e.g. "2000" → 20:00, "0730" → 7:30
+                        const m = parseInt(digits.slice(0, digits.length - 2));
+                        const s = parseInt(digits.slice(-2));
+                        if (s < 60) totalSeconds = (m * 60) + s;
                     }
                 }
+
+                if (totalSeconds !== null && totalSeconds >= 0) {
+                    state.timer.timeLeft = totalSeconds;
+                    if (state.timer.running) {
+                        state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
+                    }
+                }
+
                 ui.updateTimer();
                 game.syncProjection(true);
             },
@@ -4542,6 +4573,27 @@
                     return false;
                 }
                 return true;
+            },
+
+            restrictToTime: (e) => {
+                // Allow: backspace, delete, tab, escape, enter
+                if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                    // Allow: Ctrl+A,C,V,X
+                    (e.ctrlKey === true && [65, 67, 86, 88].indexOf(e.keyCode) !== -1) ||
+                    // Allow: home, end, left, right
+                    (e.keyCode >= 35 && e.keyCode <= 39)) {
+                    return true;
+                }
+                // Allow digits (0-9 on main keyboard and numpad)
+                if ((!e.shiftKey && e.keyCode >= 48 && e.keyCode <= 57) || (e.keyCode >= 96 && e.keyCode <= 105)) {
+                    return true;
+                }
+                // Allow colon : (Shift+; on Czech/EN keyboard = keyCode 186 or 59)
+                if (e.key === ':') { return true; }
+                // Allow period/dot (numpad decimal = 110, main = 190)
+                if (e.keyCode === 110 || e.keyCode === 190) { return true; }
+                e.preventDefault();
+                return false;
             },
 
             sanitizeInput: (input) => {
