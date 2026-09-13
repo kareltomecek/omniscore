@@ -615,19 +615,19 @@
         }
 
         #p-timer {
-            font-size: 6vw;
+            font-size: 7.5vw;
             font-family: 'Courier New', monospace;
             text-align: right;
             font-weight: bold;
             white-space: nowrap;
         }
 
-        body.timer-large #p-timer {
-            font-size: 7.5vw;
+        body.timer-small #p-timer {
+            font-size: 6vw;
         }
 
-        body.timer-max #p-timer {
-            font-size: 8.7vw;
+        body.timer-large #p-timer {
+            font-size: 9vw;
         }
 
         #p-row-mid {
@@ -2274,9 +2274,9 @@
                         <div class="form-group">
                             <label for="input-po-timer-size">Velikost času v projekci (PO)</label>
                             <select id="input-po-timer-size" onchange="admin.saveSettings(false)">
-                                <option value="standard">Standardní (100 %)</option>
-                                <option value="large">Větší (+25 %)</option>
-                                <option value="max">Maximální (+45 %)</option>
+                                <option value="small">Menší (-20 %)</option>
+                                <option value="standard" selected>Standardní (100 %)</option>
+                                <option value="large">Větší (+20 %)</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -8279,8 +8279,8 @@
                     document.body.classList.toggle('theme-light', usedState.theme !== 'dark');
 
                     const timerSize = usedState.poTimerSize || 'standard';
+                    document.body.classList.toggle('timer-small', timerSize === 'small');
                     document.body.classList.toggle('timer-large', timerSize === 'large');
-                    document.body.classList.toggle('timer-max', timerSize === 'max');
 
                     // Update Top Row
                     const titleEl = document.getElementById('p-match-title');
