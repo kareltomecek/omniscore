@@ -2059,17 +2059,8 @@
                     Tabulky <span>▼</span>
                 </div>
                 <div id="acc-standings" class="accordion-content">
-                    <div class="tab-switcher"
-                        style="display: flex; gap: 5px; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 8px;">
-                        <button id="tab-btn-standings" class="small-btn" style="flex: 1;"
-                            onclick="admin.setStandingsTab('standings')"
-                            title="Zobrazit standardní tabulku s pořadím, body a skóre.">Pořadí</button>
-                        <button id="tab-btn-cross" class="small-btn" style="flex: 1;"
-                            onclick="admin.setStandingsTab('cross')"
-                            title="Zobrazit křížovou tabulku vzájemných zápasů.">Křížová</button>
-                    </div>
                     <div id="standings-container">
-                        <!-- Standard standings or Cross table will be rendered here -->
+                        <!-- Standings table will be rendered here -->
                     </div>
                 </div>
             </div>
@@ -2272,7 +2263,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="input-po-timer-size">Velikost času v projekci (PO)</label>
+                            <label for="input-po-timer-size">Velikost času v Projekci Skóre</label>
                             <select id="input-po-timer-size" onchange="admin.saveSettings(false)">
                                 <option value="small">Menší (-20 %)</option>
                                 <option value="standard" selected>Standardní (100 %)</option>
@@ -7598,21 +7589,6 @@
             renderStandings: () => {
                 const container = document.getElementById('standings-container');
                 if (!container) return;
-
-                // Update tab buttons style
-                const btnS = document.getElementById('tab-btn-standings');
-                const btnC = document.getElementById('tab-btn-cross');
-                if (btnS && btnC) {
-                    const activeStyle = "background: var(--accent-blue); color: #fff; transform: translateY(-1px); border: 1px solid #555;";
-                    const inactiveStyle = "background: #333; color: #aaa; border: 1px solid #444;";
-                    btnS.style = (state.activeStandingsTab !== 'cross') ? activeStyle : inactiveStyle;
-                    btnC.style = (state.activeStandingsTab === 'cross') ? activeStyle : inactiveStyle;
-                }
-
-                if (state.activeStandingsTab === 'cross') {
-                    ui.renderCrossTable(container);
-                    return;
-                }
 
                 const standings = admin.calculateStandings();
                 if (standings.length === 0) {
