@@ -1492,7 +1492,8 @@
                 <div class="center-panel">
                     <div id="match-info-display" style="color:#aaa; margin-bottom:5px; font-weight:bold;">-</div>
                     <div class="timer-display">
-                        <span id="main-timer" onblur="game.manualTimeEntry()"
+                        <span id="main-timer" contenteditable="true" onblur="game.manualTimeEntry()"
+                            onfocus="admin.selectTimerText(this)"
                             onkeydown="if(event.key==='Enter'){this.blur(); event.preventDefault();} else { return admin.restrictToTime(event); }">00:00</span>
                         <div class="timer-arrows">
                             <button class="arrow-btn" id="btn-time-up" onclick="game.adjustTime(1)">▲</button>
@@ -4575,30 +4576,49 @@
                 return true;
             },
 
+            selectTimerText: (el) => {
+                if (el.contentEditable === 'true') {
+                    setTimeout(() => {
+                        const sel = window.getSelection();
+                        if (sel) {
+                            const range = document.createRange();
+                            range.selectNodeContents(el);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        }
+                    }, 20);
+                }
+            },
+
             restrictToTime: (e) => {
                 // Allow: backspace, delete, tab, escape, enter
                 if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
-                    // Allow: Ctrl+A,C,V,X
-                    (e.ctrlKey === true && [65, 67, 86, 88].indexOf(e.keyCode) !== -1) ||
+                    // Allow: Ctrl/Cmd + A, C, V, X
+                    ((e.ctrlKey || e.metaKey) && [65, 67, 86, 88].indexOf(e.keyCode) !== -1) ||
                     // Allow: home, end, left, right
                     (e.keyCode >= 35 && e.keyCode <= 39)) {
                     return true;
                 }
-                // Check if it's a digit key
-                const isDigit = (!e.shiftKey && e.keyCode >= 48 && e.keyCode <= 57) || (e.keyCode >= 96 && e.keyCode <= 105);
+                // Allow colon (:) and dot (.)
+                if (e.key === ':' || e.key === '.' || e.keyCode === 190 || e.keyCode === 110) {
+                    return true;
+                }
+                // Check if it's a digit key (e.key '0'-'9', numpad 96-105, or top row 48-57)
+                const isDigit = (e.key >= '0' && e.key <= '9') ||
+                                (e.keyCode >= 96 && e.keyCode <= 105) ||
+                                (e.keyCode >= 48 && e.keyCode <= 57);
+
                 if (isDigit) {
-                    // Limit to max 4 digit characters in the field
+                    // Limit to max 4 digits (minus digits currently selected for replacement)
                     const currentDigits = (e.target.textContent || '').replace(/\D/g, '');
-                    if (currentDigits.length >= 4) {
+                    const sel = window.getSelection();
+                    const selectedDigits = sel ? (sel.toString() || '').replace(/\D/g, '').length : 0;
+                    if (currentDigits.length - selectedDigits >= 4) {
                         e.preventDefault();
                         return false;
                     }
                     return true;
                 }
-                // Allow colon : 
-                if (e.key === ':') { return true; }
-                // Allow period/dot (numpad decimal = 110, main = 190)
-                if (e.keyCode === 110 || e.keyCode === 190) { return true; }
                 e.preventDefault();
                 return false;
             },
