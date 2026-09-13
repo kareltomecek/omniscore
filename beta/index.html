@@ -2528,13 +2528,18 @@
         /*
           Aplikace OmniScore (OmS) pro řízení sportovních turnajů.
           
+          ZÁVAZNÁ TERMINOLOGIE A ZKRATKY OKEN:
+          - OO: Ovládací okno (hlavní administrační rozhraní pro správu a časomíru)
+          - PO: Projekční okno (zobrazení pro projektor / obrazovku do haly)
+          - OPG: Ovládací panel gólů (rychlé zadávání branek a střelců)
+          
           Základní komponenty:
           - state: Jednotný zdroj pravdy pro data (tournament, teams, players, schedule, timers).
           - game: Logické jádro (běh času, skóre, přepínání fází).
-          - admin: Správa dat, výpočty tabulek, importy/exporty, persistence (localStorage).
-          - ui: Vykreslovací vrstva pro ovládací okno i projekci.
+          - admin: Správa dat pro OO, výpočty tabulek, importy/exporty, persistence (localStorage).
+          - ui: Vykreslovací vrstva pro OO i PO.
           - music/jingles: Moduly pro práci s audio soubory (FileSystem API, IndexedDB).
-          - syncChannel: Synchronizace dat mezi hlavním oknem a projekčním oknem (BroadcastChannel).
+          - syncChannel: Synchronizace dat mezi OO a PO (BroadcastChannel).
         */
 
         // ===================================================================================
@@ -2688,6 +2693,29 @@
         let directoryHandle = null;
         let signalAudio = new Audio();
         let poTransitionTimeoutID = null;
+
+        // ===================================================================================
+        // SYSTEM & WAKE LOCK (Ochrana před uspáním)
+        // ===================================================================================
+        let screenWakeLock = null;
+        async function requestScreenWakeLock() {
+            try {
+                if ('wakeLock' in navigator && !screenWakeLock) {
+                    screenWakeLock = await navigator.wakeLock.request('screen');
+                    screenWakeLock.addEventListener('release', () => {
+                        screenWakeLock = null;
+                    });
+                }
+            } catch (err) {
+                // Wake lock může selhat např. při nízkém stavu baterie nebo nepodpoře prohlížeče
+            }
+        }
+        function releaseScreenWakeLock() {
+            if (screenWakeLock) {
+                screenWakeLock.release().catch(() => {});
+                screenWakeLock = null;
+            }
+        }
 
         // ===================================================================================
         // AUTHENTICATION LOGIC
@@ -3116,6 +3144,24 @@
                         });
                     }, 1000);
 
+                    // Lokální plynulý odpočet zápasového času v PO (zcela nezávislý na zatížení či uspání OO)
+                    setInterval(() => {
+                        const usedState = (state.poTransitionActive && state.poTransitionData) ? state.poTransitionData : state;
+                        if (usedState && usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
+                            const timerEl = document.getElementById('p-timer');
+                            if (timerEl) {
+                                const remMs = usedState.timer.targetEndTime - Date.now();
+                                const timeLeft = Math.max(0, Math.floor(remMs / 1000));
+                                const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                                const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
+                                const timeFormatted = m + ":" + s;
+                                if (timerEl.innerText !== timeFormatted) {
+                                    timerEl.innerText = timeFormatted;
+                                }
+                            }
+                        }
+                    }, 200);
+
                     ui.updateProjection();
                     return;
                 }
@@ -3169,9 +3215,61 @@
                         }
                     };
 
-                    // Start periodic Firebase sync
-                    setInterval(() => game.tick(), 100);
+                    // --- NEZÁVISLÝ ČASOVAČ NA POZADÍ (WEB WORKER) ---
+                    // Web Worker běží na vlastním systémovém vlákně, které Chrome neškrtí ani při přepnutí do Excelu / jiného okna
+                    try {
+                        const tickerBlob = new Blob([`
+                            let intervalId = null;
+                            self.onmessage = function(e) {
+                                if (e.data === 'start') {
+                                    if (!intervalId) {
+                                        intervalId = setInterval(function() {
+                                            self.postMessage('tick');
+                                        }, 100);
+                                    }
+                                } else if (e.data === 'stop') {
+                                    if (intervalId) {
+                                        clearInterval(intervalId);
+                                        intervalId = null;
+                                    }
+                                }
+                            };
+                        `], { type: 'application/javascript' });
+                        game._tickerWorker = new Worker(URL.createObjectURL(tickerBlob));
+                        game._tickerWorker.onmessage = function(e) {
+                            if (e.data === 'tick') {
+                                game.tick();
+                            }
+                        };
+                        game._tickerWorker.postMessage('start');
+                    } catch (workerErr) {
+                        console.warn("Web Worker timer nelze spustit, použije se záložní setInterval:", workerErr);
+                    }
+
+                    // Záložní interval pro případ, kdyby Web Worker nebyl v daném prostředí podporován
+                    if (!game._tickerWorker) {
+                        setInterval(() => game.tick(), 100);
+                    }
+
                     setInterval(() => ui.updateAdminFooter(), 1000);
+
+                    // Okamžitá reaktivace a vykreslení při návratu do okna (např. přepnutí z Excelu)
+                    window.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) {
+                            if (state.timer.running) {
+                                game.tick();
+                                if (!screenWakeLock) requestScreenWakeLock();
+                            }
+                            ui.updateAdminFooter();
+                        }
+                    });
+                    window.addEventListener('focus', () => {
+                        if (state.timer.running) {
+                            game.tick();
+                            if (!screenWakeLock) requestScreenWakeLock();
+                        }
+                        ui.updateAdminFooter();
+                    });
                 } catch (e) {
                     console.error("Initialization error:", e);
                 }
@@ -3205,6 +3303,10 @@
                         if (state.currentMatch.phaseIndex === 1 || state.currentMatch.phaseIndex === 3) {
                             game.playSignal();
                         }
+                        // Pokud vypršel čas 2. poločasu zápasu, zaznamenat konec zápasu pro telemetrii
+                        if (state.currentMatch.phaseIndex === 3 && !state.currentMatch.isEvent) {
+                            game.recordMatchEnd();
+                        }
                     }
 
                     ui.updateTimer();
@@ -3218,6 +3320,7 @@
             toggleTimer: () => {
                 state.timer.running = !state.timer.running;
                 if (state.timer.running) {
+                    requestScreenWakeLock();
                     state.timer.lastTick = Date.now();
                     // User preference: -1ms offset for "snappy" immediate second change
                     state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000) - 1;
@@ -3240,9 +3343,13 @@
                     if (state.tournamentStartTime === null) {
                         state.tournamentStartTime = Date.now();
                     }
+                    // Zaznamenat začátek zápasu pro telemetrii
+                    game.recordMatchStart();
+
                     // Immediate first tick to reflect visual change (e.g. 7:00 -> 6:59)
                     game.tick();
                 } else {
+                    releaseScreenWakeLock();
                     // When pausing, store the exact remaining time (plus the 1ms offset to avoid drift on resume)
                     const remainingMs = state.timer.targetEndTime - Date.now();
                     state.timer.timeLeft = Math.max(0, (remainingMs + 1) / 1000);
@@ -3257,6 +3364,7 @@
 
             resetTimer: () => {
                 state.timer.running = false;
+                releaseScreenWakeLock();
                 if (state.currentMatch.isEvent) {
                     state.timer.timeLeft = state.currentMatch.duration || 600;
                 } else {
@@ -3394,6 +3502,7 @@
 
                 // Moving Forward past last phase -> Next Match
                 if (newPhaseIndex >= phaseCount) {
+                    game.recordMatchEnd();
                     if (game.loadMatchByRelativeIndex(1)) {
                         // Match loaded, transition handled inside loadMatchByRelativeIndex
                         return;
@@ -3403,6 +3512,7 @@
                         if (!state.currentMatch.isEvent && state.activeMatchIndex !== -1 && state.schedule[state.activeMatchIndex]) {
                             state.schedule[state.activeMatchIndex].homeScore = state.currentMatch.homeScore;
                             state.schedule[state.activeMatchIndex].guestScore = state.currentMatch.guestScore;
+                            game.recordMatchEnd(state.activeMatchIndex);
                             ui.renderSchedule();
                             ui.renderStandings(); // UPDATE STANDINGS
                             admin.saveToStorage(); game.syncProjection();
@@ -3440,6 +3550,9 @@
                 }
 
                 state.currentMatch.phaseIndex = index;
+                if (index === 0 || index === 1) {
+                    game.recordMatchStart();
+                }
                 if (resetTime) {
                     game.resetTimer();
                 }
@@ -3466,6 +3579,9 @@
                     if (currentMatchInSched && currentMatchInSched.type === 'match') {
                         currentMatchInSched.homeScore = state.currentMatch.homeScore;
                         currentMatchInSched.guestScore = state.currentMatch.guestScore;
+                        if (offset > 0) {
+                            game.recordMatchEnd(state.activeMatchIndex);
+                        }
                     }
                 }
 
@@ -3500,6 +3616,40 @@
                 return false;
             },
 
+            // ===================================================================================
+            // TELEMETRIE & VÝPOČET PŘEDPOKLÁDANÉHO KONCE
+            // ===================================================================================
+            recordMatchStart: (targetIdx = -1) => {
+                const idx = (targetIdx !== -1) ? targetIdx : state.activeMatchIndex;
+                if (idx !== -1 && state.schedule && state.schedule[idx]) {
+                    const m = state.schedule[idx];
+                    if ((m.type === 'match' || (!m.type && !m.isEvent)) && !m.realStartTime) {
+                        m.realStartTime = Date.now();
+                    }
+                }
+            },
+
+            recordMatchEnd: (targetIdx = -1) => {
+                const idx = (targetIdx !== -1) ? targetIdx : state.activeMatchIndex;
+                if (idx !== -1 && state.schedule && state.schedule[idx]) {
+                    const m = state.schedule[idx];
+                    if (m.type === 'match' || (!m.type && !m.isEvent)) {
+                        // Pokud zápas ještě neměl zaznamenaný realStartTime, ale proběhl:
+                        if (!m.realStartTime && state.tournamentStartTime) {
+                            m.realStartTime = Math.max(state.tournamentStartTime, Date.now() - (((state.times.play || 420) * 2 + 60) * 1000));
+                        }
+                        if (m.realStartTime && !m.realDuration) {
+                            m.realEndTime = Date.now();
+                            const durationSec = Math.round((m.realEndTime - m.realStartTime) / 1000);
+                            // Validace reálné délky (alespoň 3 minuty a max 90 minut, aby se nezapočítávaly omyly/rychlé prokliknutí)
+                            if (durationSec >= 180 && durationSec <= 5400) {
+                                m.realDuration = durationSec;
+                            }
+                        }
+                    }
+                }
+            },
+
             getTelemetry: () => {
                 const now = new Date();
                 const timeStr = now.toLocaleTimeString('cs-CZ');
@@ -3510,56 +3660,72 @@
                 const totalItems = (state.schedule || []).length;
                 const progressStr = `Právě se hraje: ${currentIdx + 1} z ${totalItems}`;
 
-                // Average "Planned" overhead per match (Setup + Break)
-                const s = state.times.setup || 0;
-                const b = state.times.break || 0;
-                const p = state.times.play || 0;
-                const plannedOverhead = s + b;
+                // --- VÝPOČET PŘEDPOKLÁDANÉHO KONCE TURNAJE ---
+                const p = state.times.play || 420; // délka 1 poločasu v sekundách
+                // 1. Absolutní plánovaná délka 1 zápasu: 2 poločasy + 1 minuta celkem na režii (kroky Nastupuje a Přestávka)
+                const fixedMatchDuration = (p * 2) + 60;
 
-                let avgLag = 0;
-                let learnedOverhead = 0;
+                // 2. Skutečně dokončené zápasy s validní reálnou délkou (min 3 min, max 90 min)
+                const completedMatches = (state.schedule || []).filter(m =>
+                    (m.type === 'match' || (!m.type && !m.isEvent)) &&
+                    typeof m.realDuration === 'number' &&
+                    m.realDuration >= 180 &&
+                    m.realDuration <= 5400
+                );
 
-                // Adjust based on real performance if tournament started
-                if (state.tournamentStartTime && state.activeMatchIndex > 0) {
-                    const realElapsed = (Date.now() - state.tournamentStartTime) / 1000;
-                    const playElapsed = state.playTimeAccumulated || 0;
-                    const totalOverhead = realElapsed - playElapsed;
-                    learnedOverhead = totalOverhead / state.activeMatchIndex;
+                // 3. Prahová hodnota pro adaptivní průměrování
+                const allMatches = (state.schedule || []).filter(m => m.type === 'match' || (!m.type && !m.isEvent));
+                const totalMatchesCount = allMatches.length;
+                // Pro malé turnaje (< 10 zápasů) začínáme dříve, standardně po 8 odehraných zápasech
+                const requiredMatchesForAvg = (totalMatchesCount < 10 && totalMatchesCount > 0)
+                    ? Math.min(8, Math.max(3, Math.floor(totalMatchesCount / 2)))
+                    : 8;
 
-                    // Lag is the delay compared to theoretical plan (can be negative if faster)
-                    avgLag = learnedOverhead - plannedOverhead;
-
-                    // Clamp to reasonable range (-5 mins to +10 mins extra per match)
-                    avgLag = Math.max(-300, Math.min(600, avgLag));
+                let matchDurationToUse = fixedMatchDuration;
+                if (completedMatches.length >= requiredMatchesForAvg) {
+                    const sumDuration = completedMatches.reduce((acc, m) => acc + m.realDuration, 0);
+                    matchDurationToUse = Math.round(sumDuration / completedMatches.length);
                 }
 
-                let remainingSeconds = state.timer.running
-                    ? (state.timer.targetEndTime - Date.now()) / 1000
-                    : state.timer.timeLeft;
+                // 4. Zbývající čas v aktuálně rozběhnuté položce
+                let remainingSeconds = 0;
+                const currentTimerSeconds = state.timer.running
+                    ? Math.max(0, (state.timer.targetEndTime - Date.now()) / 1000)
+                    : Math.max(0, state.timer.timeLeft || 0);
 
-                // Current item progress
-                // If we are in "free play" (activeMatchIndex is -1 and schedule is empty), 
-                // we treat the currentMatch as the active one for prediction.
-                let mCurrent = (currentIdx !== -1) ? state.schedule[currentIdx] : (totalItems === 0 ? state.currentMatch : null);
+                const mCurrent = (currentIdx !== -1) ? state.schedule[currentIdx] : (totalItems === 0 ? state.currentMatch : null);
 
-                if (mCurrent && (mCurrent.type === 'match' || (mCurrent.isEvent === false && !mCurrent.type))) {
-                    const curPhase = state.currentMatch.phaseIndex;
-                    // Ph 0 (Setup): + P1, B, P2
-                    if (curPhase === 0) remainingSeconds += (p * 2) + b + (avgLag * 0.8);
-                    // Ph 1 (P1): + B, P2
-                    else if (curPhase === 1) remainingSeconds += p + b + (avgLag * 0.5);
-                    // Ph 2 (Break): + P2
-                    else if (curPhase === 2) remainingSeconds += p + (avgLag * 0.2);
-                    // Ph 3 (P2): already covered by timer
-                }
-
-                // Upcoming items
-                (state.schedule || []).slice(currentIdx + 1).forEach(m => {
-                    if (m.type === 'event') {
-                        remainingSeconds += (m.duration || 600);
-                        remainingSeconds += (avgLag * 0.5); // Add partial lag for events too
+                if (mCurrent) {
+                    if (mCurrent.type === 'event' || mCurrent.isEvent) {
+                        // Běžící událost: zbývá zbytek jejího odpočtu
+                        remainingSeconds += currentTimerSeconds;
                     } else {
-                        remainingSeconds += (p * 2) + plannedOverhead + avgLag;
+                        // Běžící zápas: zbývající čas aktuálního kroku + zbývající budoucí kroky v tomto zápase
+                        const curPhase = (typeof state.currentMatch.phaseIndex === 'number') ? state.currentMatch.phaseIndex : 0;
+                        remainingSeconds += currentTimerSeconds;
+                        if (curPhase === 0) {
+                            // Fáze 0 (Nastupuje): zbývá 1. poločas + přestávka (30 s) + 2. poločas
+                            remainingSeconds += (p * 2) + 30;
+                        } else if (curPhase === 1) {
+                            // Fáze 1 (1. poločas): zbývá přestávka (30 s) + 2. poločas
+                            remainingSeconds += p + 30;
+                        } else if (curPhase === 2) {
+                            // Fáze 2 (Přestávka): zbývá 2. poločas
+                            remainingSeconds += p;
+                        }
+                        // Fáze 3 (2. poločas): zbývající čas je plně pokryt v currentTimerSeconds
+                    }
+                }
+
+                // 5. Budoucí položky v playlistu (od currentIdx + 1 do konce)
+                const startIndex = (currentIdx === -1) ? 0 : (currentIdx + 1);
+                (state.schedule || []).slice(startIndex).forEach(m => {
+                    if (m.type === 'event' || m.isEvent) {
+                        // Událost: přičte se její zadaná délka (default 600 s)
+                        remainingSeconds += (m.duration || 600);
+                    } else {
+                        // Zápas: fixní čas (2*p + 60s), nebo dynamický průměr po dosažení prahu zápasů
+                        remainingSeconds += matchDurationToUse;
                     }
                 });
 
@@ -3583,7 +3749,11 @@
                 // --- TIMESTAMP GENERATION ---
                 state.lastUpdate = Date.now();
 
-                const payload = { ...state, telemetry: game.getTelemetry() };
+                // --- ODLEHČENÝ SYNCHRONIZAČNÍ PAYLOAD PRO PO A CLOUD ---
+                // Vyřadíme objemná data, která PO ani veřejná zobrazení nepotřebují (MP3 znělky v base64, globální databázi hráčů apod.)
+                // Tím se objem dat zmenší z desítek megabajtů na jednotky kilobajtů a zamezí se zasekávání hlavního vlákna a tlačítek gólů.
+                const { teamAnthems, masterPlayers, musicPlaylist, ...lightState } = state;
+                const payload = { ...lightState, telemetry: game.getTelemetry() };
                 const plainPayload = JSON.parse(JSON.stringify(payload));
 
                 // Send to BroadcastChannel for all listeners (OBS, other tabs)
@@ -6372,6 +6542,9 @@
                     if (currentMatchInSched && currentMatchInSched.type === 'match') {
                         currentMatchInSched.homeScore = state.currentMatch.homeScore;
                         currentMatchInSched.guestScore = state.currentMatch.guestScore;
+                        if (index > state.activeMatchIndex || state.currentMatch.phaseIndex >= 3) {
+                            game.recordMatchEnd(state.activeMatchIndex);
+                        }
                         admin.saveToStorage(); // ENSURE STORAGE IS UPDATED
                     }
                 }
@@ -8072,7 +8245,11 @@
 
                     const timerEl = document.getElementById('p-timer');
                     if (timerEl) {
-                        const timeLeft = Math.floor(usedState.timer.timeLeft);
+                        let timeLeft = Math.floor(usedState.timer.timeLeft);
+                        if (usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
+                            const remMs = usedState.timer.targetEndTime - Date.now();
+                            timeLeft = Math.max(0, Math.floor(remMs / 1000));
+                        }
                         const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                         const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
                         timerEl.innerText = m + ":" + s;
