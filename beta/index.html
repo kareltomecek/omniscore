@@ -4599,28 +4599,31 @@
                     (e.keyCode >= 35 && e.keyCode <= 39)) {
                     return true;
                 }
-                // Allow colon (:) and dot (.)
-                if (e.key === ':' || e.key === '.' || e.keyCode === 190 || e.keyCode === 110) {
-                    return true;
-                }
-                // Check if it's a digit key (e.key '0'-'9', numpad 96-105, or top row 48-57)
-                const isDigit = (e.key >= '0' && e.key <= '9') ||
-                                (e.keyCode >= 96 && e.keyCode <= 105) ||
-                                (e.keyCode >= 48 && e.keyCode <= 57);
 
-                if (isDigit) {
-                    // Limit to max 4 digits (minus digits currently selected for replacement)
-                    const currentDigits = (e.target.textContent || '').replace(/\D/g, '');
-                    const sel = window.getSelection();
-                    const selectedDigits = sel ? (sel.toString() || '').replace(/\D/g, '').length : 0;
-                    if (currentDigits.length - selectedDigits >= 4) {
-                        e.preventDefault();
-                        return false;
-                    }
-                    return true;
+                // Check allowed input characters: digits 0-9, colon, dot
+                let char = e.key;
+                if (e.keyCode >= 96 && e.keyCode <= 105) {
+                    char = String(e.keyCode - 96);
+                } else if (e.keyCode === 110) {
+                    char = '.';
                 }
-                e.preventDefault();
-                return false;
+
+                const isAllowedChar = (char >= '0' && char <= '9') || char === ':' || char === '.';
+                if (!isAllowedChar) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                // Max 5 characters total limit (considering currently selected text to be replaced)
+                const currentText = e.target.textContent || '';
+                const sel = window.getSelection();
+                const selectedLen = sel ? (sel.toString() || '').length : 0;
+                if (currentText.length - selectedLen >= 5) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                return true;
             },
 
             sanitizeInput: (input) => {
