@@ -2746,7 +2746,8 @@
                 running: false,
                 timeLeft: 0,
                 lastTick: 0,
-                targetEndTime: 0
+                targetEndTime: 0,
+                serverTargetEndTime: 0
             },
             pendingEditIndex: -1, // Tracks which match is being edited
             schedule: [],
@@ -3137,7 +3138,8 @@
         // HERNÍ JÁDRO (GAME)
         // ===================================================================================
         // --- CORE LOGIC CLASS ---
-        // --- FIREBASE INITIALIZATION ---
+        // --- FIREBASE INITIALIZATION & SERVER TIME SYNCHRONIZATION ---
+        let fbServerOffset = 0;
         if (typeof firebase !== 'undefined' && typeof firebaseConfig !== 'undefined') {
             try {
                 if (!firebase.apps.length) {
@@ -3149,6 +3151,11 @@
 
                     // [ODSTRANĚNO] Automatické mazání při odpojení bylo nahrazeno Garbage Collectorem a ručním resetem pro vyšší bezpečnost dat.
                 }
+
+                // Posluchač pro přesnou synchronizaci času se servery Google Firebase pro eliminaci odchylek systémových hodin mezi zařízeními
+                firebase.database().ref('.info/serverTimeOffset').on('value', (snap) => {
+                    fbServerOffset = snap.val() || 0;
+                });
             } catch (e) { console.error("[Firebase] Initialization failed:", e); }
         }
 
@@ -3252,10 +3259,16 @@
                     // Lokální plynulý odpočet zápasového času v PO (zcela nezávislý na zatížení či uspání OO)
                     setInterval(() => {
                         const usedState = (state.poTransitionActive && state.poTransitionData) ? state.poTransitionData : state;
-                        if (usedState && usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
+                        if (usedState && usedState.timer && usedState.timer.running && (usedState.timer.serverTargetEndTime > 0 || usedState.timer.targetEndTime > 0)) {
                             const timerEl = document.getElementById('p-timer');
                             if (timerEl) {
-                                const remMs = usedState.timer.targetEndTime - Date.now();
+                                let remMs;
+                                if (usedState.timer.serverTargetEndTime) {
+                                    const currentServerTime = Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0);
+                                    remMs = usedState.timer.serverTargetEndTime - currentServerTime;
+                                } else {
+                                    remMs = usedState.timer.targetEndTime - Date.now();
+                                }
                                 const timeLeft = Math.max(0, Math.ceil(remMs / 1000));
                                 const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                                 const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
@@ -3402,6 +3415,7 @@
 
                     if (remainingMs <= 0) {
                         state.timer.timeLeft = 0;
+                        state.timer.serverTargetEndTime = 0;
                         game.toggleTimer(); // Stop at 0
 
                         // Play signal only for 1. Poločas (1) and 2. Poločas (3)
@@ -3428,6 +3442,7 @@
                     requestScreenWakeLock();
                     state.timer.lastTick = Date.now();
                     state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
+                    state.timer.serverTargetEndTime = (Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0)) + (state.timer.timeLeft * 1000);
 
                     const isVoulat = (state.currentMatch.phaseIndex === 1 || state.currentMatch.phaseIndex === 3);
 
@@ -3462,6 +3477,7 @@
                     // When pausing, store the exact remaining time (plus the 1ms offset to avoid drift on resume)
                     const remainingMs = state.timer.targetEndTime - Date.now();
                     state.timer.timeLeft = Math.max(0, (remainingMs + 1) / 1000);
+                    state.timer.serverTargetEndTime = 0;
                 }
                 ui.updateTimerBtn();
                 game.syncProjection(true);
@@ -3481,6 +3497,7 @@
                     state.timer.timeLeft = state.times[currentPhase.timeKey];
                 }
                 state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
+                state.timer.serverTargetEndTime = (Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0)) + (state.timer.timeLeft * 1000);
 
                 ui.updateTimer();
                 ui.updateTimerBtn();
@@ -3492,6 +3509,11 @@
                 if (state.timer.timeLeft < 0) state.timer.timeLeft = 0;
                 if (state.timer.running) {
                     state.timer.targetEndTime += (seconds * 1000);
+                    if (state.timer.serverTargetEndTime) {
+                        state.timer.serverTargetEndTime += (seconds * 1000);
+                    } else {
+                        state.timer.serverTargetEndTime = (Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0)) + (state.timer.timeLeft * 1000);
+                    }
                 }
                 ui.updateTimer();
                 game.syncProjection(true);
@@ -3539,6 +3561,7 @@
                     state.timer.timeLeft = Math.min(3599, totalSeconds); // Max 59:59
                     if (state.timer.running) {
                         state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
+                        state.timer.serverTargetEndTime = (Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0)) + (state.timer.timeLeft * 1000);
                     }
                 }
 
@@ -3920,13 +3943,13 @@
                     projectionWindow.postMessage(plainPayload, '*');
                 }
 
-                // --- THROTTLED FIREBASE SYNC ---
+                // --- THROTTLED FIREBASE SYNC (Heartbeat interval 8s) ---
                 const now = Date.now();
                 const timeSinceLastSync = now - (game._lastFirebaseSync || 0);
 
                 if (typeof firebase !== 'undefined' && !state.isProjectionMode && auth.isLicensed()) {
-                    // Send to Firebase immediately if forceFirebase=true OR if it has been more than 1s
-                    if (forceFirebase || timeSinceLastSync >= 1000) {
+                    // Send to Firebase immediately if forceFirebase=true OR if it has been more than 8s (8000 ms heartbeat)
+                    if (forceFirebase || timeSinceLastSync >= 8000) {
                         try {
                             firebase.database().ref('sessions/' + state.sessionId).set(plainPayload);
                             game._lastFirebaseSync = now;
@@ -9464,8 +9487,14 @@
                     const timerEl = document.getElementById('p-timer');
                     if (timerEl) {
                         let timeLeft = Math.ceil(usedState.timer.timeLeft);
-                        if (usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
-                            const remMs = usedState.timer.targetEndTime - Date.now();
+                        if (usedState.timer && usedState.timer.running && (usedState.timer.serverTargetEndTime > 0 || usedState.timer.targetEndTime > 0)) {
+                            let remMs;
+                            if (usedState.timer.serverTargetEndTime) {
+                                const currentServerTime = Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0);
+                                remMs = usedState.timer.serverTargetEndTime - currentServerTime;
+                            } else {
+                                remMs = usedState.timer.targetEndTime - Date.now();
+                            }
                             timeLeft = Math.max(0, Math.ceil(remMs / 1000));
                         }
                         const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
