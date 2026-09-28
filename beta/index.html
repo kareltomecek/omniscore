@@ -420,6 +420,34 @@
             color: white !important;
         }
 
+        /* Subtle Dark UI button styles for harmonious toolbars */
+        .btn-subtle {
+            background: #374151 !important;
+            border: 1px solid #4b5563 !important;
+            color: #e5e7eb !important;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+
+        .btn-subtle:hover {
+            background: #4b5563 !important;
+            border-color: #6b7280 !important;
+            color: #ffffff !important;
+        }
+
+        .btn-subtle-green {
+            background: #2e7d32 !important;
+            border: 1px solid #388e3c !important;
+            color: #ffffff !important;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .btn-subtle-green:hover {
+            background: #388e3c !important;
+            border-color: #4caf50 !important;
+        }
+
         /* List Styling */
         .match-list {
             list-style: none;
@@ -1901,36 +1929,47 @@
                             <!-- Dynamically populated -->
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px;">
-                            <div style="display:flex; gap:5px;">
-                                <button class="small-btn btn-green" onclick="admin.addPlayerSlot()"
-                                    title="Přidá nový prázdný řádek pro zadání jména a UCI-ID hráče.">+ Přidat
-                                    hráče</button>
+                            <div style="display:flex; gap:6px;">
+                                <button class="small-btn btn-subtle-green" onclick="admin.addPlayerSlot()"
+                                    title="Přidá nový prázdný řádek pro zadání jména a UCI-ID hráče."
+                                    style="height:28px; padding:0 12px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; gap:5px; box-sizing:border-box;">
+                                    + Přidat hráče
+                                </button>
                                 <a href="https://portal.czechcyclingfederation.com/Racer" target="_blank"
-                                    class="small-btn"
+                                    class="small-btn btn-subtle"
                                     title="Otevře oficiální portál ČSC pro vyhledání UCI-ID podle jména."
-                                    style="background:#0056b3; display:flex; align-items:center; text-decoration:none; color:white; font-size:0.75em; padding:0 10px;">
+                                    style="height:28px; padding:0 12px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; gap:5px; box-sizing:border-box; text-decoration:none;">
                                     🌐 Hledat UCI-ID
                                 </a>
                             </div>
-                            <!-- Řádek: Synchronizace databáze hráčů -->
-                            <div style="display:flex; gap:5px; align-items:stretch;">
-                                <button class="small-btn" onclick="admin.updatePlayersFromCloud()"
-                                    title="Pokusí se automaticky stáhnout databázi hráčů z Google Disku. Pokud selže, použijte tlačítka vpravo."
-                                    style="background:#0077cc; white-space:nowrap;">🔄 Auto z cloudu</button>
-                                <a href="https://drive.google.com/drive/folders/19QCjd6wXCUj4qI0A12rtSv-1eVf-tfgA"
-                                    target="_blank"
-                                    class="small-btn"
-                                    title="Najděte soubor s databází hráčů s příponou .json a stáhněte ho do počítače."
-                                    style="background:#1a7f3c; display:flex; align-items:center; text-decoration:none; color:white; font-size:0.75em; padding:0 10px; white-space:nowrap;">
-                                    📁 Google Disk
-                                </a>
-                                <!-- Skrytý input pro výběr JSON souboru -->
-                                <input type="file" id="input-players-json-upload" accept=".json" style="display:none;"
-                                    onchange="admin.uploadPlayersFromFile(this)">
-                                <button class="small-btn"
-                                    title="Nahrajte do aplikace soubor s databází hráčů s příponou .json."
-                                    onclick="document.getElementById('input-players-json-upload').click()"
-                                    style="background:#555; white-space:nowrap;">📂 Nahrát JSON</button>
+                            <!-- Sekce: Aktualizace hlavní databáze hráčů -->
+                            <div style="margin-top: 4px; border-top: 1px solid #374151; padding-top: 8px;">
+                                <div style="font-size: 0.78em; color: #9ca3af; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.3px;">
+                                    Aktualizace hlavní databáze hráčů
+                                </div>
+                                <div style="display:flex; gap:6px; align-items:stretch;">
+                                    <button class="small-btn btn-subtle" onclick="admin.updatePlayersFromCloud()"
+                                        title="Pokusí se automaticky stáhnout databázi hráčů z Google Disku. Pokud selže, použijte tlačítka vpravo."
+                                        style="flex:1; height:28px; padding:0 8px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:5px; box-sizing:border-box; white-space:nowrap;">
+                                        🔄 Cloud
+                                    </button>
+                                    <a href="https://drive.google.com/drive/folders/19QCjd6wXCUj4qI0A12rtSv-1eVf-tfgA"
+                                        target="_blank"
+                                        class="small-btn btn-subtle"
+                                        title="Najděte soubor s databází hráčů s příponou .json a stáhněte ho do počítače."
+                                        style="flex:1; height:28px; padding:0 8px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:5px; box-sizing:border-box; text-decoration:none; white-space:nowrap;">
+                                        📁 Google Disk
+                                    </a>
+                                    <!-- Skrytý input pro výběr JSON souboru -->
+                                    <input type="file" id="input-players-json-upload" accept=".json" style="display:none;"
+                                        onchange="admin.uploadPlayersFromFile(this)">
+                                    <button class="small-btn btn-subtle"
+                                        title="Nahrajte do aplikace soubor s databází hráčů s příponou .json."
+                                        onclick="document.getElementById('input-players-json-upload').click()"
+                                        style="flex:1; height:28px; padding:0 8px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:5px; box-sizing:border-box; white-space:nowrap;">
+                                        📂 Ze souboru
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
