@@ -6073,6 +6073,12 @@
             generateScheduleFromTemplate: () => {
                 admin.syncTeamsFromDOM();
 
+                // Kontrola: generování je povoleno pouze při zamčeném pořadí družstev
+                if (!admin.teamsOrderLocked) {
+                    alert("⚠️ Pořadí družstev je odemčené.\n\nPřed generováním rozpisu nejprve uzamkněte pořadí družstev 🔒 v záložce Družstva (tím potvrdíte jejich finální nasazení).");
+                    return;
+                }
+
                 const templateSelect = document.getElementById('sched-template-select');
                 const templateId = templateSelect ? templateSelect.value : '';
                 const template = SCHEDULE_TEMPLATES[templateId];
