@@ -5278,6 +5278,14 @@
                         admin.syncTeamsFromDOM();
                         state.teams = state.teams.filter(t => t.id !== item.id);
                     } else {
+                        // Kontrola, zda je rozhodčí nasazen v zápasech
+                        const isUsed = state.schedule.some(m => m.type === 'match' && m.referee === item.id);
+                        if (isUsed) {
+                            const refName = admin.getRefName(item, true);
+                            if (!confirm(`Rozhodčí "${refName}" je nasazen v zápasech. Opravdu ho chcete smazat? V zápasech bude nahrazen textem "Rozhodčí".`)) {
+                                return;
+                            }
+                        }
                         state.referees = state.referees.filter(r => r.id !== item.id);
                     }
                     admin.renderIdentityInputs();
@@ -5442,8 +5450,9 @@
             },
 
             getTeamName: (id) => {
+                if (!id) return "OmS";
                 const team = state.teams.find(t => t.id === id);
-                return team ? team.name : (id ? "OmS" : "Tým");
+                return team ? team.name : "OmS";
             },
 
             getRefName: (inp, full = false) => {
@@ -5451,19 +5460,23 @@
                 let ref = null;
                 if (typeof inp === 'string') {
                     ref = state.referees.find(r => r.id === inp);
-                    if (!ref) return inp;
+                    if (!ref) {
+                        // Pokud jde o technické ID (ref_...) smazaného rozhodčího, vrátit bezpečný zástupný text
+                        if (inp.startsWith('ref_')) return "Rozhodčí";
+                        return inp;
+                    }
                 } else if (typeof inp === 'object') {
                     ref = inp;
                 } else return "-";
 
                 if (full) {
                     if (ref.surname || ref.firstName) {
-                        return `${ref.surname || ""} ${ref.firstName || ""}`.trim() || "-";
+                        return `${ref.surname || ""} ${ref.firstName || ""}`.trim() || "Rozhodčí";
                     }
-                    return ref.name || "-";
+                    return ref.name || "Rozhodčí";
                 } else {
-                    // UI view: Surname only (or fallback to shared name)
-                    return ref.surname || ref.name || "-";
+                    // UI view: Pouze příjmení (nebo fallback na jméno / zástupný text)
+                    return ref.surname || ref.name || "Rozhodčí";
                 }
             },
 
@@ -7164,8 +7177,8 @@
                     homeName: m.home || "",
                     guestName: m.guest || "",
                     referee: m.referee || "",
-                    homeScore: (m.homeScore !== null) ? m.homeScore : 0,
-                    guestScore: (m.guestScore !== null) ? m.guestScore : 0,
+                    homeScore: (typeof m.homeScore === 'number' && !isNaN(m.homeScore)) ? m.homeScore : ((m.homeScore !== null && m.homeScore !== undefined && m.homeScore !== "") ? Number(m.homeScore) : 0),
+                    guestScore: (typeof m.guestScore === 'number' && !isNaN(m.guestScore)) ? m.guestScore : ((m.guestScore !== null && m.guestScore !== undefined && m.guestScore !== "") ? Number(m.guestScore) : 0),
                     duration: m.duration || 600
                 };
 
@@ -8935,8 +8948,10 @@
             },
 
             updateScores: () => {
-                document.getElementById('home-score-disp').textContent = state.currentMatch.homeScore;
-                document.getElementById('guest-score-disp').textContent = state.currentMatch.guestScore;
+                const hs = (state.currentMatch.homeScore !== null && state.currentMatch.homeScore !== undefined && !isNaN(state.currentMatch.homeScore)) ? state.currentMatch.homeScore : 0;
+                const gs = (state.currentMatch.guestScore !== null && state.currentMatch.guestScore !== undefined && !isNaN(state.currentMatch.guestScore)) ? state.currentMatch.guestScore : 0;
+                document.getElementById('home-score-disp').textContent = hs;
+                document.getElementById('guest-score-disp').textContent = gs;
             },
 
             updateNames: () => {
@@ -9432,9 +9447,9 @@
                         const gn = document.getElementById('p-guest-name');
                         if (gn) gn.innerText = truncate(getTName(matchData.guestName), 20);
                         const hs = document.getElementById('p-home-score');
-                        if (hs) hs.innerText = matchData.homeScore;
+                        if (hs) hs.innerText = (matchData.homeScore !== null && matchData.homeScore !== undefined && !isNaN(matchData.homeScore)) ? matchData.homeScore : 0;
                         const gs = document.getElementById('p-guest-score');
-                        if (gs) gs.innerText = matchData.guestScore;
+                        if (gs) gs.innerText = (matchData.guestScore !== null && matchData.guestScore !== undefined && !isNaN(matchData.guestScore)) ? matchData.guestScore : 0;
 
                         const scoreBox = document.getElementById('p-score-box');
                         if (scoreBox) scoreBox.classList.toggle('p-row-blink', isBlinking);
