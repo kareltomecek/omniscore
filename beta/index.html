@@ -7784,6 +7784,130 @@
                 })[m]);
             },
 
+            sanitizeSessionId: (str) => {
+                if (!str) return "";
+                return str
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "") // odstranění diakritiky
+                    .trim()
+                    .replace(/\s+/g, '-') // mezery na pomlčky
+                    .replace(/[^a-zA-Z0-9_-]/g, '') // pouze bezpečné znaky pro Firebase a URL
+                    .substring(0, 32);
+            },
+
+            renameCloudSessionTitle: async (targetId, currentName) => {
+                if (!auth.currentUser || !auth.isLicensed()) {
+                    alert("Pro úpravu turnaje se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+
+                const newTitle = window.prompt("Zadejte nový název turnaje:", currentName || "");
+                if (newTitle === null) return;
+                const finalTitle = newTitle.trim();
+                if (!finalTitle) {
+                    alert("Název turnaje nesmí být prázdný.");
+                    return;
+                }
+                if (finalTitle === currentName) return;
+
+                try {
+                    // Aktualizace v metadatech uživatele
+                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${targetId}/tournamentName`).set(finalTitle);
+                    // Aktualizace v datech turnaje
+                    await firebase.database().ref(`sessions/${targetId}/tournamentName`).set(finalTitle);
+
+                    // Pokud je to aktuálně otevřený turnaj, promítnout do aplikace
+                    if (targetId === state.sessionId) {
+                        state.tournamentName = finalTitle;
+                        const input = document.getElementById('tournament-name');
+                        if (input) input.value = finalTitle;
+                        admin.saveToStorage();
+                        game.syncProjection();
+                    }
+
+                    admin.refreshCloudSessionsList();
+                } catch (e) {
+                    console.error("Chyba při přejmenování turnaje:", e);
+                    alert("Nepodařilo se přejmenovat turnaj: " + e.message);
+                }
+            },
+
+            changeCloudSessionId: async (oldId) => {
+                if (!auth.currentUser || !auth.isLicensed()) {
+                    alert("Pro změnu kódu relace se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+
+                const promptText = `Zadejte nový Kód relace (ID) pro turnaj:\n\n• Délka: 8 až 32 znaků\n• Povolené znaky: písmena (a-z, A-Z), číslice (0-9), pomlčka (-), podtržítko (_)\n• Příklad: 2026-liga-olomouc nebo cesky-pohar-2026\n\nAktuální kód: ${oldId}`;
+                const rawInput = window.prompt(promptText, oldId);
+                if (rawInput === null) return;
+
+                const newId = admin.sanitizeSessionId(rawInput);
+                if (newId === oldId) return;
+
+                if (newId.length < 8 || newId.length > 32) {
+                    alert(`Neplatná délka kódu relace: ${newId.length} znaků.\n\nVlastní kód relace musí mít délku 8 až 32 znaků a může obsahovat pouze písmena, číslice, pomlčku (-) a podtržítko (_).`);
+                    return;
+                }
+
+                try {
+                    // 1. Kontrola unikátnosti ve Firebase
+                    const checkSnap = await firebase.database().ref('sessions/' + newId).once('value');
+                    if (checkSnap.exists()) {
+                        alert(`⚠️ Kód relace "${newId}" je již v cloudu obsazen!\n\nZvolte prosím jiný unikátní kód.`);
+                        return;
+                    }
+
+                    // 2. Načtení dat ze starého ID
+                    const snapData = await firebase.database().ref('sessions/' + oldId).once('value');
+                    const sourceData = snapData.val();
+                    if (!sourceData) {
+                        alert("Nepodařilo se načíst data zdrojového turnaje.");
+                        return;
+                    }
+
+                    // 3. Načtení metadat ze starého ID
+                    const snapMeta = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${oldId}`).once('value');
+                    const sourceMeta = snapMeta.val() || {};
+
+                    // 4. Zápis pod nové ID
+                    const now = Date.now();
+                    const updatedData = { ...sourceData, sessionId: newId, lastUpdate: now };
+                    const updatedMeta = { ...sourceMeta, sessionId: newId, lastUpdate: now };
+
+                    await firebase.database().ref('sessions/' + newId).set(updatedData);
+                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${newId}`).set(updatedMeta);
+
+                    // 5. Smazání starého ID
+                    await firebase.database().ref('sessions/' + oldId).remove();
+                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${oldId}`).remove();
+
+                    // 6. Pokud byl změněn právě aktivní turnaj v tomto okně
+                    if (oldId === state.sessionId) {
+                        state.sessionId = newId;
+                        localStorage.setItem('oms_session_id', newId);
+                        admin.saveToStorage();
+                        game.syncProjection(true);
+
+                        const activeSpan = document.getElementById('cloud-active-session-id');
+                        if (activeSpan) activeSpan.innerText = newId;
+
+                        const footerSpan = document.getElementById('admin-footer-session');
+                        if (footerSpan) footerSpan.innerText = newId;
+
+                        if (window.history && window.history.replaceState) {
+                            window.history.replaceState(null, '', window.location.pathname + '?session=' + newId);
+                        }
+                    }
+
+                    admin.refreshCloudSessionsList();
+                    alert(`Kód relace byl úspěšně změněn na "${newId}".`);
+                } catch (e) {
+                    console.error("Chyba při změně kódu relace:", e);
+                    alert("Nepodařilo se změnit kód relace: " + e.message);
+                }
+            },
+
             refreshCloudSessionsList: async () => {
                 const container = document.getElementById('cloud-sessions-list-container');
                 const infoEl = document.getElementById('cloud-sessions-user-info');
@@ -7840,8 +7964,11 @@
                         html += `
                             <tr style="border-bottom:1px solid #282828; ${isCurrent ? 'background:rgba(76,175,80,0.08);' : ''}">
                                 <td style="padding:10px 8px; font-weight:bold; color:#fff;">
-                                    ${safeName}
-                                    ${isCurrent ? '<span style="margin-left:8px; background:var(--accent-green); color:#000; font-size:0.75em; padding:2px 6px; border-radius:3px; font-weight:bold;">AKTIVNÍ</span>' : ''}
+                                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                        <span>${safeName}</span>
+                                        <button class="small-btn" onclick="admin.renameCloudSessionTitle('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="padding:1px 5px; font-size:0.8em; background:#333; color:#aaa; border:1px solid #444; cursor:pointer;" title="Upravit název turnaje">✏️</button>
+                                        ${isCurrent ? '<span style="background:var(--accent-green); color:#000; font-size:0.75em; padding:2px 6px; border-radius:3px; font-weight:bold;">AKTIVNÍ</span>' : ''}
+                                    </div>
                                 </td>
                                 <td style="padding:10px 8px; color:#bbb;">
                                     ${safeCat}<br><small style="color:#777;">${safeDate}</small>
@@ -7850,7 +7977,10 @@
                                     ${item.matchCount || 0} zápasů<br><small style="color:#777;">${item.teamCount || 0} týmů</small>
                                 </td>
                                 <td style="padding:10px 8px;">
-                                    <code style="background:#222; padding:3px 6px; border-radius:4px; color:var(--accent-blue); font-weight:bold; font-size:1.05em;">${item.sessionId}</code>
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <code style="background:#222; padding:3px 6px; border-radius:4px; color:var(--accent-blue); font-weight:bold; font-size:1.05em;">${item.sessionId}</code>
+                                        <button class="small-btn" onclick="admin.changeCloudSessionId('${item.sessionId}')" style="padding:1px 5px; font-size:0.8em; background:#333; color:#aaa; border:1px solid #444; cursor:pointer;" title="Změnit kód relace (ID)">✏️</button>
+                                    </div>
                                 </td>
                                 <td style="padding:10px 8px; font-size:0.85em; color:#888;">
                                     ${updated}
@@ -8051,11 +8181,28 @@
                         return;
                     }
 
-                    if (!confirm("Založit nový turnaj?\n\nStávající turnaj zůstane v cloudu bezpečně uložen. Otevře se čisté prostředí s novým kódem relace.")) {
-                        return;
+                    const randomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+                    const promptText = `Založit nový turnaj?\n\nZadejte Kód relace (ID):\n• Ponechte navržený 5místný kód: ${randomId}\n• Nebo zadejte vlastní název o délce 8 až 32 znaků (např. 2026-liga-olomouc)\n\nStávající turnaj zůstane v cloudu bezpečně uložen.`;
+                    const rawInput = window.prompt(promptText, randomId);
+                    if (rawInput === null) return;
+
+                    let newId = rawInput.trim();
+                    if (newId === randomId) {
+                        // Uživatel ponechal automatický 5místný kód
+                    } else {
+                        newId = admin.sanitizeSessionId(newId);
+                        if (newId.length < 8 || newId.length > 32) {
+                            alert(`Neplatná délka kódu relace: ${newId.length} znaků.\n\nVlastní kód relace musí mít délku 8 až 32 znaků a může obsahovat pouze písmena, číslice, pomlčku (-) a podtržítko (_).`);
+                            return;
+                        }
                     }
 
-                    const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
+                    // Kontrola unikátnosti ve Firebase
+                    const checkSnap = await firebase.database().ref('sessions/' + newId).once('value');
+                    if (checkSnap.exists()) {
+                        alert(`⚠️ Kód relace "${newId}" je již v cloudu obsazen!\n\nZvolte prosím jiný unikátní název.`);
+                        return;
+                    }
 
                     // Vyčištění stavu turnaje
                     state.tournamentName = "";
