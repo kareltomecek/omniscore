@@ -2496,8 +2496,8 @@
             <span id="admin-footer-license"
                 style="font-size:0.75em; padding:2px 6px; border-radius:4px; font-weight:bold; background:#333; color:#aaa; text-transform:uppercase;">...</span>
             <span id="admin-footer-session" onclick="admin.openCloudSessionsModal()"
-                style="font-weight:bold; color:var(--accent-blue); cursor:pointer; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom;" title="Klikněte pro správu cloudových turnajů">---</span>
-            <span id="admin-footer-progress" style="font-weight:bold; color:#888;">&nbsp;&nbsp;&nbsp;&nbsp;-</span>
+                style="font-weight:bold; color:var(--accent-blue); cursor:pointer; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom;" title="Klikněte pro správu cloudových turnajů">---</span>
+            <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:36px;">-</span>
         </div>
         <div id="admin-footer-end">OmniScore (OmS)</div>
         <div id="admin-footer-time">-</div>
@@ -8684,7 +8684,7 @@
                 const sess = document.getElementById('admin-footer-session');
                 const lic = document.getElementById('admin-footer-license');
 
-                if (prog) prog.innerText = `\u00A0\u00A0\u00A0\u00A0${telemetry.progress}`;
+                if (prog) prog.innerText = telemetry.progress;
                 if (end) end.innerText = telemetry.end;
                 if (time) time.innerText = telemetry.time;
                 if (sess) sess.innerText = state.sessionId;
