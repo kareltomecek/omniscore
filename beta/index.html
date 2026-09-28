@@ -509,6 +509,26 @@
             gap: 5px;
             align-items: center;
             margin-bottom: 5px;
+            position: relative;
+        }
+
+        .team-identity-row.drop-indicator-top::before,
+        .team-identity-row.drop-indicator-bottom::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background-color: var(--accent-blue, #2196f3);
+            z-index: 10;
+        }
+
+        .team-identity-row.drop-indicator-top::before {
+            top: -2px;
+        }
+
+        .team-identity-row.drop-indicator-bottom::before {
+            bottom: -2px;
         }
 
         .identity-label {
@@ -1901,7 +1921,21 @@
                 </div>
                 <div id="acc-logos" class="accordion-content">
                     <div class="form-group">
-                        <label>Seznam Družstev</label>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:5px;">
+                            <label style="margin:0; font-weight:bold;">Seznam Družstev</label>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <button id="btn-teams-lock" type="button" class="small-btn" onclick="admin.toggleTeamsLock()"
+                                    style="display:flex; align-items:center; gap:4px; font-size:0.8em; padding:3px 8px; background:#444; border:1px solid #666; cursor:pointer;"
+                                    title="Uzamknout nebo odemknout změnu pořadí družstev">
+                                    🔒 Pořadí zamčeno
+                                </button>
+                                <button id="btn-teams-shuffle" type="button" class="small-btn btn-blue" onclick="admin.shuffleTeams()"
+                                    style="display:none; align-items:center; gap:4px; font-size:0.8em; padding:3px 8px;"
+                                    title="Náhodně vylosovat / promíchat pořadí družstev">
+                                    🎲 Vylosovat pořadí
+                                </button>
+                            </div>
+                        </div>
                         <div id="teams-input-list"
                             style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px;">
                             <!-- Dynamically populated numbered inputs -->
@@ -4403,6 +4437,67 @@
         // ===================================================================================
         // --- ADMIN HELPERS ---
         const admin = {
+            // =======================================================================
+            // REGION: SPRÁVA POŘADÍ DRUŽSTEV (LOCK, REORDER, SWAP, SHUFFLE, DRAG&DROP)
+            // =======================================================================
+            teamsOrderLocked: true,
+
+            syncTeamsFromDOM: () => {
+                const teamInputs = document.querySelectorAll('.team-name-input');
+                teamInputs.forEach(input => {
+                    const id = input.dataset.id;
+                    const team = state.teams.find(t => t.id === id);
+                    if (team) {
+                        team.name = input.value.trim();
+                    }
+                });
+            },
+
+            toggleTeamsLock: () => {
+                admin.syncTeamsFromDOM();
+                admin.teamsOrderLocked = !admin.teamsOrderLocked;
+                admin.renderIdentityInputs();
+            },
+
+            moveTeam: (fromIndex, direction) => {
+                admin.syncTeamsFromDOM();
+                const toIndex = fromIndex + direction;
+                if (toIndex < 0 || toIndex >= state.teams.length) return;
+                const item = state.teams.splice(fromIndex, 1)[0];
+                state.teams.splice(toIndex, 0, item);
+                admin.onTeamsOrderChanged();
+            },
+
+            swapTeamPosition: (fromIndex, toIndex) => {
+                admin.syncTeamsFromDOM();
+                if (toIndex < 0 || toIndex >= state.teams.length || fromIndex === toIndex) return;
+                const temp = state.teams[fromIndex];
+                state.teams[fromIndex] = state.teams[toIndex];
+                state.teams[toIndex] = temp;
+                admin.onTeamsOrderChanged();
+            },
+
+            shuffleTeams: () => {
+                if (state.teams.length < 2) return;
+                if (!confirm("Opravdu chcete náhodně vylosovat pořadí družstev?")) return;
+                admin.syncTeamsFromDOM();
+                for (let i = state.teams.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [state.teams[i], state.teams[j]] = [state.teams[j], state.teams[i]];
+                }
+                admin.onTeamsOrderChanged();
+            },
+
+            onTeamsOrderChanged: () => {
+                admin.renderIdentityInputs();
+                admin.renderLogoSettings();
+                ui.updateNames();
+                ui.fillSelects();
+                admin.saveToStorage();
+                game.syncProjection();
+            },
+            // =======================================================================
+
             saveSettings: (showAlert = true) => {
                 if (state.isLoading) return;
                 state.tournamentName = document.getElementById('input-tournament-name').value;
@@ -4648,6 +4743,26 @@
             },
 
             renderIdentityInputs: () => {
+                // Update lock toolbar button state if present
+                const lockBtn = document.getElementById('btn-teams-lock');
+                const shuffleBtn = document.getElementById('btn-teams-shuffle');
+                if (lockBtn) {
+                    if (admin.teamsOrderLocked) {
+                        lockBtn.innerHTML = "🔒 Pořadí zamčeno";
+                        lockBtn.style.background = "#444";
+                        lockBtn.style.borderColor = "#666";
+                        lockBtn.style.color = "#fff";
+                    } else {
+                        lockBtn.innerHTML = "🔓 Pořadí odemčeno";
+                        lockBtn.style.background = "#ff9800";
+                        lockBtn.style.borderColor = "#e65100";
+                        lockBtn.style.color = "#000";
+                    }
+                }
+                if (shuffleBtn) {
+                    shuffleBtn.style.display = admin.teamsOrderLocked ? "none" : "inline-flex";
+                }
+
                 // Teams
                 const teamList = document.getElementById('teams-input-list');
                 teamList.innerHTML = "";
@@ -4925,7 +5040,187 @@
 
                 const label = document.createElement('span');
                 label.className = "identity-label";
-                label.innerText = (type === 'team' ? "Družstvo " : "Rozhodčí ") + (index + 1);
+
+                if (type === 'team' && !admin.teamsOrderLocked) {
+                    label.style.display = "flex";
+                    label.style.alignItems = "center";
+                    label.style.gap = "4px";
+                    label.style.width = "auto";
+                    label.style.minWidth = "120px";
+
+                    // 1. Drag Handle
+                    const dragHandle = document.createElement('span');
+                    dragHandle.className = "team-drag-handle";
+                    dragHandle.innerHTML = "&#x283f;"; // ⠿
+                    dragHandle.title = "Přetažením myší změníte pořadí družstva";
+                    dragHandle.style.cursor = "grab";
+                    dragHandle.style.fontSize = "1.2em";
+                    dragHandle.style.color = "#aaa";
+                    dragHandle.style.padding = "0 3px";
+                    dragHandle.style.userSelect = "none";
+                    dragHandle.style.lineHeight = "1";
+                    label.appendChild(dragHandle);
+
+                    // 2. Up / Down Arrows
+                    const arrowsDiv = document.createElement('div');
+                    arrowsDiv.style.display = "flex";
+                    arrowsDiv.style.flexDirection = "column";
+                    arrowsDiv.style.gap = "1px";
+
+                    const btnUp = document.createElement('button');
+                    btnUp.type = "button";
+                    btnUp.className = "small-btn";
+                    btnUp.innerText = "▲";
+                    btnUp.title = "Posunout o 1 nahoru";
+                    btnUp.style.padding = "0 3px";
+                    btnUp.style.fontSize = "0.6em";
+                    btnUp.style.lineHeight = "1";
+                    btnUp.style.minWidth = "15px";
+                    btnUp.style.height = "12px";
+                    btnUp.style.display = "flex";
+                    btnUp.style.alignItems = "center";
+                    btnUp.style.justifyContent = "center";
+                    if (index === 0) {
+                        btnUp.disabled = true;
+                        btnUp.style.opacity = "0.25";
+                        btnUp.style.cursor = "default";
+                    } else {
+                        btnUp.onclick = (e) => { e.stopPropagation(); admin.moveTeam(index, -1); };
+                    }
+
+                    const btnDown = document.createElement('button');
+                    btnDown.type = "button";
+                    btnDown.className = "small-btn";
+                    btnDown.innerText = "▼";
+                    btnDown.title = "Posunout o 1 dolů";
+                    btnDown.style.padding = "0 3px";
+                    btnDown.style.fontSize = "0.6em";
+                    btnDown.style.lineHeight = "1";
+                    btnDown.style.minWidth = "15px";
+                    btnDown.style.height = "12px";
+                    btnDown.style.display = "flex";
+                    btnDown.style.alignItems = "center";
+                    btnDown.style.justifyContent = "center";
+                    if (index === state.teams.length - 1) {
+                        btnDown.disabled = true;
+                        btnDown.style.opacity = "0.25";
+                        btnDown.style.cursor = "default";
+                    } else {
+                        btnDown.onclick = (e) => { e.stopPropagation(); admin.moveTeam(index, 1); };
+                    }
+
+                    arrowsDiv.appendChild(btnUp);
+                    arrowsDiv.appendChild(btnDown);
+                    label.appendChild(arrowsDiv);
+
+                    // 3. Position Select Dropdown (1..N) with automatic swap
+                    const posSelect = document.createElement('select');
+                    posSelect.className = "team-pos-select";
+                    posSelect.title = "Změnou čísla se družstvo automaticky prohodí s vybranou pozicí";
+                    posSelect.style.fontWeight = "bold";
+                    posSelect.style.padding = "2px 4px";
+                    posSelect.style.borderRadius = "3px";
+                    posSelect.style.background = "#222";
+                    posSelect.style.color = "#ffeb3b";
+                    posSelect.style.border = "1px solid #ff9800";
+                    posSelect.style.fontSize = "0.85em";
+                    posSelect.style.cursor = "pointer";
+
+                    for (let i = 0; i < state.teams.length; i++) {
+                        const opt = document.createElement('option');
+                        opt.value = i;
+                        opt.innerText = (i + 1) + ".";
+                        if (i === index) opt.selected = true;
+                        posSelect.appendChild(opt);
+                    }
+
+                    posSelect.onchange = (e) => {
+                        const targetIdx = parseInt(e.target.value);
+                        if (!isNaN(targetIdx) && targetIdx !== index) {
+                            admin.swapTeamPosition(index, targetIdx);
+                        }
+                    };
+                    label.appendChild(posSelect);
+
+                    // Text hint label
+                    const teamWord = document.createElement('span');
+                    teamWord.style.fontSize = "0.85em";
+                    teamWord.style.color = "#aaa";
+                    teamWord.style.marginLeft = "2px";
+                    teamWord.innerText = "Družstvo";
+                    label.appendChild(teamWord);
+
+                    // Drag & Drop event bindings on div
+                    div.dataset.index = index;
+
+                    dragHandle.onmouseenter = () => { div.draggable = true; };
+                    dragHandle.onmouseleave = () => { if (!div.classList.contains('is-dragging')) div.draggable = false; };
+
+                    div.addEventListener('dragstart', (e) => {
+                        admin.syncTeamsFromDOM();
+                        div.classList.add('is-dragging');
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', String(index));
+                        div.style.opacity = '0.4';
+                    });
+
+                    div.addEventListener('dragend', () => {
+                        div.classList.remove('is-dragging');
+                        div.draggable = false;
+                        div.style.opacity = '1';
+                        document.querySelectorAll('.team-identity-row').forEach(row => {
+                            row.classList.remove('drop-indicator-top', 'drop-indicator-bottom');
+                        });
+                    });
+
+                    div.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+
+                        document.querySelectorAll('.team-identity-row').forEach(row => {
+                            row.classList.remove('drop-indicator-top', 'drop-indicator-bottom');
+                        });
+
+                        const rect = div.getBoundingClientRect();
+                        const relY = e.clientY - rect.top;
+                        if (relY > rect.height / 2) {
+                            div.classList.add('drop-indicator-bottom');
+                        } else {
+                            div.classList.add('drop-indicator-top');
+                        }
+                    });
+
+                    div.addEventListener('dragleave', () => {
+                        div.classList.remove('drop-indicator-top', 'drop-indicator-bottom');
+                    });
+
+                    div.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        div.classList.remove('drop-indicator-top', 'drop-indicator-bottom');
+                        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                        if (isNaN(fromIdx) || fromIdx === index) return;
+
+                        let toIdx = index;
+                        const rect = div.getBoundingClientRect();
+                        const relY = e.clientY - rect.top;
+                        if (relY > rect.height / 2) {
+                            toIdx++;
+                        }
+                        if (fromIdx < toIdx) {
+                            toIdx--;
+                        }
+                        if (fromIdx !== toIdx) {
+                            const movedItem = state.teams.splice(fromIdx, 1)[0];
+                            state.teams.splice(toIdx, 0, movedItem);
+                            admin.onTeamsOrderChanged();
+                        }
+                    });
+                } else {
+                    label.innerText = (type === 'team' ? "Družstvo " : "Rozhodčí ") + (index + 1);
+                    if (type === 'team') {
+                        label.title = "Pořadí je uzamčeno zámečkem";
+                    }
+                }
                 div.appendChild(label);
 
                 if (type === 'team') {
@@ -4936,6 +5231,7 @@
                     input.value = item.name || "";
                     input.maxLength = 32;
                     input.style.flex = "1";
+                    input.setAttribute('draggable', 'false');
                     input.oninput = () => {
                         admin.sanitizeInput(input);
                         item.name = input.value;
@@ -4979,8 +5275,18 @@
                 const removeBtn = document.createElement('button');
                 removeBtn.className = "small-btn btn-red";
                 removeBtn.innerText = "x";
+                if (type === 'team' && admin.teamsOrderLocked) {
+                    removeBtn.title = "Pro odebrání družstva nejprve odemkněte zámeček pořadí";
+                    removeBtn.style.opacity = "0.6";
+                } else {
+                    removeBtn.title = "Smazat";
+                }
                 removeBtn.onclick = () => {
                     if (type === 'team') {
+                        if (admin.teamsOrderLocked) {
+                            alert("Pro odebrání družstva nejprve odemkněte zámeček (🔓) v záhlaví seznamu družstev.");
+                            return;
+                        }
                         // Check if team is used in schedule
                         const isUsed = state.schedule.some(m => m.type === 'match' && (m.home === item.id || m.guest === item.id));
                         if (isUsed) {
@@ -4988,6 +5294,7 @@
                                 return;
                             }
                         }
+                        admin.syncTeamsFromDOM();
                         state.teams = state.teams.filter(t => t.id !== item.id);
                     } else {
                         state.referees = state.referees.filter(r => r.id !== item.id);
@@ -5209,6 +5516,7 @@
             },
 
             addTeamSlot: () => {
+                admin.syncTeamsFromDOM();
                 const id = "team_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
                 state.teams.push({ id, name: "", playerIds: [] });
                 admin.renderIdentityInputs();
