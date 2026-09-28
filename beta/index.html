@@ -2496,7 +2496,7 @@
             <span id="admin-footer-license"
                 style="font-size:0.75em; padding:2px 6px; border-radius:4px; font-weight:bold; background:#333; color:#aaa; text-transform:uppercase;">...</span>
             <span id="admin-footer-session" onclick="admin.openCloudSessionsModal()"
-                style="font-weight:bold; color:var(--accent-blue); cursor:pointer;" title="Klikněte pro správu cloudových turnajů">---</span>
+                style="font-weight:bold; color:var(--accent-blue); cursor:pointer; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom;" title="Klikněte pro správu cloudových turnajů">---</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888;">&nbsp;&nbsp;&nbsp;&nbsp;-</span>
         </div>
         <div id="admin-footer-end">OmniScore (OmS)</div>
@@ -7850,7 +7850,7 @@
                     .trim()
                     .replace(/\s+/g, '-') // mezery na pomlčky
                     .replace(/[^a-zA-Z0-9_-]/g, '') // pouze bezpečné znaky pro Firebase a URL
-                    .substring(0, 32);
+                    .substring(0, 96);
             },
 
             renameCloudSessionTitle: async (targetId, currentName) => {
@@ -7896,15 +7896,15 @@
                     return;
                 }
 
-                const promptText = `Zadejte nový Kód relace (ID) pro turnaj:\n\n• Délka: 8 až 32 znaků\n• Povolené znaky: písmena (a-z, A-Z), číslice (0-9), pomlčka (-), podtržítko (_)\n• Příklad: 2026-liga-olomouc nebo cesky-pohar-2026\n\nAktuální kód: ${oldId}`;
+                const promptText = `Zadejte nový Kód relace (ID) pro turnaj:\n\n• Délka: 8 až 96 znaků\n• Povolené znaky: písmena (a-z, A-Z), číslice (0-9), pomlčka (-), podtržítko (_)\n• Příklad: 2026-liga-olomouc nebo cesky-pohar-2026\n\nAktuální kód: ${oldId}`;
                 const rawInput = window.prompt(promptText, oldId);
                 if (rawInput === null) return;
 
                 const newId = admin.sanitizeSessionId(rawInput);
                 if (newId === oldId) return;
 
-                if (newId.length < 8 || newId.length > 32) {
-                    alert(`Neplatná délka kódu relace: ${newId.length} znaků.\n\nVlastní kód relace musí mít délku 8 až 32 znaků a může obsahovat pouze písmena, číslice, pomlčku (-) a podtržítko (_).`);
+                if (newId.length < 8 || newId.length > 96) {
+                    alert(`Neplatná délka kódu relace: ${newId.length} znaků.\n\nVlastní kód relace musí mít délku 8 až 96 znaků a může obsahovat pouze písmena, číslice, pomlčku (-) a podtržítko (_).`);
                     return;
                 }
 
@@ -8033,10 +8033,10 @@
                                 <td style="padding:10px 8px; color:#bbb;">
                                     ${item.matchCount || 0} zápasů<br><small style="color:#777;">${item.teamCount || 0} týmů</small>
                                 </td>
-                                <td style="padding:10px 8px;">
+                                <td style="padding:10px 8px; max-width:240px;">
                                     <div style="display:flex; align-items:center; gap:6px;">
-                                        <code style="background:#222; padding:3px 6px; border-radius:4px; color:var(--accent-blue); font-weight:bold; font-size:1.05em;">${item.sessionId}</code>
-                                        <button class="small-btn" onclick="admin.changeCloudSessionId('${item.sessionId}')" style="padding:1px 5px; font-size:0.8em; background:#333; color:#aaa; border:1px solid #444; cursor:pointer;" title="Změnit kód relace (ID)">✏️</button>
+                                        <code style="background:#222; padding:3px 6px; border-radius:4px; color:var(--accent-blue); font-weight:bold; font-size:1.05em; word-break:break-all;">${item.sessionId}</code>
+                                        <button class="small-btn" onclick="admin.changeCloudSessionId('${item.sessionId}')" style="padding:1px 5px; font-size:0.8em; background:#333; color:#aaa; border:1px solid #444; cursor:pointer; flex-shrink:0;" title="Změnit kód relace (ID)">✏️</button>
                                     </div>
                                 </td>
                                 <td style="padding:10px 8px; font-size:0.85em; color:#888;">
@@ -8239,7 +8239,7 @@
                     }
 
                     const randomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-                    const promptText = `Založit nový turnaj?\n\nZadejte Kód relace (ID):\n• Ponechte navržený 5místný kód: ${randomId}\n• Nebo zadejte vlastní název o délce 8 až 32 znaků (např. 2026-liga-olomouc)\n\nStávající turnaj zůstane v cloudu bezpečně uložen.`;
+                    const promptText = `Založit nový turnaj?\n\nZadejte Kód relace (ID):\n• Ponechte navržený 5místný kód: ${randomId}\n• Nebo zadejte vlastní název o délce 8 až 96 znaků (např. 2026-liga-olomouc)\n\nStávající turnaj zůstane v cloudu bezpečně uložen.`;
                     const rawInput = window.prompt(promptText, randomId);
                     if (rawInput === null) return;
 
@@ -8248,8 +8248,8 @@
                         // Uživatel ponechal automatický 5místný kód
                     } else {
                         newId = admin.sanitizeSessionId(newId);
-                        if (newId.length < 8 || newId.length > 32) {
-                            alert(`Neplatná délka kódu relace: ${newId.length} znaků.\n\nVlastní kód relace musí mít délku 8 až 32 znaků a může obsahovat pouze písmena, číslice, pomlčku (-) a podtržítko (_).`);
+                        if (newId.length < 8 || newId.length > 96) {
+                            alert(`Neplatná délka kódu relace: ${newId.length} znaků.\n\nVlastní kód relace musí mít délku 8 až 96 znaků a může obsahovat pouze písmena, číslice, pomlčku (-) a podtržítko (_).`);
                             return;
                         }
                     }
@@ -9941,7 +9941,7 @@
 
             <div style="padding:12px 20px; background:#1c2430; border-bottom:1px solid #2b394d; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <div style="font-size:0.88em; color:#ddd;">
-                    Aktivní relace v tomto okně: <code id="cloud-active-session-id" style="color:var(--accent-green); background:#111; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:1.1em;">---</code>
+                    Aktivní relace v tomto okně: <code id="cloud-active-session-id" style="color:var(--accent-green); background:#111; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:1.1em; word-break:break-all;">---</code>
                 </div>
                 <div style="display:flex; gap:10px;">
                     <button class="small-btn btn-green" onclick="admin.saveCurrentSessionToCloud(true)" style="padding:6px 14px; font-weight:bold;" title="Uložit rozpracovaný turnaj do cloudu">
