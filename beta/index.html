@@ -1912,12 +1912,25 @@
                                     🌐 Hledat UCI-ID
                                 </a>
                             </div>
-                            <div style="display:flex; gap:5px;">
+                            <!-- Řádek: Synchronizace databáze hráčů -->
+                            <div style="display:flex; gap:5px; align-items:stretch;">
                                 <button class="small-btn" onclick="admin.updatePlayersFromCloud()"
-                                    title="Stáhne nejnovější globální databázi hráčů z Google Disku a synchronizuje ji s vaší hlavní lokální verzí."
-                                    style="background:#00a2ff; flex:1; font-weight:bold;">🔄 Aktualizovat databázi
-                                    hráčů</button>
-
+                                    title="Pokusí se automaticky stáhnout databázi hráčů z Google Disku. Pokud selže, použijte tlačítka vpravo."
+                                    style="background:#0077cc; white-space:nowrap;">🔄 Auto z cloudu</button>
+                                <a href="https://drive.google.com/drive/folders/19QCjd6wXCUj4qI0A12rtSv-1eVf-tfgA"
+                                    target="_blank"
+                                    class="small-btn"
+                                    title="Najděte soubor s databází hráčů s příponou .json a stáhněte ho do počítače."
+                                    style="background:#1a7f3c; display:flex; align-items:center; text-decoration:none; color:white; font-size:0.75em; padding:0 10px; white-space:nowrap;">
+                                    📁 Google Disk
+                                </a>
+                                <!-- Skrytý input pro výběr JSON souboru -->
+                                <input type="file" id="input-players-json-upload" accept=".json" style="display:none;"
+                                    onchange="admin.uploadPlayersFromFile(this)">
+                                <button class="small-btn"
+                                    title="Nahrajte do aplikace soubor s databází hráčů s příponou .json."
+                                    onclick="document.getElementById('input-players-json-upload').click()"
+                                    style="background:#555; white-space:nowrap;">📂 Nahrát JSON</button>
                             </div>
                         </div>
                     </div>
@@ -2375,14 +2388,7 @@
                             ID získáte z odkazu pro sdílení (např. 19QC...e1f3). Nastaveno správcem.
                         </small>
                     </div>
-                    <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
-                        <label>Ruční nahrání databáze (JSON)</label>
-                        <input type="file" id="input-manual-cloud-json" accept=".json" style="margin-bottom: 5px;">
-                        <button class="btn-full" onclick="admin.uploadManualCloudData()" style="background:var(--accent-blue); margin-top:0;">Nahrát vybraný soubor k synchronizaci</button>
-                        <small style="color:#888; font-size:0.75em; display:block; margin-top:4px;">
-                            Použijte, pokud automatická synchronizace nefunguje. Databáze se ověří úplně stejně jako z cloudu.
-                        </small>
-                    </div>
+
                     <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
                         <button class="btn-full" onclick="admin.exportPlayersWithPassword()"
                             title="Vytvoří zálohu vaší aktuální databáze hráčů do souboru. Vyžaduje heslo."
@@ -5746,33 +5752,38 @@
                 }
             },
 
+            // --- Nahrát JSON přímo z tlačítka v sekci Hráči (spouštěno přes onchange na skrytém inputu) ---
+            uploadPlayersFromFile: (inputEl) => {
+                if (!inputEl || !inputEl.files || inputEl.files.length === 0) return;
+                admin._processPlayerJsonFile(inputEl.files[0], () => { inputEl.value = ""; });
+            },
+
+            // --- Starší ruční nahrání z Nastavení aplikace (zachováno pro zpětnou kompatibilitu) ---
             uploadManualCloudData: async () => {
                 const input = document.getElementById('input-manual-cloud-json');
-                if (!input.files || input.files.length === 0) {
+                if (!input || !input.files || input.files.length === 0) {
                     alert("Vyberte prosím JSON soubor s databází.");
                     return;
                 }
+                admin._processPlayerJsonFile(input.files[0], () => { input.value = ""; });
+            },
 
-                const file = input.files[0];
+            // --- Sdílená pomocná funkce: načtení, validace a import JSON souboru s hráči ---
+            _processPlayerJsonFile: (file, onSuccess) => {
                 const reader = new FileReader();
-
                 reader.onload = async (e) => {
-                    let text = e.target.result;
-                    let imported = null;
-
+                    const text = e.target.result;
                     try {
                         const rawData = JSON.parse(text);
                         if (!Array.isArray(rawData)) throw new Error("Nahraný JSON není pole hráčů.");
 
-                        // VALIDATION & SANITIZATION (Identical to Cloud Sync)
-                        imported = rawData.map(item => {
+                        // VALIDACE A SANITACE — přebíráme pouze známá textová pole
+                        const sanitize = (str) => {
+                            if (typeof str !== 'string') return "";
+                            return str.replace(/[<>]/g, "").trim().substring(0, 100);
+                        };
+                        const imported = rawData.map(item => {
                             if (typeof item !== 'object' || item === null) return null;
-
-                            const sanitize = (str) => {
-                                if (typeof str !== 'string') return "";
-                                return str.replace(/[<>]/g, "").trim().substring(0, 100);
-                            };
-
                             return {
                                 id: sanitize(item.id) || ("player_" + Math.random().toString(36).substr(2, 9)),
                                 firstName: sanitize(item.firstName),
@@ -5783,19 +5794,14 @@
 
                         if (imported.length === 0) throw new Error("JSON neobsahuje žádné platné záznamy o hráčích.");
 
-                        // Reuse the existing conflict logic
                         admin.importPlayersData(imported);
-                        input.value = ""; // Reset input after success
+                        if (typeof onSuccess === 'function') onSuccess();
 
                     } catch (err) {
-                        alert("Chyba při zpracování nahraného JSON souboru: " + err.message);
+                        alert("Chyba při zpracování JSON souboru: " + err.message);
                     }
                 };
-
-                reader.onerror = () => {
-                    alert("Chyba při čtení souboru.");
-                };
-
+                reader.onerror = () => { alert("Chyba při čtení souboru."); };
                 reader.readAsText(file);
             },
 
