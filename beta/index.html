@@ -1832,11 +1832,11 @@
                     <div
                         style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 10px 0;">
                         <h4 style="margin: 0; border: none; padding: 0;">Bodování a Pravidla</h4>
-                        <label
-                            style="font-size: 0.75em; color: var(--accent-orange); display: flex; align-items: center; gap: 5px; cursor: pointer; background: #333; padding: 2px 8px; border-radius: 4px; border: 1px solid #444;">
-                            <input type="checkbox" id="rule-lock-toggle" onchange="admin.toggleRulesLock()"
-                                style="width: auto; margin: 0;"> 🔓 Upravit
-                        </label>
+                        <button id="btn-rules-lock" type="button" class="small-btn" onclick="admin.toggleRulesLock()"
+                            style="display: flex; align-items: center; gap: 4px; font-size: 0.8em; padding: 3px 8px; background: #444; border: 1px solid #666; color: #fff; cursor: pointer;"
+                            title="Uzamknout nebo odemknout úpravu pravidel a bodování">
+                            🔒 Zamčeno
+                        </button>
                     </div>
 
                     <div id="rules-container" style="opacity: 0.6; pointer-events: none; transition: all 0.3s ease;">
@@ -4619,17 +4619,39 @@
                 }
             },
 
-            toggleRulesLock: () => {
-                const unlocked = document.getElementById('rule-lock-toggle').checked;
+            rulesLocked: true,
+
+            toggleRulesLock: (explicitState = null) => {
+                if (explicitState !== null) {
+                    admin.rulesLocked = explicitState;
+                } else {
+                    admin.rulesLocked = !admin.rulesLocked;
+                }
+
+                const lockBtn = document.getElementById('btn-rules-lock');
+                if (lockBtn) {
+                    if (admin.rulesLocked) {
+                        lockBtn.innerHTML = "🔒 Zamčeno";
+                        lockBtn.style.background = "#444";
+                        lockBtn.style.borderColor = "#666";
+                        lockBtn.style.color = "#fff";
+                    } else {
+                        lockBtn.innerHTML = "🔓 Odemčeno";
+                        lockBtn.style.background = "#ff9800";
+                        lockBtn.style.borderColor = "#e65100";
+                        lockBtn.style.color = "#000";
+                    }
+                }
+
                 const container = document.getElementById('rules-container');
-                const inputs = container.querySelectorAll('input');
-
-                container.style.opacity = unlocked ? "1" : "0.6";
-                container.style.pointerEvents = unlocked ? "auto" : "none";
-
-                inputs.forEach(input => {
-                    input.disabled = !unlocked;
-                });
+                if (container) {
+                    container.style.opacity = admin.rulesLocked ? "0.6" : "1";
+                    container.style.pointerEvents = admin.rulesLocked ? "none" : "auto";
+                    const inputs = container.querySelectorAll('input');
+                    inputs.forEach(input => {
+                        input.disabled = admin.rulesLocked;
+                    });
+                }
             },
 
             formatTime: (totalSeconds) => {
@@ -7664,11 +7686,7 @@
                 }
 
                 // Ensure Rules are locked on load
-                const lockToggle = document.getElementById('rule-lock-toggle');
-                if (lockToggle) {
-                    lockToggle.checked = false;
-                    admin.toggleRulesLock();
-                }
+                admin.toggleRulesLock(true);
 
                 state.isLoading = false;
             },
@@ -8968,6 +8986,7 @@
                     if (isEvent) {
                         const durMin = Math.floor((m.duration || 600) / 60);
                         li.innerHTML = `
+                            <span class="match-drag-handle" title="Přetažením myší změníte pořadí" style="cursor: grab; font-size: 1.2em; color: #aaa; padding: 0 4px 0 0; user-select: none; flex-shrink: 0;">&#x283f;</span>
                             <div style="flex:1; display:grid; grid-template-columns: 120px 1fr 15px 1fr 60px 1fr; align-items:center; font-size:0.85em; gap:5px; padding-right:10px; overflow:hidden;">
                                 <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.title || "Událost"}</div>
                                 <div style="grid-column: 2 / 5; text-align:center; color:#aaa; white-space:nowrap;">⏱ ${durMin}m</div>
@@ -8978,6 +8997,7 @@
                     } else {
                         const matchNum = admin.getMatchNumber(idx, state.schedule);
                         li.innerHTML = `
+                            <span class="match-drag-handle" title="Přetažením myší změníte pořadí zápasu" style="cursor: grab; font-size: 1.2em; color: #aaa; padding: 0 4px 0 0; user-select: none; flex-shrink: 0;">&#x283f;</span>
                             <div style="flex:1; display:grid; grid-template-columns: 120px 1fr 15px 1fr 60px 1fr; align-items:center; font-size:0.85em; gap:5px; padding-right:10px; overflow:hidden;">
                                 <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${matchNum !== null ? matchNum + '.' : ''}</b> ${m.title}</div>
                                 <div style="text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
