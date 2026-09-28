@@ -7962,12 +7962,11 @@
                         const updated = item.lastUpdate ? new Date(item.lastUpdate).toLocaleString('cs-CZ') : "-";
 
                         html += `
-                            <tr style="border-bottom:1px solid #282828; ${isCurrent ? 'background:rgba(76,175,80,0.08);' : ''}">
+                            <tr style="border-bottom:1px solid #282828; ${isCurrent ? 'background:rgba(76,175,80,0.22); border-left:4px solid var(--accent-green);' : 'border-left:4px solid transparent;'}">
                                 <td style="padding:10px 8px; font-weight:bold; color:#fff;">
-                                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <div style="display:flex; align-items:center; gap:6px;">
                                         <span>${safeName}</span>
-                                        <button class="small-btn" onclick="admin.renameCloudSessionTitle('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="padding:1px 5px; font-size:0.8em; background:#333; color:#aaa; border:1px solid #444; cursor:pointer;" title="Upravit název turnaje">✏️</button>
-                                        ${isCurrent ? '<span style="background:var(--accent-green); color:#000; font-size:0.75em; padding:2px 6px; border-radius:3px; font-weight:bold;">AKTIVNÍ</span>' : ''}
+                                        <button class="small-btn" onclick="admin.renameCloudSessionTitle('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="padding:1px 5px; font-size:0.8em; background:#333; color:#aaa; border:1px solid #444; cursor:pointer; flex-shrink:0;" title="Upravit název turnaje">✏️</button>
                                     </div>
                                 </td>
                                 <td style="padding:10px 8px; color:#bbb;">
@@ -7986,7 +7985,7 @@
                                     ${updated}
                                 </td>
                                 <td style="padding:10px 8px; text-align:right; white-space:nowrap;">
-                                    ${isCurrent ? '' : `<button class="small-btn btn-green" onclick="admin.loadCloudSession('${item.sessionId}')" style="margin-right:6px;" title="Otevřít a načíst tento turnaj">📂 Otevřít</button>`}
+                                    ${isCurrent ? '<span style="display:inline-flex; align-items:center; gap:4px; margin-right:6px; background:var(--accent-green); color:#000; font-size:0.82em; padding:4px 9px; border-radius:4px; font-weight:bold; vertical-align:middle;">✓ AKTIVNÍ</span>' : `<button class="small-btn btn-green" onclick="admin.loadCloudSession('${item.sessionId}')" style="margin-right:6px;" title="Otevřít a načíst tento turnaj">📂 Otevřít</button>`}
                                     <button class="small-btn" onclick="admin.duplicateCloudSession('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="background:#5c3d99; color:#fff; margin-right:6px;" title="Vytvořit kopii tohoto turnaje">📋 Kopie</button>
                                     <button class="small-btn btn-red" onclick="admin.deleteCloudSession('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" title="Smazat z cloudu">🗑️ Smazat</button>
                                 </td>
