@@ -3198,6 +3198,18 @@
                         state.viewMode = modeView;
                         state.qrCyclingActive = qrActive;
 
+                        // --- INTERPOLACE ČASOMÍRY NA PO ---
+                        // Zaznamenáme místní čas příjmu a přijatý zbývající čas.
+                        // Lokální ticker pak počítá: receivedTimeLeft - (now - localReceivedAt) / 1000.
+                        // Tato metoda je zcela nezávislá na synchronizaci hodin mezi zařízeními.
+                        if (state.timer && state.timer.running) {
+                            state._localReceivedAt = Date.now();
+                            state._localReceivedTimeLeft = state.timer.timeLeft;
+                        } else {
+                            state._localReceivedAt = 0;
+                            state._localReceivedTimeLeft = state.timer ? state.timer.timeLeft : 0;
+                        }
+
                         // Force restart cycle if enabled changed
                         if (qrEnabledChanged) {
                             if (state.qrCyclingEnabled) {
@@ -3256,20 +3268,16 @@
                         });
                     }, 1000);
 
-                    // Lokální plynulý odpočet zápasového času v PO (zcela nezávislý na zatížení či uspání OO)
+                    // Lokální plynulý odpočet zápasového času v PO
+                    // Metoda: receivedTimeLeft - (now - _localReceivedAt) / 1000
+                    // Zcela nezávislá na synchronizaci hodin mezi zařízeními.
                     setInterval(() => {
                         const usedState = (state.poTransitionActive && state.poTransitionData) ? state.poTransitionData : state;
-                        if (usedState && usedState.timer && usedState.timer.running && (usedState.timer.serverTargetEndTime > 0 || usedState.timer.targetEndTime > 0)) {
+                        if (usedState && usedState.timer && usedState.timer.running && usedState._localReceivedAt > 0) {
                             const timerEl = document.getElementById('p-timer');
                             if (timerEl) {
-                                let remMs;
-                                if (usedState.timer.serverTargetEndTime) {
-                                    const currentServerTime = Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0);
-                                    remMs = usedState.timer.serverTargetEndTime - currentServerTime;
-                                } else {
-                                    remMs = usedState.timer.targetEndTime - Date.now();
-                                }
-                                const timeLeft = Math.max(0, Math.ceil(remMs / 1000));
+                                const elapsed = (Date.now() - usedState._localReceivedAt) / 1000;
+                                const timeLeft = Math.max(0, Math.ceil(usedState._localReceivedTimeLeft - elapsed));
                                 const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                                 const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
                                 const timeFormatted = m + ":" + s;
@@ -3415,7 +3423,6 @@
 
                     if (remainingMs <= 0) {
                         state.timer.timeLeft = 0;
-                        state.timer.serverTargetEndTime = 0;
                         game.toggleTimer(); // Stop at 0
 
                         // Play signal only for 1. Poločas (1) and 2. Poločas (3)
@@ -3442,7 +3449,6 @@
                     requestScreenWakeLock();
                     state.timer.lastTick = Date.now();
                     state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
-                    state.timer.serverTargetEndTime = (Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0)) + (state.timer.timeLeft * 1000);
 
                     const isVoulat = (state.currentMatch.phaseIndex === 1 || state.currentMatch.phaseIndex === 3);
 
@@ -3477,7 +3483,6 @@
                     // When pausing, store the exact remaining time (plus the 1ms offset to avoid drift on resume)
                     const remainingMs = state.timer.targetEndTime - Date.now();
                     state.timer.timeLeft = Math.max(0, (remainingMs + 1) / 1000);
-                    state.timer.serverTargetEndTime = 0;
                 }
                 ui.updateTimerBtn();
                 game.syncProjection(true);
@@ -3497,7 +3502,6 @@
                     state.timer.timeLeft = state.times[currentPhase.timeKey];
                 }
                 state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
-                state.timer.serverTargetEndTime = (Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0)) + (state.timer.timeLeft * 1000);
 
                 ui.updateTimer();
                 ui.updateTimerBtn();
@@ -3509,11 +3513,6 @@
                 if (state.timer.timeLeft < 0) state.timer.timeLeft = 0;
                 if (state.timer.running) {
                     state.timer.targetEndTime += (seconds * 1000);
-                    if (state.timer.serverTargetEndTime) {
-                        state.timer.serverTargetEndTime += (seconds * 1000);
-                    } else {
-                        state.timer.serverTargetEndTime = (Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0)) + (state.timer.timeLeft * 1000);
-                    }
                 }
                 ui.updateTimer();
                 game.syncProjection(true);
@@ -3561,7 +3560,6 @@
                     state.timer.timeLeft = Math.min(3599, totalSeconds); // Max 59:59
                     if (state.timer.running) {
                         state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
-                        state.timer.serverTargetEndTime = (Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0)) + (state.timer.timeLeft * 1000);
                     }
                 }
 
@@ -9486,16 +9484,14 @@
 
                     const timerEl = document.getElementById('p-timer');
                     if (timerEl) {
-                        let timeLeft = Math.ceil(usedState.timer.timeLeft);
-                        if (usedState.timer && usedState.timer.running && (usedState.timer.serverTargetEndTime > 0 || usedState.timer.targetEndTime > 0)) {
-                            let remMs;
-                            if (usedState.timer.serverTargetEndTime) {
-                                const currentServerTime = Date.now() + (typeof fbServerOffset === 'number' ? fbServerOffset : 0);
-                                remMs = usedState.timer.serverTargetEndTime - currentServerTime;
-                            } else {
-                                remMs = usedState.timer.targetEndTime - Date.now();
-                            }
-                            timeLeft = Math.max(0, Math.ceil(remMs / 1000));
+                        let timeLeft;
+                        // Pokud čas běží a máme zaznamenán čas příjmu, interpolujeme plynule
+                        if (usedState.timer && usedState.timer.running && usedState._localReceivedAt > 0) {
+                            const elapsed = (Date.now() - usedState._localReceivedAt) / 1000;
+                            timeLeft = Math.max(0, Math.ceil(usedState._localReceivedTimeLeft - elapsed));
+                        } else {
+                            // Čas stojí – zobrazit statickou hodnotu
+                            timeLeft = Math.ceil(usedState.timer ? usedState.timer.timeLeft : 0);
                         }
                         const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                         const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
