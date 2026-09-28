@@ -3789,6 +3789,7 @@
                     ? Math.max(0, (state.timer.targetEndTime - Date.now()) / 1000)
                     : Math.max(0, state.timer.timeLeft || 0);
 
+                const totalItems = (state.schedule || []).length;
                 const mCurrent = (currentIdx !== -1) ? state.schedule[currentIdx] : (totalItems === 0 ? state.currentMatch : null);
 
                 if (mCurrent) {
