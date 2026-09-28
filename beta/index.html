@@ -5061,58 +5061,6 @@
                     dragHandle.style.lineHeight = "1";
                     label.appendChild(dragHandle);
 
-                    // 2. Up / Down Arrows
-                    const arrowsDiv = document.createElement('div');
-                    arrowsDiv.style.display = "flex";
-                    arrowsDiv.style.flexDirection = "column";
-                    arrowsDiv.style.gap = "1px";
-
-                    const btnUp = document.createElement('button');
-                    btnUp.type = "button";
-                    btnUp.className = "small-btn";
-                    btnUp.innerText = "▲";
-                    btnUp.title = "Posunout o 1 nahoru";
-                    btnUp.style.padding = "0 3px";
-                    btnUp.style.fontSize = "0.6em";
-                    btnUp.style.lineHeight = "1";
-                    btnUp.style.minWidth = "15px";
-                    btnUp.style.height = "12px";
-                    btnUp.style.display = "flex";
-                    btnUp.style.alignItems = "center";
-                    btnUp.style.justifyContent = "center";
-                    if (index === 0) {
-                        btnUp.disabled = true;
-                        btnUp.style.opacity = "0.25";
-                        btnUp.style.cursor = "default";
-                    } else {
-                        btnUp.onclick = (e) => { e.stopPropagation(); admin.moveTeam(index, -1); };
-                    }
-
-                    const btnDown = document.createElement('button');
-                    btnDown.type = "button";
-                    btnDown.className = "small-btn";
-                    btnDown.innerText = "▼";
-                    btnDown.title = "Posunout o 1 dolů";
-                    btnDown.style.padding = "0 3px";
-                    btnDown.style.fontSize = "0.6em";
-                    btnDown.style.lineHeight = "1";
-                    btnDown.style.minWidth = "15px";
-                    btnDown.style.height = "12px";
-                    btnDown.style.display = "flex";
-                    btnDown.style.alignItems = "center";
-                    btnDown.style.justifyContent = "center";
-                    if (index === state.teams.length - 1) {
-                        btnDown.disabled = true;
-                        btnDown.style.opacity = "0.25";
-                        btnDown.style.cursor = "default";
-                    } else {
-                        btnDown.onclick = (e) => { e.stopPropagation(); admin.moveTeam(index, 1); };
-                    }
-
-                    arrowsDiv.appendChild(btnUp);
-                    arrowsDiv.appendChild(btnDown);
-                    label.appendChild(arrowsDiv);
-
                     // 3. Position Select Dropdown (1..N) with automatic swap
                     const posSelect = document.createElement('select');
                     posSelect.className = "team-pos-select";
@@ -6122,23 +6070,47 @@
             },
 
             generateScheduleFromTemplate: () => {
-                const templateId = document.getElementById('sched-template-select').value;
-                const template = SCHEDULE_TEMPLATES[templateId];
-                if (!template) return;
+                admin.syncTeamsFromDOM();
 
-                const count = template.teams;
-                if (state.teams.length < count) {
-                    alert(`Pro toto schéma je potřeba definovat alespoň ${count} družstev. Aktuálně jich máte ${state.teams.length}.`);
+                const templateSelect = document.getElementById('sched-template-select');
+                const templateId = templateSelect ? templateSelect.value : '';
+                const template = SCHEDULE_TEMPLATES[templateId];
+                if (!template) {
+                    alert("Vyberte prosím platný vzor rozpisu ze seznamu.");
                     return;
                 }
 
-                if (!auth.checkTrialLimit(template.matches.length)) return;
+                const count = template.teams;
+                if (!state.teams || state.teams.length < count) {
+                    const currentTeamsCount = state.teams ? state.teams.length : 0;
+                    alert(`Pro toto schéma je potřeba definovat alespoň ${count} družstev. Aktuálně jich máte v seznamu ${currentTeamsCount}.`);
+                    return;
+                }
 
-                // Always replace
+                // 1. Upozornění / Potvrzení před generováním
+                const hasExisting = state.schedule && state.schedule.length > 0;
+                const hasResults = hasExisting && state.schedule.some(m => m.type === 'match' && (m.homeScore !== null && m.homeScore !== undefined || m.guestScore !== null && m.guestScore !== undefined));
+
+                let confirmMsg = `Opravdu chcete vygenerovat nový rozpis pro ${count} družstev podle vybraného vzoru?`;
+                if (hasResults) {
+                    confirmMsg += `\n\n⚠️ POZOR: V aktuálním rozpisu jsou již odehrané zápasy s výsledky! Vygenerováním nového rozpisu budou všechny stávající zápasy a jejich výsledky SMAZÁNY!`;
+                } else if (hasExisting) {
+                    confirmMsg += `\n\nPozor: Stávající rozpis zápasů bude smazán a nahrazen novým podle aktuálního pořadí družstev.`;
+                }
+                if (!confirm(confirmMsg)) return;
+
+                // 2. TRIAL kontrola (počítá se pouze nově generovaný rozpis, protože starý se maže)
+                if (typeof auth !== 'undefined' && typeof auth.isLicensed === 'function' && !auth.isLicensed()) {
+                    if (template.matches.length > 10) {
+                        alert(`Režim TRIAL je omezen na maximálně 10 zápasů.\nTento vzor obsahuje ${template.matches.length} zápasů.\n\nPro neomezený počet zápasů si prosím zakupte roční licenci.`);
+                        return;
+                    }
+                }
+
+                // 3. Vytvoření nového rozpisu
                 state.schedule = [];
                 state.activeMatchIndex = -1;
 
-                const startIdx = state.schedule.length;
                 const pairs = template.matches;
                 const defaultDuration = (state.times.play * 2) + state.times.break;
                 const refsPerMatch = template.refsPerMatch || 1;
@@ -6148,21 +6120,23 @@
                     // Resolve home team
                     let home = pair[0];
                     if (typeof home === 'number') {
-                        home = state.teams[home - 1].id;
+                        const t = state.teams[home - 1];
+                        home = t ? t.id : `team_${home}`;
                     }
 
                     // Resolve guest team
                     let guest = pair[1];
                     if (typeof guest === 'number') {
-                        guest = state.teams[guest - 1].id;
+                        const t = state.teams[guest - 1];
+                        guest = t ? t.id : `team_${guest}`;
                     }
 
                     // Resolve title (optional 3rd element)
-                    const title = pair[2] || `Zápas ${startIdx + idx + 1}`;
+                    const title = pair[2] || `Zápas ${idx + 1}`;
 
                     // Assign Referees
                     let assignedRefs = [];
-                    if (state.referees.length > 0) {
+                    if (state.referees && state.referees.length > 0) {
                         for (let r = 0; r < refsPerMatch; r++) {
                             const ref = state.referees[(refIdx + r) % state.referees.length];
                             if (ref) assignedRefs.push(ref.id);
@@ -6183,27 +6157,17 @@
                     });
                 });
 
-                // CLEANUP: Keep only used identities and their assets
-                const usedTeamIds = new Set(state.schedule.filter(m => m.type === 'match').flatMap(m => [m.home, m.guest]));
-                const usedRefIds = new Set(state.schedule.filter(m => m.type === 'match').map(m => m.referee));
-
-                state.teams = state.teams.filter(t => usedTeamIds.has(t.id));
-                state.referees = state.referees.filter(r => usedRefIds.has(r.id));
-
-                Object.keys(state.teamLogos).forEach(id => {
-                    if (!usedTeamIds.has(id)) delete state.teamLogos[id];
-                });
-                Object.keys(state.teamAnthems).forEach(id => {
-                    if (!usedTeamIds.has(id)) delete state.teamAnthems[id];
-                });
-
-                admin.saveSettings(false); // Silent save
+                // Uložení do úložiště a kompletní překreslení všech návazností
+                admin.saveToStorage();
+                ui.fillSelects();
                 ui.renderSchedule();
-                admin.renderIdentityInputs(); // Refresh lists
-                admin.renderLogoSettings();   // Refresh logo section
-                game.syncProjection();
-                game.syncProjection();
-                alert(`Rozpis pro ${count} družstev byl vygenerován.`);
+                admin.renderIdentityInputs();
+                admin.renderLogoSettings();
+                if (typeof ui.renderStandings === 'function') {
+                    ui.renderStandings();
+                }
+                game.syncProjection(true);
+                alert(`Rozpis pro ${count} družstev (${pairs.length} zápasů) byl úspěšně vygenerován podle aktuálního pořadí družstev.`);
             },
 
             addMatch: () => {
