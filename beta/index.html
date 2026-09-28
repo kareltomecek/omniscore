@@ -434,10 +434,20 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            cursor: move;
+            cursor: pointer;
             position: relative;
             /* Required for ::before positioning */
             transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .team-drag-handle,
+        .match-drag-handle {
+            cursor: grab;
+        }
+
+        .team-drag-handle:active,
+        .match-drag-handle:active {
+            cursor: grabbing;
         }
 
         .match-item.drop-indicator-top::before,
@@ -8650,20 +8660,33 @@
                     li.style.display = "flex";
                     li.style.alignItems = "center";
                     li.style.padding = "5px 10px";
-                    li.draggable = true;
+                    li.draggable = false;
                     li.dataset.index = idx;
 
                     li.innerHTML = `
-                        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:move;">${track.name}</span>
+                        <span class="match-drag-handle" title="Přetažením myší změníte pořadí skladby" style="cursor: grab; font-size: 1.2em; color: #aaa; padding: 0 6px 0 0; user-select: none; flex-shrink: 0;">&#x283f;</span>
+                        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;">${track.name}</span>
                         <span style="font-size:1.2em; cursor:pointer;" onclick="event.stopPropagation(); music.play(${idx})">${idx === currentMusicIndex && !currentMusicAudio.paused ? '♫' : '▶'}</span>
                     `;
 
+                    // Drag pouze přes úchyt ⠿
+                    const dragHandle = li.querySelector('.match-drag-handle');
+                    if (dragHandle) {
+                        dragHandle.onmouseenter = () => { li.draggable = true; };
+                        dragHandle.onmouseleave = () => { if (!li.classList.contains('is-dragging')) li.draggable = false; };
+                    }
+
                     // Drag & Drop
                     li.addEventListener('dragstart', (e) => {
+                        li.classList.add('is-dragging');
                         e.dataTransfer.setData('text/plain', idx);
                         li.style.opacity = '0.5';
                     });
-                    li.addEventListener('dragend', () => li.style.opacity = '1');
+                    li.addEventListener('dragend', () => {
+                        li.classList.remove('is-dragging');
+                        li.draggable = false;
+                        li.style.opacity = '1';
+                    });
                     li.addEventListener('dragover', (e) => {
                         e.preventDefault();
                         li.classList.add('drag-over');
@@ -8679,7 +8702,10 @@
                         }
                     });
 
-                    li.onclick = () => music.play(idx);
+                    li.onclick = (e) => {
+                        if (e.target.closest('.match-drag-handle')) return;
+                        music.play(idx);
+                    };
                     list.appendChild(li);
                 });
             },
@@ -8881,9 +8907,9 @@
                 state.schedule.forEach((m, idx) => {
                     const li = document.createElement('li');
                     li.className = "match-item";
-                    li.draggable = true;
+                    li.draggable = false;
                     li.dataset.index = idx;
-                    li.title = "Dvojklik pro editaci, Tažením změň pořadí";
+                    li.title = "Klik pro označení, dvojklik pro editaci";
 
                     // Double Click to Edit
                     li.addEventListener('dblclick', (e) => {
@@ -8892,6 +8918,7 @@
 
                     // Drag Events
                     li.addEventListener('dragstart', (e) => {
+                        li.classList.add('is-dragging');
                         // If we are dragging an item that's part of a selection, move the whole selection
                         // If not, select just this item and move it
                         if (!state.selectedIndices.includes(idx)) {
@@ -8909,7 +8936,9 @@
                         li.style.opacity = '0.5';
                     });
 
-                    li.addEventListener('dragend', (e) => {
+                    li.addEventListener('dragend', () => {
+                        li.classList.remove('is-dragging');
+                        li.draggable = false;
                         li.style.opacity = '1';
                         // Remove drop indicator styles from all items
                         document.querySelectorAll('.match-item').forEach(item => {
@@ -9013,7 +9042,15 @@
                         `;
                     }
 
+                    const dragHandle = li.querySelector('.match-drag-handle');
+                    if (dragHandle) {
+                        dragHandle.onmouseenter = () => { li.draggable = true; };
+                        dragHandle.onmouseleave = () => { if (!li.classList.contains('is-dragging')) li.draggable = false; };
+                    }
+
                     li.onclick = (e) => {
+                        // Neklikat výběr při kliku na úchyt přetahování
+                        if (e.target.closest('.match-drag-handle')) return;
                         admin.toggleSelection(idx, e.shiftKey, e.ctrlKey);
                     };
 
