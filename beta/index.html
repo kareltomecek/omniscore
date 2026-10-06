@@ -3991,10 +3991,12 @@
                 // Vyřadíme objemná data, která PO ani veřejná zobrazení nepotřebují (MP3 znělky v base64, globální databázi hráčů apod.)
                 // Tím se objem dat zmenší z desítek megabajtů na jednotky kilobajtů a zamezí se zasekávání hlavního vlákna a tlačítek gólů.
                 const { teamAnthems, masterPlayers, musicPlaylist, ...lightState } = state;
+                const tempVip = auth.getTempVIPInfo();
                 const payload = { 
                     ...lightState, 
                     telemetry: game.getTelemetry(),
-                    ownerUid: (auth.currentUser ? auth.currentUser.uid : null)
+                    ownerUid: (auth.currentUser ? auth.currentUser.uid : null),
+                    adminToken: (tempVip && tempVip.token ? tempVip.token : null)
                 };
                 const plainPayload = JSON.parse(JSON.stringify(payload));
 
@@ -5807,23 +5809,26 @@
                 const expiresAt = Date.now() + durationMs;
                 const sig = admin.computeTempVIPSig(expiresAt);
 
+                // Log into Firebase access log
+                const dbToken = await admin.computeDBToken(pass);
+
                 const tempVipData = {
                     expiresAt: expiresAt,
                     activatedAt: Date.now(),
                     session: state.sessionId || "default",
-                    sig: sig
+                    sig: sig,
+                    token: dbToken
                 };
 
                 localStorage.setItem('oms_temp_vip', JSON.stringify(tempVipData));
 
-                // Log into Firebase access log
-                const dbToken = await admin.computeDBToken(pass);
                 admin.recordAdminAccess(dbToken, expiresAt);
 
                 input.value = "";
                 admin.updateAdminVipModalState();
                 if (typeof ui !== 'undefined' && ui.updateAdminFooter) ui.updateAdminFooter();
                 if (typeof auth !== 'undefined' && auth.updateUI) auth.updateUI();
+                if (typeof game !== 'undefined' && game.syncState) game.syncState(true);
 
                 alert("✅ Administrátorský VIP přístup byl úspěšně aktivován na 168 hodin (7 dní).");
             },
@@ -8101,8 +8106,29 @@
             // REGION: CLOUDOVÁ SPRÁVA RELACÍ A TURNAJŮ (FIREBASE CLOUD SESSIONS)
             // ===================================================================================
             _lastMetaSync: 0,
+
+            // Helper to get correct Firebase database path for sessions metadata
+            // Returns: { ref: DatabaseReference, isTempVIP: boolean, token: string|null }
+            getCloudSessionsDbRef: (subPath = "") => {
+                if (auth.currentUser) {
+                    const basePath = `users/${auth.currentUser.uid}/sessions`;
+                    const fullPath = subPath ? `${basePath}/${subPath}` : basePath;
+                    return { ref: firebase.database().ref(fullPath), isTempVIP: false, token: null };
+                }
+                const tempVip = auth.getTempVIPInfo();
+                if (tempVip && tempVip.token) {
+                    const basePath = `admin_vip_space/sessions`;
+                    const fullPath = subPath ? `${basePath}/${subPath}` : basePath;
+                    return { ref: firebase.database().ref(fullPath), isTempVIP: true, token: tempVip.token };
+                }
+                return null;
+            },
+
             updateUserSessionMetadataThrottled: (force = false) => {
-                if (typeof firebase === 'undefined' || !auth.currentUser || !auth.isLicensed()) return;
+                if (typeof firebase === 'undefined' || !auth.isLicensed()) return;
+                const cloudTarget = admin.getCloudSessionsDbRef(state.sessionId);
+                if (!cloudTarget) return;
+
                 const now = Date.now();
                 if (!force && (now - (admin._lastMetaSync || 0) < 30000)) return; // Throttling: max jednou za 30 s
                 admin._lastMetaSync = now;
@@ -8114,10 +8140,11 @@
                     tournamentDate: state.tournamentDate || "-",
                     matchCount: (state.schedule || []).filter(m => m.type === 'match').length,
                     teamCount: (state.teams || []).length,
-                    lastUpdate: Date.now()
+                    lastUpdate: Date.now(),
+                    ...(cloudTarget.isTempVIP ? { token: cloudTarget.token } : {})
                 };
 
-                firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${state.sessionId}`).set(meta)
+                cloudTarget.ref.set(meta)
                     .catch(e => console.warn("[Cloud] Metadata sync failed:", e));
             },
 
@@ -8126,8 +8153,8 @@
                     alert("Firebase není k dispozici.");
                     return;
                 }
-                if (!auth.currentUser) {
-                    alert("Pro správu cloudových turnajů se nejprve přihlaste přes Google účet.");
+                if (!auth.currentUser && !auth.isTempVIPActive()) {
+                    alert("Pro správu cloudových turnajů se přihlaste přes Google účet nebo aktivujte administrátorský VIP přístup.");
                     auth.login();
                     return;
                 }
@@ -8172,8 +8199,13 @@
             },
 
             renameCloudSessionTitle: async (targetId, currentName) => {
-                if (!auth.currentUser || !auth.isLicensed()) {
+                if (!auth.isLicensed()) {
                     alert("Pro úpravu turnaje se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+                const cloudTarget = admin.getCloudSessionsDbRef(targetId);
+                if (!cloudTarget) {
+                    alert("Chybí oprávnění pro správu cloudových turnajů.");
                     return;
                 }
 
@@ -8187,8 +8219,8 @@
                 if (finalTitle === currentName) return;
 
                 try {
-                    // Aktualizace v metadatech uživatele
-                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${targetId}/tournamentName`).set(finalTitle);
+                    // Aktualizace v metadatech uživatele / admin prostoru
+                    await cloudTarget.ref.child('tournamentName').set(finalTitle);
                     // Aktualizace v datech turnaje
                     await firebase.database().ref(`sessions/${targetId}/tournamentName`).set(finalTitle);
 
@@ -8209,8 +8241,13 @@
             },
 
             changeCloudSessionId: async (oldId) => {
-                if (!auth.currentUser || !auth.isLicensed()) {
+                if (!auth.isLicensed()) {
                     alert("Pro změnu kódu relace se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+                const oldCloudTarget = admin.getCloudSessionsDbRef(oldId);
+                if (!oldCloudTarget) {
+                    alert("Chybí oprávnění pro správu cloudových turnajů.");
                     return;
                 }
 
@@ -8243,20 +8280,25 @@
                     }
 
                     // 3. Načtení metadat ze starého ID
-                    const snapMeta = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${oldId}`).once('value');
+                    const snapMeta = await oldCloudTarget.ref.once('value');
                     const sourceMeta = snapMeta.val() || {};
 
                     // 4. Zápis pod nové ID
                     const now = Date.now();
                     const updatedData = { ...sourceData, sessionId: newId, lastUpdate: now };
                     const updatedMeta = { ...sourceMeta, sessionId: newId, lastUpdate: now };
+                    if (oldCloudTarget.isTempVIP) {
+                        updatedData.adminToken = oldCloudTarget.token;
+                        updatedMeta.token = oldCloudTarget.token;
+                    }
 
+                    const newCloudTarget = admin.getCloudSessionsDbRef(newId);
                     await firebase.database().ref('sessions/' + newId).set(updatedData);
-                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${newId}`).set(updatedMeta);
+                    await newCloudTarget.ref.set(updatedMeta);
 
                     // 5. Smazání starého ID
                     await firebase.database().ref('sessions/' + oldId).remove();
-                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${oldId}`).remove();
+                    await oldCloudTarget.ref.remove();
 
                     // 6. Pokud byl změněn právě aktivní turnaj v tomto okně
                     if (oldId === state.sessionId) {
@@ -8287,12 +8329,18 @@
             refreshCloudSessionsList: async () => {
                 const container = document.getElementById('cloud-sessions-list-container');
                 const infoEl = document.getElementById('cloud-sessions-user-info');
-                if (!container || !auth.currentUser) return;
+                if (!container) return;
+
+                const cloudTarget = admin.getCloudSessionsDbRef();
+                if (!cloudTarget) {
+                    container.innerHTML = '<div style="text-align:center; padding:30px; color:#aaa;">Pro správu turnajů se přihlaste přes Google nebo aktivujte administrátorský VIP.</div>';
+                    return;
+                }
 
                 container.innerHTML = '<div style="text-align:center; padding:30px; color:#aaa;">🔄 Načítám seznam turnajů z cloudu...</div>';
 
                 try {
-                    const snap = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions`).once('value');
+                    const snap = await cloudTarget.ref.once('value');
                     const sessionsMap = snap.val() || {};
                     const sessionKeys = Object.keys(sessionsMap);
 
@@ -8300,8 +8348,12 @@
                     const list = sessionKeys.map(k => sessionsMap[k]).sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
 
                     if (infoEl) {
-                        const userEmail = auth.currentUser.email || auth.currentUser.displayName || "Uživatel";
-                        infoEl.innerHTML = `Přihlášen: <b>${admin.escapeHtml(userEmail)}</b> | Využito: <b style="color:${list.length >= 20 ? 'var(--accent-red)' : 'var(--accent-green)'};">${list.length} / 20 turnajů</b>`;
+                        if (cloudTarget.isTempVIP) {
+                            infoEl.innerHTML = `Režim: <b style="color:var(--accent-green);">🔑 Administrátorský VIP prostor</b> | Využito: <b style="color:${list.length >= 20 ? 'var(--accent-red)' : 'var(--accent-green)'};">${list.length} / 20 turnajů</b>`;
+                        } else {
+                            const userEmail = auth.currentUser.email || auth.currentUser.displayName || "Uživatel";
+                            infoEl.innerHTML = `Přihlášen: <b>${admin.escapeHtml(userEmail)}</b> | Využito: <b style="color:${list.length >= 20 ? 'var(--accent-red)' : 'var(--accent-green)'};">${list.length} / 20 turnajů</b>`;
+                        }
                     }
 
                     if (list.length === 0) {
@@ -8383,14 +8435,19 @@
             },
 
             saveCurrentSessionToCloud: async (showFeedback = true) => {
-                if (typeof firebase === 'undefined' || !auth.currentUser || !auth.isLicensed()) {
+                if (typeof firebase === 'undefined' || !auth.isLicensed()) {
                     alert("Pro uložení do cloudu se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+                const cloudTarget = admin.getCloudSessionsDbRef();
+                if (!cloudTarget) {
+                    alert("Chybí oprávnění pro cloudovou správu turnajů.");
                     return;
                 }
 
                 try {
                     // Kontrola limitu 20 turnajů
-                    const snap = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions`).once('value');
+                    const snap = await cloudTarget.ref.once('value');
                     const userSessions = snap.val() || {};
                     const isExisting = !!userSessions[state.sessionId];
                     const currentCount = Object.keys(userSessions).length;
@@ -8446,9 +8503,14 @@
                 if (!confirm(`Opravdu chcete trvale smazat turnaj "${name || targetId}" z cloudu Firebase?\n\nTato akce je nevratná.`)) {
                     return;
                 }
+                const cloudTarget = admin.getCloudSessionsDbRef(targetId);
+                if (!cloudTarget) {
+                    alert("Chybí oprávnění pro cloudovou správu turnajů.");
+                    return;
+                }
 
                 try {
-                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${targetId}`).remove();
+                    await cloudTarget.ref.remove();
                     await firebase.database().ref(`sessions/${targetId}`).remove();
 
                     // Pokud byla smazána aktuálně otevřená relace, vygenerujeme nové čisté ID
@@ -8474,14 +8536,19 @@
 
             // --- DUPLIKACE CLOUDOVÉHO TURNAJE ---
             duplicateCloudSession: async (sourceId, sourceName) => {
-                if (!auth.currentUser || !auth.isLicensed()) {
+                if (!auth.isLicensed()) {
                     alert("Pro duplikaci turnaje se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+                const cloudTarget = admin.getCloudSessionsDbRef();
+                if (!cloudTarget) {
+                    alert("Chybí oprávnění pro cloudovou správu turnajů.");
                     return;
                 }
 
                 try {
                     // Kontrola limitu
-                    const snapMeta = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions`).once('value');
+                    const snapMeta = await cloudTarget.ref.once('value');
                     const userSessions = snapMeta.val() || {};
                     if (Object.keys(userSessions).length >= 20) {
                         alert("Dosáhli jste maximálního limitu 20 uložených turnajů.\n\nPro vytvoření kopie nejprve smažte některý starší turnaj ze seznamu.");
@@ -8515,7 +8582,8 @@
                         sessionId: newId,
                         tournamentName: finalName,
                         lastUpdate: Date.now(),
-                        ownerUid: auth.currentUser.uid
+                        ownerUid: (auth.currentUser ? auth.currentUser.uid : null),
+                        ...(cloudTarget.isTempVIP ? { adminToken: cloudTarget.token } : {})
                     };
 
                     // Uložit kopii do Firebase sessions a do metadat uživatele
@@ -8527,9 +8595,11 @@
                         tournamentDate: sourceData.tournamentDate || "-",
                         matchCount: (sourceData.schedule || []).filter(m => m.type === 'match').length,
                         teamCount: (sourceData.teams || []).length,
-                        lastUpdate: Date.now()
+                        lastUpdate: Date.now(),
+                        ...(cloudTarget.isTempVIP ? { token: cloudTarget.token } : {})
                     };
-                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${newId}`).set(meta);
+                    const newCloudTarget = admin.getCloudSessionsDbRef(newId);
+                    await newCloudTarget.ref.set(meta);
 
                     admin.refreshCloudSessionsList();
                     if (confirm(`Kopie turnaje "${finalName}" byla vytvořena!\n\nKód nové relace: ${newId}\n\nChcete přejít na tuto kopii a otevřít ji?`)) {
@@ -8543,13 +8613,18 @@
             },
 
             createNewCloudSession: async () => {
-                if (!auth.currentUser || !auth.isLicensed()) {
+                if (!auth.isLicensed()) {
                     alert("Pro založení nového cloudového turnaje se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+                const cloudTarget = admin.getCloudSessionsDbRef();
+                if (!cloudTarget) {
+                    alert("Chybí oprávnění pro cloudovou správu turnajů.");
                     return;
                 }
 
                 try {
-                    const snap = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions`).once('value');
+                    const snap = await cloudTarget.ref.once('value');
                     const userSessions = snap.val() || {};
                     const count = Object.keys(userSessions).length;
 
