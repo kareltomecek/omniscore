@@ -2493,8 +2493,9 @@
 
     <div id="admin-footer">
         <div style="display:flex; align-items:center; gap:10px;">
-            <span id="admin-footer-license"
-                style="font-size:0.75em; padding:2px 6px; border-radius:4px; font-weight:bold; background:#333; color:#aaa; text-transform:uppercase;">...</span>
+            <span id="admin-footer-license" onclick="admin.openAdminVipModal()"
+                style="font-size:0.75em; padding:2px 6px; border-radius:4px; font-weight:bold; background:#333; color:#aaa; text-transform:uppercase; cursor:pointer;"
+                title="Klikněte pro administrátorský VIP přístup">...</span>
             <span id="admin-footer-session" onclick="admin.openCloudSessionsModal()"
                 style="font-weight:bold; color:var(--accent-blue); cursor:pointer; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom;" title="Klikněte pro správu cloudových turnajů">---</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:32px;">-</span>
@@ -2831,6 +2832,35 @@
             isVIP: false,
             licenseData: null, // { isPaid: boolean, expiresAt: timestamp }
 
+            // Helper to check valid temporary VIP access (168h with signed token)
+            getTempVIPInfo: () => {
+                try {
+                    const raw = localStorage.getItem('oms_temp_vip');
+                    if (!raw) return null;
+                    const data = JSON.parse(raw);
+                    if (!data || !data.expiresAt || !data.sig) return null;
+                    const now = Date.now();
+                    if (now >= data.expiresAt) {
+                        localStorage.removeItem('oms_temp_vip');
+                        return null;
+                    }
+                    // Validate signature against admin target hash
+                    const expectedSig = admin.computeTempVIPSig(data.expiresAt);
+                    if (data.sig !== expectedSig) {
+                        console.warn("[Auth] Temp VIP signature mismatch!");
+                        localStorage.removeItem('oms_temp_vip');
+                        return null;
+                    }
+                    return data;
+                } catch (e) {
+                    return null;
+                }
+            },
+
+            isTempVIPActive: () => {
+                return !!auth.getTempVIPInfo();
+            },
+
             init: () => {
                 firebase.auth().onAuthStateChanged((user) => {
                     auth.currentUser = user;
@@ -2912,6 +2942,7 @@
             },
 
             getLicenseStatus: () => {
+                if (auth.isTempVIPActive()) return "temp-vip";
                 if (!auth.currentUser) return "not-logged-in";
                 if (auth.isVIP) return "vip";
 
@@ -2932,7 +2963,7 @@
 
             isLicensed: () => {
                 const status = auth.getLicenseStatus();
-                return status === 'paid' || status === 'vip' || status === 'paid-expires-soon';
+                return status === 'paid' || status === 'vip' || status === 'paid-expires-soon' || status === 'temp-vip';
             },
 
             checkTrialLimit: (newItemsCount = 1) => {
@@ -5687,6 +5718,23 @@
             // BAKED-IN PASSWORD HASHES
             _targetHash: "39a2c54c5bdaad1c10d81f97243bc7c4c90dbb1ed7c6526886dc243259dd0310",
             _fallbackHash: "fallback_5076cf47",
+            _dbLogSalt: "_oms_admin_log_salt_2026",
+
+            // Compute deterministic signature for localStorage temp VIP token
+            computeTempVIPSig: (expiresAt) => {
+                let s = expiresAt + ":" + admin._targetHash;
+                let h = 0;
+                for (let i = 0; i < s.length; i++) {
+                    h = ((h << 5) - h) + s.charCodeAt(i);
+                    h |= 0;
+                }
+                return "sig_" + Math.abs(h).toString(16);
+            },
+
+            // Compute salted DB token for Firebase rules write authorization
+            computeDBToken: async (pass) => {
+                return await admin._hash(pass + admin._dbLogSalt);
+            },
 
             // Reusable admin verification
             verifyAdminPassword: async () => {
@@ -5696,6 +5744,203 @@
                 if (hashed === admin._targetHash || hashed === admin._fallbackHash) return true;
                 alert("Špatné heslo. Přístup odepřen.");
                 return false;
+            },
+
+            // --- ADMIN TEMP VIP MANAGEMENT ---
+            openAdminVipModal: () => {
+                const modal = document.getElementById('modal-admin-vip');
+                if (!modal) return;
+                modal.style.display = 'flex';
+                admin.updateAdminVipModalState();
+                admin.loadAdminAccessLog();
+                const input = document.getElementById('input-admin-vip-password');
+                if (input) {
+                    input.value = "";
+                    input.focus();
+                }
+            },
+
+            closeAdminVipModal: () => {
+                const modal = document.getElementById('modal-admin-vip');
+                if (modal) modal.style.display = 'none';
+            },
+
+            updateAdminVipModalState: () => {
+                const activeBox = document.getElementById('admin-vip-active-box');
+                const loginBox = document.getElementById('admin-vip-login-box');
+                const timeRemEl = document.getElementById('admin-vip-time-remaining');
+                const info = auth.getTempVIPInfo();
+
+                if (info && info.expiresAt) {
+                    if (activeBox) activeBox.style.display = 'flex';
+                    if (loginBox) loginBox.style.display = 'none';
+                    if (timeRemEl) {
+                        const remMs = info.expiresAt - Date.now();
+                        const hours = Math.floor(remMs / (1000 * 60 * 60));
+                        const minutes = Math.floor((remMs % (1000 * 60 * 60)) / (1000 * 60));
+                        const expDateStr = new Date(info.expiresAt).toLocaleString('cs-CZ');
+                        timeRemEl.innerText = `Zbývá: ${hours} hod. ${minutes} min. (platné do ${expDateStr})`;
+                    }
+                } else {
+                    if (activeBox) activeBox.style.display = 'none';
+                    if (loginBox) loginBox.style.display = 'block';
+                }
+            },
+
+            activateTempVIP: async () => {
+                const input = document.getElementById('input-admin-vip-password');
+                if (!input) return;
+                const pass = input.value;
+                if (!pass) {
+                    alert("Zadejte prosím administrátorské heslo.");
+                    return;
+                }
+
+                const hashed = await admin._hash(pass);
+                if (hashed !== admin._targetHash && hashed !== admin._fallbackHash) {
+                    alert("Špatné administrátorské heslo. Přístup zamítnut.");
+                    return;
+                }
+
+                // 168 hours = 7 days validity
+                const durationMs = 168 * 60 * 60 * 1000;
+                const expiresAt = Date.now() + durationMs;
+                const sig = admin.computeTempVIPSig(expiresAt);
+
+                const tempVipData = {
+                    expiresAt: expiresAt,
+                    activatedAt: Date.now(),
+                    session: state.sessionId || "default",
+                    sig: sig
+                };
+
+                localStorage.setItem('oms_temp_vip', JSON.stringify(tempVipData));
+
+                // Log into Firebase access log
+                const dbToken = await admin.computeDBToken(pass);
+                admin.recordAdminAccess(dbToken, expiresAt);
+
+                input.value = "";
+                admin.updateAdminVipModalState();
+                if (typeof ui !== 'undefined' && ui.updateAdminFooter) ui.updateAdminFooter();
+                if (typeof auth !== 'undefined' && auth.updateUI) auth.updateUI();
+
+                alert("✅ Administrátorský VIP přístup byl úspěšně aktivován na 168 hodin (7 dní).");
+            },
+
+            revokeTempVIP: () => {
+                if (confirm("Opravdu chcete dočasný VIP přístup ukončit?")) {
+                    localStorage.removeItem('oms_temp_vip');
+                    admin.updateAdminVipModalState();
+                    if (typeof ui !== 'undefined' && ui.updateAdminFooter) ui.updateAdminFooter();
+                    if (typeof auth !== 'undefined' && auth.updateUI) auth.updateUI();
+                    alert("Dočasný VIP přístup byl ukončen.");
+                }
+            },
+
+            recordAdminAccess: (dbToken, expiresAt) => {
+                if (typeof firebase === 'undefined' || !firebase.database) return;
+                try {
+                    const ua = navigator.userAgent || "";
+                    let browser = "Neznámý";
+                    if (ua.includes("Firefox")) browser = "Firefox";
+                    else if (ua.includes("Edg")) browser = "Edge";
+                    else if (ua.includes("Chrome")) browser = "Chrome";
+                    else if (ua.includes("Safari")) browser = "Safari";
+
+                    let os = "Neznámý";
+                    if (ua.includes("Win")) os = "Windows";
+                    else if (ua.includes("Mac")) os = "macOS";
+                    else if (ua.includes("Android")) os = "Android";
+                    else if (ua.includes("Linux")) os = "Linux";
+                    else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
+
+                    const deviceInfo = `${os} / ${browser}`;
+                    const expStr = new Date(expiresAt).toLocaleString('cs-CZ');
+
+                    const entry = {
+                        timestamp: firebase.database.ServerValue.TIMESTAMP,
+                        clientTime: new Date().toLocaleString('cs-CZ'),
+                        session: state.sessionId || "default",
+                        device: deviceInfo,
+                        expiresAtFormatted: expStr,
+                        token: dbToken
+                    };
+
+                    firebase.database().ref('admin_access_log').push(entry, (err) => {
+                        if (err) {
+                            console.warn("[Admin Log] Zápis do logu se nezdařil:", err.message);
+                        } else {
+                            setTimeout(admin.loadAdminAccessLog, 800);
+                        }
+                    });
+                } catch (e) {
+                    console.warn("[Admin Log] Chyba při odesílání logu:", e);
+                }
+            },
+
+            loadAdminAccessLog: () => {
+                const container = document.getElementById('admin-vip-log-container');
+                if (!container) return;
+
+                if (typeof firebase === 'undefined' || !firebase.database) {
+                    container.innerHTML = '<div style="color:#aaa; text-align:center; padding:15px;">Firebase databáze není dostupná (offline režim).</div>';
+                    return;
+                }
+
+                container.innerHTML = '<div style="color:#888; text-align:center; padding:15px;">⏳ Načítám historii z Firebase...</div>';
+
+                firebase.database().ref('admin_access_log')
+                    .limitToLast(20)
+                    .once('value', (snap) => {
+                        if (!snap.exists()) {
+                            container.innerHTML = '<div style="color:#aaa; text-align:center; padding:15px;">Zatím žádné záznamy o přístupech.</div>';
+                            return;
+                        }
+
+                        const items = [];
+                        snap.forEach(child => {
+                            items.push({ id: child.key, ...child.val() });
+                        });
+
+                        // Reverse so latest is first
+                        items.reverse();
+
+                        let html = `
+                            <table style="width:100%; border-collapse:collapse; font-size:0.82em; color:#ddd;">
+                                <thead>
+                                    <tr style="border-bottom:1px solid #444; background:#222; text-align:left;">
+                                        <th style="padding:8px 10px; color:#aaa;">Čas aktivace</th>
+                                        <th style="padding:8px 10px; color:#aaa;">Turnaj (Relace)</th>
+                                        <th style="padding:8px 10px; color:#aaa;">Zařízení a systém</th>
+                                        <th style="padding:8px 10px; color:#aaa;">Platnost do</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        `;
+
+                        items.forEach((it, idx) => {
+                            const timeStr = it.timestamp ? new Date(it.timestamp).toLocaleString('cs-CZ') : (it.clientTime || "---");
+                            const sessStr = it.session || "---";
+                            const devStr = it.device || "---";
+                            const expStr = it.expiresAtFormatted || "168 hod";
+                            const bg = idx % 2 === 0 ? 'background:#181818;' : 'background:#1f1f1f;';
+
+                            html += `
+                                <tr style="${bg} border-bottom:1px solid #2a2a2a;">
+                                    <td style="padding:8px 10px; font-weight:bold; color:#70c0ff; white-space:nowrap;">${timeStr}</td>
+                                    <td style="padding:8px 10px; font-family:Consolas, monospace; color:#98c379;">${sessStr}</td>
+                                    <td style="padding:8px 10px; color:#bbb;">${devStr}</td>
+                                    <td style="padding:8px 10px; color:#aaa; white-space:nowrap;">${expStr}</td>
+                                </tr>
+                            `;
+                        });
+
+                        html += `</tbody></table>`;
+                        container.innerHTML = html;
+                    }, (err) => {
+                        container.innerHTML = `<div style="color:#e06c75; text-align:center; padding:15px;">Nepodařilo se načíst log: ${err.message}</div>`;
+                    });
             },
 
             exportPlayersWithPassword: async () => {
@@ -8764,7 +9009,18 @@
 
                 if (lic) {
                     const status = auth.getLicenseStatus();
-                    if (status === 'vip') {
+                    if (status === 'temp-vip') {
+                        const info = auth.getTempVIPInfo();
+                        let remStr = "";
+                        if (info && info.expiresAt) {
+                            const hoursLeft = Math.max(0, Math.round((info.expiresAt - Date.now()) / (1000 * 60 * 60)));
+                            const daysLeft = Math.floor(hoursLeft / 24);
+                            remStr = daysLeft > 0 ? ` (${daysLeft}d)` : ` (${hoursLeft}h)`;
+                        }
+                        lic.innerText = "VIP (Dočasný" + remStr + ")";
+                        lic.style.background = "var(--accent-green)";
+                        lic.style.color = "black";
+                    } else if (status === 'vip') {
                         lic.innerText = "VIP Access";
                         lic.style.background = "var(--accent-green)";
                         lic.style.color = "black";
@@ -10041,6 +10297,70 @@
                     Každý účet má limit maximálně 20 uložených relací. Smazáním uvolníte místo pro další turnaje.
                 </div>
                 <button class="small-btn btn-yellow" onclick="admin.closeCloudSessionsModal()" style="padding:6px 20px;">Zavřít</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Temp VIP Modal -->
+    <div id="modal-admin-vip" class="modal-overlay"
+        style="display:none; z-index: 10000; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); align-items:center; justify-content:center;">
+        <div style="background:var(--bg-dark); border:1px solid #444; width:94%; max-width:850px; max-height:88vh; border-radius:8px; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+            <!-- Modal Header -->
+            <div style="padding:16px 20px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h3 style="margin:0; color:var(--accent-green); display:flex; align-items:center; gap:8px;">
+                        🔑 Administrátorský VIP přístup
+                    </h3>
+                    <div style="font-size:0.82em; color:#aaa; margin-top:4px;">
+                        Dočasná aktivace plného VIP režimu na 168 hodin (7 dní) bez nutnosti přihlášení k Google účtu.
+                    </div>
+                </div>
+                <button class="small-btn btn-yellow" onclick="admin.closeAdminVipModal()" style="font-size:1.1em; padding:4px 10px;">✕</button>
+            </div>
+
+            <!-- Current VIP Status / Form -->
+            <div style="padding:15px 20px; background:#1c2430; border-bottom:1px solid #2b394d;">
+                <div id="admin-vip-active-box" style="display:none; background:rgba(0,255,100,0.08); border:1px solid var(--accent-green); border-radius:6px; padding:12px 16px; margin-bottom:10px; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <div style="font-weight:bold; color:var(--accent-green); font-size:1em;">✅ Dočasný VIP režim je AKTIVNÍ</div>
+                        <div id="admin-vip-time-remaining" style="font-size:0.85em; color:#ddd; margin-top:3px;">Zbývá: ...</div>
+                    </div>
+                    <button class="small-btn btn-red" onclick="admin.revokeTempVIP()" style="padding:6px 14px; font-weight:bold;">
+                        Ukončit VIP předčasně
+                    </button>
+                </div>
+
+                <div id="admin-vip-login-box">
+                    <label style="display:block; font-size:0.85em; color:#ccc; margin-bottom:6px;">Zadejte administrátorské heslo:</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="password" id="input-admin-vip-password" placeholder="•••••••••••••••••"
+                            style="flex:1; padding:8px 12px; background:#111; border:1px solid #555; color:#fff; border-radius:4px; font-size:14px;"
+                            onkeydown="if(event.key==='Enter') admin.activateTempVIP();">
+                        <button class="small-btn btn-green" onclick="admin.activateTempVIP()" style="padding:8px 16px; font-weight:bold; white-space:nowrap;">
+                            🚀 Aktivovat VIP (168 hod)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Access History Section -->
+            <div style="padding:10px 20px 4px 20px; display:flex; justify-content:space-between; align-items:center;">
+                <h4 style="margin:0; font-size:0.95em; color:#4da3ff;">📋 Historie přístupů (posledních 20 záznamů)</h4>
+                <button class="small-btn" onclick="admin.loadAdminAccessLog()" style="background:#333; color:#ccc; padding:3px 10px; font-size:0.8em;" title="Obnovit historii z databáze">
+                    🔄 Obnovit
+                </button>
+            </div>
+
+            <div id="admin-vip-log-container" style="flex:1; overflow-y:auto; padding:10px 20px 15px 20px;">
+                <div style="color:#888; font-size:0.85em; text-align:center; padding:20px;">Načítám záznamy...</div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="padding:10px 20px; border-top:1px solid #333; display:flex; justify-content:space-between; align-items:center; background:#1a1a1a; border-bottom-left-radius:8px; border-bottom-right-radius:8px;">
+                <div style="font-size:0.75em; color:#777;">
+                    Data z této historie jsou zabezpečena a lze je spravovat přímo v konzoli Firebase Realtime Database.
+                </div>
+                <button class="small-btn btn-yellow" onclick="admin.closeAdminVipModal()" style="padding:5px 18px;">Zavřít</button>
             </div>
         </div>
     </div>
