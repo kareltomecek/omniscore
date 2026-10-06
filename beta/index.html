@@ -8117,7 +8117,7 @@
                 }
                 const tempVip = auth.getTempVIPInfo();
                 if (tempVip && tempVip.token) {
-                    const basePath = `admin_vip_space/sessions`;
+                    const basePath = `users/admin_vip_master/sessions`;
                     const fullPath = subPath ? `${basePath}/${subPath}` : basePath;
                     return { ref: firebase.database().ref(fullPath), isTempVIP: true, token: tempVip.token };
                 }
