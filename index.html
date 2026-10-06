@@ -420,6 +420,34 @@
             color: white !important;
         }
 
+        /* Subtle Dark UI button styles for harmonious toolbars */
+        .btn-subtle {
+            background: #374151 !important;
+            border: 1px solid #4b5563 !important;
+            color: #e5e7eb !important;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+
+        .btn-subtle:hover {
+            background: #4b5563 !important;
+            border-color: #6b7280 !important;
+            color: #ffffff !important;
+        }
+
+        .btn-subtle-green {
+            background: #2e7d32 !important;
+            border: 1px solid #388e3c !important;
+            color: #ffffff !important;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .btn-subtle-green:hover {
+            background: #388e3c !important;
+            border-color: #4caf50 !important;
+        }
+
         /* List Styling */
         .match-list {
             list-style: none;
@@ -434,10 +462,20 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            cursor: move;
+            cursor: pointer;
             position: relative;
             /* Required for ::before positioning */
             transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .team-drag-handle,
+        .match-drag-handle {
+            cursor: grab;
+        }
+
+        .team-drag-handle:active,
+        .match-drag-handle:active {
+            cursor: grabbing;
         }
 
         .match-item.drop-indicator-top::before,
@@ -509,6 +547,26 @@
             gap: 5px;
             align-items: center;
             margin-bottom: 5px;
+            position: relative;
+        }
+
+        .team-identity-row.drop-indicator-top::before,
+        .team-identity-row.drop-indicator-bottom::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background-color: var(--accent-blue, #2196f3);
+            z-index: 10;
+        }
+
+        .team-identity-row.drop-indicator-top::before {
+            top: -2px;
+        }
+
+        .team-identity-row.drop-indicator-bottom::before {
+            bottom: -2px;
         }
 
         .identity-label {
@@ -1492,8 +1550,9 @@
                 <div class="center-panel">
                     <div id="match-info-display" style="color:#aaa; margin-bottom:5px; font-weight:bold;">-</div>
                     <div class="timer-display">
-                        <span id="main-timer" onblur="game.manualTimeEntry()"
-                            onkeydown="if(event.key==='Enter'){this.blur(); event.preventDefault();} else { return admin.restrictToNumbers(event); }">00:00</span>
+                        <span id="main-timer" contenteditable="true" onblur="game.manualTimeEntry()"
+                            onfocus="admin.selectTimerText(this)"
+                            onkeydown="if(event.key==='Enter'){this.blur(); event.preventDefault();} else { return admin.restrictToTime(event); }">00:00</span>
                         <div class="timer-arrows">
                             <button class="arrow-btn" id="btn-time-up" onclick="game.adjustTime(1)">▲</button>
                             <button class="arrow-btn" id="btn-time-down" onclick="game.adjustTime(-1)">▼</button>
@@ -1629,6 +1688,11 @@
                             <button class="btn-full" onclick="document.getElementById('input-sched-import').click()"
                                 style="background: var(--accent-green); color: #000; font-weight: bold; margin-top:0;">📂
                                 Vybrat soubor (Rozpis nebo Záloha)</button>
+
+                            <button class="btn-full" onclick="admin.openCloudSessionsModal()"
+                                style="background: #2b4b7c; color: #fff; font-weight: bold; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:8px;">
+                                ☁️ Cloudové turnaje na Firebase (Moje relace)
+                            </button>
 
                             <div
                                 style="margin-top:15px; font-size:0.8em; color:#ddd; background:rgba(0,0,0,0.2); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
@@ -1806,11 +1870,11 @@
                     <div
                         style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 10px 0;">
                         <h4 style="margin: 0; border: none; padding: 0;">Bodování a Pravidla</h4>
-                        <label
-                            style="font-size: 0.75em; color: var(--accent-orange); display: flex; align-items: center; gap: 5px; cursor: pointer; background: #333; padding: 2px 8px; border-radius: 4px; border: 1px solid #444;">
-                            <input type="checkbox" id="rule-lock-toggle" onchange="admin.toggleRulesLock()"
-                                style="width: auto; margin: 0;"> 🔓 Upravit
-                        </label>
+                        <button id="btn-rules-lock" type="button" class="small-btn" onclick="admin.toggleRulesLock()"
+                            style="display: flex; align-items: center; gap: 4px; font-size: 0.8em; padding: 3px 8px; background: #444; border: 1px solid #666; color: #fff; cursor: pointer;"
+                            title="Uzamknout nebo odemknout úpravu pravidel a bodování">
+                            🔒 Zamčeno
+                        </button>
                     </div>
 
                     <div id="rules-container" style="opacity: 0.6; pointer-events: none; transition: all 0.3s ease;">
@@ -1865,23 +1929,47 @@
                             <!-- Dynamically populated -->
                         </div>
                         <div style="display:flex; flex-direction:column; gap:8px;">
-                            <div style="display:flex; gap:5px;">
-                                <button class="small-btn btn-green" onclick="admin.addPlayerSlot()"
-                                    title="Přidá nový prázdný řádek pro zadání jména a UCI-ID hráče.">+ Přidat
-                                    hráče</button>
+                            <div style="display:flex; gap:6px;">
+                                <button class="small-btn btn-subtle-green" onclick="admin.addPlayerSlot()"
+                                    title="Přidá nový prázdný řádek pro zadání jména a UCI-ID hráče."
+                                    style="height:28px; padding:0 12px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; gap:5px; box-sizing:border-box;">
+                                    + Přidat hráče
+                                </button>
                                 <a href="https://portal.czechcyclingfederation.com/Racer" target="_blank"
-                                    class="small-btn"
+                                    class="small-btn btn-subtle"
                                     title="Otevře oficiální portál ČSC pro vyhledání UCI-ID podle jména."
-                                    style="background:#0056b3; display:flex; align-items:center; text-decoration:none; color:white; font-size:0.75em; padding:0 10px;">
+                                    style="height:28px; padding:0 12px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; gap:5px; box-sizing:border-box; text-decoration:none;">
                                     🌐 Hledat UCI-ID
                                 </a>
                             </div>
-                            <div style="display:flex; gap:5px;">
-                                <button class="small-btn" onclick="admin.updatePlayersFromCloud()"
-                                    title="Stáhne nejnovější globální databázi hráčů z Google Disku a synchronizuje ji s vaší hlavní lokální verzí."
-                                    style="background:#00a2ff; flex:1; font-weight:bold;">🔄 Aktualizovat databázi
-                                    hráčů</button>
-
+                            <!-- Sekce: Aktualizace hlavní databáze hráčů -->
+                            <div style="margin-top: 4px; border-top: 1px solid #374151; padding-top: 8px;">
+                                <div style="font-size: 0.78em; color: #9ca3af; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.3px;">
+                                    Aktualizace hlavní databáze hráčů
+                                </div>
+                                <div style="display:flex; gap:6px; align-items:stretch;">
+                                    <button class="small-btn btn-subtle" onclick="admin.updatePlayersFromCloud()"
+                                        title="Pokusí se automaticky stáhnout databázi hráčů z Google Disku. Pokud selže, použijte tlačítka vpravo."
+                                        style="flex:1; height:28px; padding:0 8px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:5px; box-sizing:border-box; white-space:nowrap;">
+                                        🔄 Cloud
+                                    </button>
+                                    <a href="https://drive.google.com/drive/folders/19QCjd6wXCUj4qI0A12rtSv-1eVf-tfgA"
+                                        target="_blank"
+                                        class="small-btn btn-subtle"
+                                        title="Najděte soubor s databází hráčů s příponou .json a stáhněte ho do počítače."
+                                        style="flex:1; height:28px; padding:0 8px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:5px; box-sizing:border-box; text-decoration:none; white-space:nowrap;">
+                                        📁 Google Disk
+                                    </a>
+                                    <!-- Skrytý input pro výběr JSON souboru -->
+                                    <input type="file" id="input-players-json-upload" accept=".json" style="display:none;"
+                                        onchange="admin.uploadPlayersFromFile(this)">
+                                    <button class="small-btn btn-subtle"
+                                        title="Nahrajte do aplikace soubor s databází hráčů s příponou .json."
+                                        onclick="document.getElementById('input-players-json-upload').click()"
+                                        style="flex:1; height:28px; padding:0 8px; font-size:0.8em; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:5px; box-sizing:border-box; white-space:nowrap;">
+                                        📂 Ze souboru
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1895,7 +1983,21 @@
                 </div>
                 <div id="acc-logos" class="accordion-content">
                     <div class="form-group">
-                        <label>Seznam Družstev</label>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:5px;">
+                            <label style="margin:0; font-weight:bold;">Seznam Družstev</label>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <button id="btn-teams-shuffle" type="button" class="small-btn btn-blue" onclick="admin.shuffleTeams()"
+                                    style="display:none; align-items:center; gap:4px; font-size:0.8em; padding:3px 8px;"
+                                    title="Náhodně vylosovat / promíchat pořadí družstev">
+                                    🎲 Vylosovat pořadí
+                                </button>
+                                <button id="btn-teams-lock" type="button" class="small-btn" onclick="admin.toggleTeamsLock()"
+                                    style="display:flex; align-items:center; gap:4px; font-size:0.8em; padding:3px 8px; background:#444; border:1px solid #666; cursor:pointer;"
+                                    title="Uzamknout nebo odemknout změnu pořadí družstev">
+                                    🔒 Pořadí zamčeno
+                                </button>
+                            </div>
+                        </div>
                         <div id="teams-input-list"
                             style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px;">
                             <!-- Dynamically populated numbered inputs -->
@@ -2056,20 +2158,11 @@
             <!-- 5. Unified Tables -->
             <div class="accordion">
                 <div class="accordion-header" onclick="toggleAccordion('acc-standings')">
-                    Tabulky <span>▼</span>
+                    Tabulka <span>▼</span>
                 </div>
                 <div id="acc-standings" class="accordion-content">
-                    <div class="tab-switcher"
-                        style="display: flex; gap: 5px; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 8px;">
-                        <button id="tab-btn-standings" class="small-btn" style="flex: 1;"
-                            onclick="admin.setStandingsTab('standings')"
-                            title="Zobrazit standardní tabulku s pořadím, body a skóre.">Pořadí</button>
-                        <button id="tab-btn-cross" class="small-btn" style="flex: 1;"
-                            onclick="admin.setStandingsTab('cross')"
-                            title="Zobrazit křížovou tabulku vzájemných zápasů.">Křížová</button>
-                    </div>
                     <div id="standings-container">
-                        <!-- Standard standings or Cross table will be rendered here -->
+                        <!-- Standings table will be rendered here -->
                     </div>
                 </div>
             </div>
@@ -2272,7 +2365,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="input-po-timer-size">Velikost času v projekci (PO)</label>
+                            <label for="input-po-timer-size">Velikost času v Projekci Skóre</label>
                             <select id="input-po-timer-size" onchange="admin.saveSettings(false)">
                                 <option value="small">Menší (-20 %)</option>
                                 <option value="standard" selected>Standardní (100 %)</option>
@@ -2334,14 +2427,7 @@
                             ID získáte z odkazu pro sdílení (např. 19QC...e1f3). Nastaveno správcem.
                         </small>
                     </div>
-                    <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
-                        <label>Ruční nahrání databáze (JSON)</label>
-                        <input type="file" id="input-manual-cloud-json" accept=".json" style="margin-bottom: 5px;">
-                        <button class="btn-full" onclick="admin.uploadManualCloudData()" style="background:var(--accent-blue); margin-top:0;">Nahrát vybraný soubor k synchronizaci</button>
-                        <small style="color:#888; font-size:0.75em; display:block; margin-top:4px;">
-                            Použijte, pokud automatická synchronizace nefunguje. Databáze se ověří úplně stejně jako z cloudu.
-                        </small>
-                    </div>
+
                     <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
                         <button class="btn-full" onclick="admin.exportPlayersWithPassword()"
                             title="Vytvoří zálohu vaší aktuální databáze hráčů do souboru. Vyžaduje heslo."
@@ -2409,8 +2495,9 @@
         <div style="display:flex; align-items:center; gap:10px;">
             <span id="admin-footer-license"
                 style="font-size:0.75em; padding:2px 6px; border-radius:4px; font-weight:bold; background:#333; color:#aaa; text-transform:uppercase;">...</span>
-            <span id="admin-footer-session" style="font-weight:bold; color:var(--accent-blue);">---</span>
-            <span id="admin-footer-progress" style="font-weight:bold; color:#888;">&nbsp;&nbsp;&nbsp;&nbsp;-</span>
+            <span id="admin-footer-session" onclick="admin.openCloudSessionsModal()"
+                style="font-weight:bold; color:var(--accent-blue); cursor:pointer; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom;" title="Klikněte pro správu cloudových turnajů">---</span>
+            <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:32px;">-</span>
         </div>
         <div id="admin-footer-end">OmniScore (OmS)</div>
         <div id="admin-footer-time">-</div>
@@ -2448,7 +2535,7 @@
                 <div id="p-upcoming-header">
                     <div></div>
                     <div style="text-align:center;">NÁSLEDUJE</div>
-                    <div style="text-align:right;">ROZHODČÍ</div>
+                    <div></div>
                 </div>
                 <div style="padding: 0 4vw; width: 100%; box-sizing: border-box;">
                     <table class="p-sched-table">
@@ -2594,7 +2681,7 @@
             "basic_5": {
                 name: "Pro 7 družstev",
                 teams: 7,
-                matches: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [5, 6, "Základní skupina"], [1, 7, "Základní skupina"], [2, 3, "Základní skupina"], [4, 5, "Základní skupina"], [6, 7, "Základní skupina"], [1, 3, "Základní skupina"], [2, 5, "Základní skupina"], [4, 7, "Základní skupina"], [1, 6, "Základní skupina"], [3, 5, "Základní skupina"], [2, 7, "Základní skupina"], [4, 6, "Zoladní skupina"], [1, 5, "Základní skupina"], [3, 7, "Základní skupina"], [2, 6, "Základní skupina"], [1, 4, "Základní skupina"], [5, 7, "Základní skupina"], [3, 6, "Základní skupina"], [2, 4, "Základní skupina"]]
+                matches: [[1, 2, "Základní skupina"], [3, 4, "Základní skupina"], [5, 6, "Základní skupina"], [1, 7, "Základní skupina"], [2, 3, "Základní skupina"], [4, 5, "Základní skupina"], [6, 7, "Základní skupina"], [1, 3, "Základní skupina"], [2, 5, "Základní skupina"], [4, 7, "Základní skupina"], [1, 6, "Základní skupina"], [3, 5, "Základní skupina"], [2, 7, "Základní skupina"], [4, 6, "Základní skupina"], [1, 5, "Základní skupina"], [3, 7, "Základní skupina"], [2, 6, "Základní skupina"], [1, 4, "Základní skupina"], [5, 7, "Základní skupina"], [3, 6, "Základní skupina"], [2, 4, "Základní skupina"]]
             },
             "basic_6": {
                 name: "Pro 8 družstev",
@@ -2659,7 +2746,8 @@
                 running: false,
                 timeLeft: 0,
                 lastTick: 0,
-                targetEndTime: 0
+                targetEndTime: 0,
+                serverTargetEndTime: 0
             },
             pendingEditIndex: -1, // Tracks which match is being edited
             schedule: [],
@@ -3050,7 +3138,8 @@
         // HERNÍ JÁDRO (GAME)
         // ===================================================================================
         // --- CORE LOGIC CLASS ---
-        // --- FIREBASE INITIALIZATION ---
+        // --- FIREBASE INITIALIZATION & SERVER TIME SYNCHRONIZATION ---
+        let fbServerOffset = 0;
         if (typeof firebase !== 'undefined' && typeof firebaseConfig !== 'undefined') {
             try {
                 if (!firebase.apps.length) {
@@ -3062,6 +3151,11 @@
 
                     // [ODSTRANĚNO] Automatické mazání při odpojení bylo nahrazeno Garbage Collectorem a ručním resetem pro vyšší bezpečnost dat.
                 }
+
+                // Posluchač pro přesnou synchronizaci času se servery Google Firebase pro eliminaci odchylek systémových hodin mezi zařízeními
+                firebase.database().ref('.info/serverTimeOffset').on('value', (snap) => {
+                    fbServerOffset = snap.val() || 0;
+                });
             } catch (e) { console.error("[Firebase] Initialization failed:", e); }
         }
 
@@ -3098,11 +3192,36 @@
                         // If qrCyclingEnabled was just toggled, ensure we pick it up immediately
                         const qrEnabledChanged = (state.qrCyclingEnabled !== receivedState.qrCyclingEnabled);
 
+                        // Zachováme stávající lokální loga, pokud v přijatém balíčku nejsou (odlehčený stream)
+                        const currentLogos = state.teamLogos || {};
+
                         Object.assign(state, receivedState);
+
+                        // Obnovíme loga, pokud nebyla v payloadu obsažena
+                        if (!receivedState.teamLogos && Object.keys(currentLogos).length > 0) {
+                            state.teamLogos = currentLogos;
+                        } else if (receivedState.teamLogos) {
+                            // Pokud dorazila nová loga, uložíme si je i do mezipaměti
+                            try {
+                                localStorage.setItem('oms_logos_' + state.sessionId, JSON.stringify(receivedState.teamLogos));
+                            } catch (e) { /* storage limit */ }
+                        }
 
                         state.isProjectionMode = modePO;
                         state.viewMode = modeView;
                         state.qrCyclingActive = qrActive;
+
+                        // --- INTERPOLACE ČASOMÍRY NA PO ---
+                        // Zaznamenáme místní čas příjmu a přijatý zbývající čas.
+                        // Lokální ticker pak počítá: receivedTimeLeft - (now - localReceivedAt) / 1000.
+                        // Tato metoda je zcela nezávislá na synchronizaci hodin mezi zařízeními.
+                        if (state.timer && state.timer.running) {
+                            state._localReceivedAt = Date.now();
+                            state._localReceivedTimeLeft = state.timer.timeLeft;
+                        } else {
+                            state._localReceivedAt = 0;
+                            state._localReceivedTimeLeft = state.timer ? state.timer.timeLeft : 0;
+                        }
 
                         // Force restart cycle if enabled changed
                         if (qrEnabledChanged) {
@@ -3124,12 +3243,33 @@
                     syncChannel.onmessage = (event) => handleSync(event.data);
                     window.addEventListener('message', (event) => handleSync(event.data));
 
+                    // Přednačtení log z mezipaměti prohlížeče (pokud existují)
+                    try {
+                        const cachedLogos = localStorage.getItem('oms_logos_' + state.sessionId);
+                        if (cachedLogos) {
+                            state.teamLogos = JSON.parse(cachedLogos);
+                        }
+                    } catch (e) { }
+
                     if (typeof firebase !== 'undefined') {
                         try {
+                            // 1. Živý odlehčený stav (bez log, každých 20s nebo při gólu)
                             const dbRef = firebase.database().ref('sessions/' + state.sessionId);
                             dbRef.on('value', (snapshot) => {
                                 const data = snapshot.val();
                                 if (data) handleSync(data);
+                            });
+
+                            // 2. Jednorázové stažení log pro PO (stáhne se jen 1x při otevření relace)
+                            firebase.database().ref('sessions/' + state.sessionId + '/teamLogos').once('value', (snap) => {
+                                const logos = snap.val();
+                                if (logos && Object.keys(logos).length > 0) {
+                                    state.teamLogos = Object.assign({}, state.teamLogos || {}, logos);
+                                    try {
+                                        localStorage.setItem('oms_logos_' + state.sessionId, JSON.stringify(state.teamLogos));
+                                    } catch (e) { }
+                                    ui.updateProjection();
+                                }
                             });
                         } catch (e) { console.error("Firebase sync error:", e); }
                     }
@@ -3162,14 +3302,16 @@
                         });
                     }, 1000);
 
-                    // Lokální plynulý odpočet zápasového času v PO (zcela nezávislý na zatížení či uspání OO)
+                    // Lokální plynulý odpočet zápasového času v PO
+                    // Metoda: receivedTimeLeft - (now - _localReceivedAt) / 1000
+                    // Zcela nezávislá na synchronizaci hodin mezi zařízeními.
                     setInterval(() => {
                         const usedState = (state.poTransitionActive && state.poTransitionData) ? state.poTransitionData : state;
-                        if (usedState && usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
+                        if (usedState && usedState.timer && usedState.timer.running && usedState._localReceivedAt > 0) {
                             const timerEl = document.getElementById('p-timer');
                             if (timerEl) {
-                                const remMs = usedState.timer.targetEndTime - Date.now();
-                                const timeLeft = Math.max(0, Math.floor(remMs / 1000));
+                                const elapsed = (Date.now() - usedState._localReceivedAt) / 1000;
+                                const timeLeft = Math.max(0, Math.ceil(usedState._localReceivedTimeLeft - elapsed));
                                 const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                                 const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
                                 const timeFormatted = m + ":" + s;
@@ -3298,7 +3440,7 @@
 
                 const now = Date.now();
                 const remainingMs = state.timer.targetEndTime - now;
-                const newTimeLeft = Math.max(0, Math.floor(remainingMs / 1000));
+                const newTimeLeft = Math.max(0, Math.ceil(remainingMs / 1000));
 
                 // Track play time accumulation
                 if (state.currentMatch.phaseIndex === 1 || state.currentMatch.phaseIndex === 3) {
@@ -3310,7 +3452,7 @@
                 const oldTimeLeft = state.timer.timeLeft;
 
                 // Update UI only if the second changed or we hit zero
-                if (newTimeLeft !== Math.floor(oldTimeLeft) || remainingMs <= 0) {
+                if (newTimeLeft !== Math.ceil(oldTimeLeft) || remainingMs <= 0) {
                     state.timer.timeLeft = Math.max(0, remainingMs / 1000);
 
                     if (remainingMs <= 0) {
@@ -3340,10 +3482,14 @@
                 if (state.timer.running) {
                     requestScreenWakeLock();
                     state.timer.lastTick = Date.now();
-                    // User preference: -1ms offset for "snappy" immediate second change
-                    state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000) - 1;
+                    state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
 
                     const isVoulat = (state.currentMatch.phaseIndex === 1 || state.currentMatch.phaseIndex === 3);
+
+                    // Pozastavit hudbu při spuštění odečtu v poločase
+                    if (isVoulat) {
+                        music.pauseAuto();
+                    }
 
                     // Prime signal audio for background playback (user interaction context)
                     if (signalAudio && signalAudio.getAttribute('src')) {
@@ -3408,18 +3554,49 @@
 
             manualTimeEntry: () => {
                 const el = document.getElementById('main-timer');
-                const val = el.textContent.trim();
-                const parts = val.split(':');
-                if (parts.length === 2) {
-                    const m = parseInt(parts[0]);
-                    const s = parseInt(parts[1]);
-                    if (!isNaN(m) && !isNaN(s)) {
-                        state.timer.timeLeft = (m * 60) + s;
-                        if (state.timer.running) {
-                            state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
-                        }
+                const raw = el.textContent.trim();
+
+                let totalSeconds = null;
+
+                // Normalize: replace dot with colon as separator
+                const normalized = raw.replace('.', ':');
+
+                if (normalized.includes(':')) {
+                    // Format: MM:SS or M:SS
+                    const parts = normalized.split(':');
+                    const m = parseInt(parts[0]) || 0;
+                    const s = parseInt(parts[1]) || 0;
+                    if (!isNaN(m) && !isNaN(s) && s < 60) {
+                        totalSeconds = (m * 60) + s;
+                    }
+                } else {
+                    // Pure digits only
+                    const digits = raw.replace(/\D/g, '');
+                    if (digits.length === 0) {
+                        // Nothing valid typed – restore display
+                    } else if (digits.length <= 2) {
+                        // 1-2 digits → whole minutes, e.g. "7" → 7:00, "15" → 15:00
+                        totalSeconds = parseInt(digits) * 60;
+                    } else if (digits.length === 3) {
+                        // 3 digits → M:SS, e.g. "730" → 7:30
+                        const m = parseInt(digits[0]);
+                        const s = parseInt(digits.slice(1));
+                        if (s < 60) totalSeconds = (m * 60) + s;
+                    } else {
+                        // 4+ digits → MM:SS, e.g. "2000" → 20:00, "0730" → 7:30
+                        const m = parseInt(digits.slice(0, digits.length - 2));
+                        const s = parseInt(digits.slice(-2));
+                        if (s < 60) totalSeconds = (m * 60) + s;
                     }
                 }
+
+                if (totalSeconds !== null && totalSeconds >= 0) {
+                    state.timer.timeLeft = Math.min(3599, totalSeconds); // Max 59:59
+                    if (state.timer.running) {
+                        state.timer.targetEndTime = Date.now() + (state.timer.timeLeft * 1000);
+                    }
+                }
+
                 ui.updateTimer();
                 game.syncProjection(true);
             },
@@ -3581,8 +3758,8 @@
 
                 if (index === 0 || index === 2) {
                     music.resumeAuto(index, previousPhase); // Pass current and previous phase
-                } else {
-                    music.pauseAuto(); // Pause (not stop)
+                } else if (state.timer.running) {
+                    music.pauseAuto(); // Pause pouze pokud už běží časomíra
                 }
 
                 ui.renderPhase();
@@ -3722,6 +3899,7 @@
                     ? Math.max(0, (state.timer.targetEndTime - Date.now()) / 1000)
                     : Math.max(0, state.timer.timeLeft || 0);
 
+                const totalItems = (state.schedule || []).length;
                 const mCurrent = (currentIdx !== -1) ? state.schedule[currentIdx] : (totalItems === 0 ? state.currentMatch : null);
 
                 if (mCurrent) {
@@ -3782,7 +3960,11 @@
                 // Vyřadíme objemná data, která PO ani veřejná zobrazení nepotřebují (MP3 znělky v base64, globální databázi hráčů apod.)
                 // Tím se objem dat zmenší z desítek megabajtů na jednotky kilobajtů a zamezí se zasekávání hlavního vlákna a tlačítek gólů.
                 const { teamAnthems, masterPlayers, musicPlaylist, ...lightState } = state;
-                const payload = { ...lightState, telemetry: game.getTelemetry() };
+                const payload = { 
+                    ...lightState, 
+                    telemetry: game.getTelemetry(),
+                    ownerUid: (auth.currentUser ? auth.currentUser.uid : null)
+                };
                 const plainPayload = JSON.parse(JSON.stringify(payload));
 
                 // Send to BroadcastChannel for all listeners (OBS, other tabs)
@@ -3793,17 +3975,39 @@
                     projectionWindow.postMessage(plainPayload, '*');
                 }
 
-                // --- THROTTLED FIREBASE SYNC ---
+                // --- THROTTLED FIREBASE SYNC (Heartbeat interval 20s) ---
                 const now = Date.now();
                 const timeSinceLastSync = now - (game._lastFirebaseSync || 0);
 
                 if (typeof firebase !== 'undefined' && !state.isProjectionMode && auth.isLicensed()) {
-                    // Send to Firebase immediately if forceFirebase=true OR if it has been more than 1s
-                    if (forceFirebase || timeSinceLastSync >= 1000) {
+                    // Send to Firebase immediately if forceFirebase=true OR if it has been more than 20s (20000 ms heartbeat)
+                    if (forceFirebase || timeSinceLastSync >= 20000) {
                         try {
-                            firebase.database().ref('sessions/' + state.sessionId).set(plainPayload);
+                            // OPTIMALIZACE PROVOZU (TRAFFIC):
+                            // Vyjmeme velká loga (Base64) z běžného synchronizačního streamu, aby se nestahovala
+                            // desítkám či stovkám diváků každých 20 sekund dokola.
+                            // Loga se ukládají do samostatného podstromu sessions/{id}/teamLogos a divák si je načte jen 1x.
+                            const { teamLogos: liveLogos, ...cloudPayload } = plainPayload;
+
+                            // 1. Zápis živého odlehčeného stavu do sessions/{sessionId}
+                            firebase.database().ref('sessions/' + state.sessionId).update(cloudPayload);
+
+                            // 2. Synchronizace log do cloudu sessions/{sessionId}/teamLogos pouze při explicitním zápisu (forceFirebase)
+                            // nebo pokud ještě nebyla v této relaci odeslána
+                            if (forceFirebase || !game._cloudLogosSynced) {
+                                if (liveLogos && Object.keys(liveLogos).length > 0) {
+                                    firebase.database().ref('sessions/' + state.sessionId + '/teamLogos').set(liveLogos)
+                                        .then(() => { game._cloudLogosSynced = true; })
+                                        .catch(err => console.warn("[Sync] Cloud logos sync warning:", err));
+                                }
+                            }
+
                             game._lastFirebaseSync = now;
                             // console.log("[Sync] Firebase updated", { force: forceFirebase });
+
+                            if (auth.currentUser) {
+                                admin.updateUserSessionMetadataThrottled();
+                            }
                         } catch (e) {
                             console.error("Firebase write failed:", e);
                         }
@@ -4146,12 +4350,12 @@
                     await music.loadTrack(currentMusicAudio, index);
 
                     // CRITICAL: Double check if we are still in a musical phase after async load
-                    // Musical phases are 0 (Nastupuje) and 2 (Přestávka)
+                    // Musical phases are 0 (Nastupuje), 2 (Přestávka), nebo poločas před spuštěním odpočtu
                     const pIdx = state.currentMatch.phaseIndex;
-                    const isMusicalPhase = (pIdx === 0 || pIdx === 2);
+                    const isMusicalPhase = (pIdx === 0 || pIdx === 2) || !state.timer.running;
 
                     if (isAuto && !isMusicalPhase) {
-                        console.log("Music play cancelled: current phase is not musical", pIdx);
+                        console.log("Music play cancelled: timer is running in match phase", pIdx);
                         return;
                     }
 
@@ -4362,6 +4566,67 @@
         // ===================================================================================
         // --- ADMIN HELPERS ---
         const admin = {
+            // =======================================================================
+            // REGION: SPRÁVA POŘADÍ DRUŽSTEV (LOCK, REORDER, SWAP, SHUFFLE, DRAG&DROP)
+            // =======================================================================
+            teamsOrderLocked: true,
+
+            syncTeamsFromDOM: () => {
+                const teamInputs = document.querySelectorAll('.team-name-input');
+                teamInputs.forEach(input => {
+                    const id = input.dataset.id;
+                    const team = state.teams.find(t => t.id === id);
+                    if (team) {
+                        team.name = input.value.trim();
+                    }
+                });
+            },
+
+            toggleTeamsLock: () => {
+                admin.syncTeamsFromDOM();
+                admin.teamsOrderLocked = !admin.teamsOrderLocked;
+                admin.renderIdentityInputs();
+            },
+
+            moveTeam: (fromIndex, direction) => {
+                admin.syncTeamsFromDOM();
+                const toIndex = fromIndex + direction;
+                if (toIndex < 0 || toIndex >= state.teams.length) return;
+                const item = state.teams.splice(fromIndex, 1)[0];
+                state.teams.splice(toIndex, 0, item);
+                admin.onTeamsOrderChanged();
+            },
+
+            swapTeamPosition: (fromIndex, toIndex) => {
+                admin.syncTeamsFromDOM();
+                if (toIndex < 0 || toIndex >= state.teams.length || fromIndex === toIndex) return;
+                const temp = state.teams[fromIndex];
+                state.teams[fromIndex] = state.teams[toIndex];
+                state.teams[toIndex] = temp;
+                admin.onTeamsOrderChanged();
+            },
+
+            shuffleTeams: () => {
+                if (state.teams.length < 2) return;
+                if (!confirm("Opravdu chcete náhodně vylosovat pořadí družstev?")) return;
+                admin.syncTeamsFromDOM();
+                for (let i = state.teams.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [state.teams[i], state.teams[j]] = [state.teams[j], state.teams[i]];
+                }
+                admin.onTeamsOrderChanged();
+            },
+
+            onTeamsOrderChanged: () => {
+                admin.renderIdentityInputs();
+                admin.renderLogoSettings();
+                ui.updateNames();
+                ui.fillSelects();
+                admin.saveToStorage();
+                game.syncProjection();
+            },
+            // =======================================================================
+
             saveSettings: (showAlert = true) => {
                 if (state.isLoading) return;
                 state.tournamentName = document.getElementById('input-tournament-name').value;
@@ -4482,17 +4747,39 @@
                 }
             },
 
-            toggleRulesLock: () => {
-                const unlocked = document.getElementById('rule-lock-toggle').checked;
+            rulesLocked: true,
+
+            toggleRulesLock: (explicitState = null) => {
+                if (explicitState !== null) {
+                    admin.rulesLocked = explicitState;
+                } else {
+                    admin.rulesLocked = !admin.rulesLocked;
+                }
+
+                const lockBtn = document.getElementById('btn-rules-lock');
+                if (lockBtn) {
+                    if (admin.rulesLocked) {
+                        lockBtn.innerHTML = "🔒 Zamčeno";
+                        lockBtn.style.background = "#444";
+                        lockBtn.style.borderColor = "#666";
+                        lockBtn.style.color = "#fff";
+                    } else {
+                        lockBtn.innerHTML = "🔓 Odemčeno";
+                        lockBtn.style.background = "#ff9800";
+                        lockBtn.style.borderColor = "#e65100";
+                        lockBtn.style.color = "#000";
+                    }
+                }
+
                 const container = document.getElementById('rules-container');
-                const inputs = container.querySelectorAll('input');
-
-                container.style.opacity = unlocked ? "1" : "0.6";
-                container.style.pointerEvents = unlocked ? "auto" : "none";
-
-                inputs.forEach(input => {
-                    input.disabled = !unlocked;
-                });
+                if (container) {
+                    container.style.opacity = admin.rulesLocked ? "0.6" : "1";
+                    container.style.pointerEvents = admin.rulesLocked ? "none" : "auto";
+                    const inputs = container.querySelectorAll('input');
+                    inputs.forEach(input => {
+                        input.disabled = admin.rulesLocked;
+                    });
+                }
             },
 
             formatTime: (totalSeconds) => {
@@ -4549,6 +4836,56 @@
                 return true;
             },
 
+            selectTimerText: (el) => {
+                if (el.contentEditable === 'true') {
+                    setTimeout(() => {
+                        const sel = window.getSelection();
+                        if (sel) {
+                            const range = document.createRange();
+                            range.selectNodeContents(el);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        }
+                    }, 20);
+                }
+            },
+
+            restrictToTime: (e) => {
+                // Allow: backspace, delete, tab, escape, enter
+                if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                    // Allow: Ctrl/Cmd + A, C, V, X
+                    ((e.ctrlKey || e.metaKey) && [65, 67, 86, 88].indexOf(e.keyCode) !== -1) ||
+                    // Allow: home, end, left, right
+                    (e.keyCode >= 35 && e.keyCode <= 39)) {
+                    return true;
+                }
+
+                // Check allowed input characters: digits 0-9, colon, dot
+                let char = e.key;
+                if (e.keyCode >= 96 && e.keyCode <= 105) {
+                    char = String(e.keyCode - 96);
+                } else if (e.keyCode === 110) {
+                    char = '.';
+                }
+
+                const isAllowedChar = (char >= '0' && char <= '9') || char === ':' || char === '.';
+                if (!isAllowedChar) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                // Max 5 characters total limit (considering currently selected text to be replaced)
+                const currentText = e.target.textContent || '';
+                const sel = window.getSelection();
+                const selectedLen = sel ? (sel.toString() || '').length : 0;
+                if (currentText.length - selectedLen >= 5) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                return true;
+            },
+
             sanitizeInput: (input) => {
                 let val = input.value;
                 if (val.match(/[<>]/)) {
@@ -4557,6 +4894,26 @@
             },
 
             renderIdentityInputs: () => {
+                // Update lock toolbar button state if present
+                const lockBtn = document.getElementById('btn-teams-lock');
+                const shuffleBtn = document.getElementById('btn-teams-shuffle');
+                if (lockBtn) {
+                    if (admin.teamsOrderLocked) {
+                        lockBtn.innerHTML = "🔒 Pořadí zamčeno";
+                        lockBtn.style.background = "#444";
+                        lockBtn.style.borderColor = "#666";
+                        lockBtn.style.color = "#fff";
+                    } else {
+                        lockBtn.innerHTML = "🔓 Pořadí odemčeno";
+                        lockBtn.style.background = "#ff9800";
+                        lockBtn.style.borderColor = "#e65100";
+                        lockBtn.style.color = "#000";
+                    }
+                }
+                if (shuffleBtn) {
+                    shuffleBtn.style.display = admin.teamsOrderLocked ? "none" : "inline-flex";
+                }
+
                 // Teams
                 const teamList = document.getElementById('teams-input-list');
                 teamList.innerHTML = "";
@@ -4834,7 +5191,135 @@
 
                 const label = document.createElement('span');
                 label.className = "identity-label";
-                label.innerText = (type === 'team' ? "Družstvo " : "Rozhodčí ") + (index + 1);
+
+                if (type === 'team' && !admin.teamsOrderLocked) {
+                    label.style.display = "flex";
+                    label.style.alignItems = "center";
+                    label.style.gap = "4px";
+                    label.style.width = "auto";
+                    label.style.minWidth = "120px";
+
+                    // 1. Drag Handle
+                    const dragHandle = document.createElement('span');
+                    dragHandle.className = "team-drag-handle";
+                    dragHandle.innerHTML = "&#x283f;"; // ⠿
+                    dragHandle.title = "Přetažením myší změníte pořadí družstva";
+                    dragHandle.style.cursor = "grab";
+                    dragHandle.style.fontSize = "1.2em";
+                    dragHandle.style.color = "#aaa";
+                    dragHandle.style.padding = "0 3px";
+                    dragHandle.style.userSelect = "none";
+                    dragHandle.style.lineHeight = "1";
+                    label.appendChild(dragHandle);
+
+                    // 3. Position Select Dropdown (1..N) with automatic swap
+                    const posSelect = document.createElement('select');
+                    posSelect.className = "team-pos-select";
+                    posSelect.title = "Změnou čísla se družstvo automaticky prohodí s vybranou pozicí";
+                    posSelect.style.fontWeight = "bold";
+                    posSelect.style.padding = "2px 4px";
+                    posSelect.style.borderRadius = "3px";
+                    posSelect.style.background = "#222";
+                    posSelect.style.color = "#ffeb3b";
+                    posSelect.style.border = "1px solid #ff9800";
+                    posSelect.style.fontSize = "0.85em";
+                    posSelect.style.cursor = "pointer";
+
+                    for (let i = 0; i < state.teams.length; i++) {
+                        const opt = document.createElement('option');
+                        opt.value = i;
+                        opt.innerText = (i + 1) + ".";
+                        if (i === index) opt.selected = true;
+                        posSelect.appendChild(opt);
+                    }
+
+                    posSelect.onchange = (e) => {
+                        const targetIdx = parseInt(e.target.value);
+                        if (!isNaN(targetIdx) && targetIdx !== index) {
+                            admin.swapTeamPosition(index, targetIdx);
+                        }
+                    };
+                    label.appendChild(posSelect);
+
+                    // Text hint label
+                    const teamWord = document.createElement('span');
+                    teamWord.style.fontSize = "0.85em";
+                    teamWord.style.color = "#aaa";
+                    teamWord.style.marginLeft = "2px";
+                    teamWord.innerText = "Družstvo";
+                    label.appendChild(teamWord);
+
+                    // Drag & Drop event bindings on div
+                    div.dataset.index = index;
+
+                    dragHandle.onmouseenter = () => { div.draggable = true; };
+                    dragHandle.onmouseleave = () => { if (!div.classList.contains('is-dragging')) div.draggable = false; };
+
+                    div.addEventListener('dragstart', (e) => {
+                        admin.syncTeamsFromDOM();
+                        div.classList.add('is-dragging');
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', String(index));
+                        div.style.opacity = '0.4';
+                    });
+
+                    div.addEventListener('dragend', () => {
+                        div.classList.remove('is-dragging');
+                        div.draggable = false;
+                        div.style.opacity = '1';
+                        document.querySelectorAll('.team-identity-row').forEach(row => {
+                            row.classList.remove('drop-indicator-top', 'drop-indicator-bottom');
+                        });
+                    });
+
+                    div.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+
+                        document.querySelectorAll('.team-identity-row').forEach(row => {
+                            row.classList.remove('drop-indicator-top', 'drop-indicator-bottom');
+                        });
+
+                        const rect = div.getBoundingClientRect();
+                        const relY = e.clientY - rect.top;
+                        if (relY > rect.height / 2) {
+                            div.classList.add('drop-indicator-bottom');
+                        } else {
+                            div.classList.add('drop-indicator-top');
+                        }
+                    });
+
+                    div.addEventListener('dragleave', () => {
+                        div.classList.remove('drop-indicator-top', 'drop-indicator-bottom');
+                    });
+
+                    div.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        div.classList.remove('drop-indicator-top', 'drop-indicator-bottom');
+                        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                        if (isNaN(fromIdx) || fromIdx === index) return;
+
+                        let toIdx = index;
+                        const rect = div.getBoundingClientRect();
+                        const relY = e.clientY - rect.top;
+                        if (relY > rect.height / 2) {
+                            toIdx++;
+                        }
+                        if (fromIdx < toIdx) {
+                            toIdx--;
+                        }
+                        if (fromIdx !== toIdx) {
+                            const movedItem = state.teams.splice(fromIdx, 1)[0];
+                            state.teams.splice(toIdx, 0, movedItem);
+                            admin.onTeamsOrderChanged();
+                        }
+                    });
+                } else {
+                    label.innerText = (type === 'team' ? "Družstvo " : "Rozhodčí ") + (index + 1);
+                    if (type === 'team') {
+                        label.title = "Pořadí je uzamčeno zámečkem";
+                    }
+                }
                 div.appendChild(label);
 
                 if (type === 'team') {
@@ -4845,6 +5330,7 @@
                     input.value = item.name || "";
                     input.maxLength = 32;
                     input.style.flex = "1";
+                    input.setAttribute('draggable', 'false');
                     input.oninput = () => {
                         admin.sanitizeInput(input);
                         item.name = input.value;
@@ -4888,8 +5374,18 @@
                 const removeBtn = document.createElement('button');
                 removeBtn.className = "small-btn btn-red";
                 removeBtn.innerText = "x";
+                if (type === 'team' && admin.teamsOrderLocked) {
+                    removeBtn.title = "Pro odebrání družstva nejprve odemkněte zámeček pořadí";
+                    removeBtn.style.opacity = "0.6";
+                } else {
+                    removeBtn.title = "Smazat";
+                }
                 removeBtn.onclick = () => {
                     if (type === 'team') {
+                        if (admin.teamsOrderLocked) {
+                            alert("Pro odebrání družstva nejprve odemkněte zámeček (🔓) v záhlaví seznamu družstev.");
+                            return;
+                        }
                         // Check if team is used in schedule
                         const isUsed = state.schedule.some(m => m.type === 'match' && (m.home === item.id || m.guest === item.id));
                         if (isUsed) {
@@ -4897,8 +5393,17 @@
                                 return;
                             }
                         }
+                        admin.syncTeamsFromDOM();
                         state.teams = state.teams.filter(t => t.id !== item.id);
                     } else {
+                        // Kontrola, zda je rozhodčí nasazen v zápasech
+                        const isUsed = state.schedule.some(m => m.type === 'match' && m.referee === item.id);
+                        if (isUsed) {
+                            const refName = admin.getRefName(item, true);
+                            if (!confirm(`Rozhodčí "${refName}" je nasazen v zápasech. Opravdu ho chcete smazat? V zápasech bude nahrazen textem "Rozhodčí".`)) {
+                                return;
+                            }
+                        }
                         state.referees = state.referees.filter(r => r.id !== item.id);
                     }
                     admin.renderIdentityInputs();
@@ -5063,8 +5568,9 @@
             },
 
             getTeamName: (id) => {
+                if (!id) return "OmS";
                 const team = state.teams.find(t => t.id === id);
-                return team ? team.name : (id ? "OmS" : "Tým");
+                return team ? team.name : "OmS";
             },
 
             getRefName: (inp, full = false) => {
@@ -5072,19 +5578,23 @@
                 let ref = null;
                 if (typeof inp === 'string') {
                     ref = state.referees.find(r => r.id === inp);
-                    if (!ref) return inp;
+                    if (!ref) {
+                        // Pokud jde o technické ID (ref_...) smazaného rozhodčího, vrátit bezpečný zástupný text
+                        if (inp.startsWith('ref_')) return "Rozhodčí";
+                        return inp;
+                    }
                 } else if (typeof inp === 'object') {
                     ref = inp;
                 } else return "-";
 
                 if (full) {
                     if (ref.surname || ref.firstName) {
-                        return `${ref.surname || ""} ${ref.firstName || ""}`.trim() || "-";
+                        return `${ref.surname || ""} ${ref.firstName || ""}`.trim() || "Rozhodčí";
                     }
-                    return ref.name || "-";
+                    return ref.name || "Rozhodčí";
                 } else {
-                    // UI view: Surname only (or fallback to shared name)
-                    return ref.surname || ref.name || "-";
+                    // UI view: Pouze příjmení (nebo fallback na jméno / zástupný text)
+                    return ref.surname || ref.name || "Rozhodčí";
                 }
             },
 
@@ -5118,6 +5628,7 @@
             },
 
             addTeamSlot: () => {
+                admin.syncTeamsFromDOM();
                 const id = "team_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
                 state.teams.push({ id, name: "", playerIds: [] });
                 admin.renderIdentityInputs();
@@ -5353,33 +5864,38 @@
                 }
             },
 
+            // --- Nahrát JSON přímo z tlačítka v sekci Hráči (spouštěno přes onchange na skrytém inputu) ---
+            uploadPlayersFromFile: (inputEl) => {
+                if (!inputEl || !inputEl.files || inputEl.files.length === 0) return;
+                admin._processPlayerJsonFile(inputEl.files[0], () => { inputEl.value = ""; });
+            },
+
+            // --- Starší ruční nahrání z Nastavení aplikace (zachováno pro zpětnou kompatibilitu) ---
             uploadManualCloudData: async () => {
                 const input = document.getElementById('input-manual-cloud-json');
-                if (!input.files || input.files.length === 0) {
+                if (!input || !input.files || input.files.length === 0) {
                     alert("Vyberte prosím JSON soubor s databází.");
                     return;
                 }
+                admin._processPlayerJsonFile(input.files[0], () => { input.value = ""; });
+            },
 
-                const file = input.files[0];
+            // --- Sdílená pomocná funkce: načtení, validace a import JSON souboru s hráči ---
+            _processPlayerJsonFile: (file, onSuccess) => {
                 const reader = new FileReader();
-
                 reader.onload = async (e) => {
-                    let text = e.target.result;
-                    let imported = null;
-
+                    const text = e.target.result;
                     try {
                         const rawData = JSON.parse(text);
                         if (!Array.isArray(rawData)) throw new Error("Nahraný JSON není pole hráčů.");
 
-                        // VALIDATION & SANITIZATION (Identical to Cloud Sync)
-                        imported = rawData.map(item => {
+                        // VALIDACE A SANITACE — přebíráme pouze známá textová pole
+                        const sanitize = (str) => {
+                            if (typeof str !== 'string') return "";
+                            return str.replace(/[<>]/g, "").trim().substring(0, 100);
+                        };
+                        const imported = rawData.map(item => {
                             if (typeof item !== 'object' || item === null) return null;
-
-                            const sanitize = (str) => {
-                                if (typeof str !== 'string') return "";
-                                return str.replace(/[<>]/g, "").trim().substring(0, 100);
-                            };
-
                             return {
                                 id: sanitize(item.id) || ("player_" + Math.random().toString(36).substr(2, 9)),
                                 firstName: sanitize(item.firstName),
@@ -5390,19 +5906,14 @@
 
                         if (imported.length === 0) throw new Error("JSON neobsahuje žádné platné záznamy o hráčích.");
 
-                        // Reuse the existing conflict logic
                         admin.importPlayersData(imported);
-                        input.value = ""; // Reset input after success
+                        if (typeof onSuccess === 'function') onSuccess();
 
                     } catch (err) {
-                        alert("Chyba při zpracování nahraného JSON souboru: " + err.message);
+                        alert("Chyba při zpracování JSON souboru: " + err.message);
                     }
                 };
-
-                reader.onerror = () => {
-                    alert("Chyba při čtení souboru.");
-                };
-
+                reader.onerror = () => { alert("Chyba při čtení souboru."); };
                 reader.readAsText(file);
             },
 
@@ -5681,6 +6192,7 @@
             resetApp: () => {
                 if (confirm("Opravdu chcete vymazat všechna data aplikace (družstva, rozpis, zvuk, jingly)? Tuto akci nelze vzít zpět.")) {
                     localStorage.removeItem('scoreboardState');
+                    localStorage.removeItem('oms_session_id');
                     // Clear any other session-related items if they exist
                     if (window.sessionStorage) sessionStorage.removeItem('oms_session_id');
 
@@ -5698,8 +6210,9 @@
                     if (typeof firebase !== 'undefined' && !state.isProjectionMode) {
                         try {
                             // Ensure the promise resolves even if the network fails
-                            firebaseCleanup = firebase.database().ref('sessions/' + state.sessionId).remove()
-                                .catch(e => console.warn("Firebase reset cleanup failed:", e));
+                            const p1 = firebase.database().ref('sessions/' + state.sessionId).remove();
+                            const p2 = (auth.currentUser ? firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${state.sessionId}`).remove() : Promise.resolve());
+                            firebaseCleanup = Promise.all([p1, p2]).catch(e => console.warn("Firebase reset cleanup failed:", e));
                         } catch (e) { console.warn("Firebase reset cleanup failed (sync):", e); }
                     }
 
@@ -5721,23 +6234,53 @@
             },
 
             generateScheduleFromTemplate: () => {
-                const templateId = document.getElementById('sched-template-select').value;
-                const template = SCHEDULE_TEMPLATES[templateId];
-                if (!template) return;
+                admin.syncTeamsFromDOM();
 
-                const count = template.teams;
-                if (state.teams.length < count) {
-                    alert(`Pro toto schéma je potřeba definovat alespoň ${count} družstev. Aktuálně jich máte ${state.teams.length}.`);
+                // Kontrola: generování je povoleno pouze při zamčeném pořadí družstev
+                if (!admin.teamsOrderLocked) {
+                    alert("⚠️ Pořadí družstev je odemčené.\n\nPřed generováním rozpisu nejprve uzamkněte pořadí družstev 🔒 v záložce Družstva (tím potvrdíte jejich finální nasazení).");
                     return;
                 }
 
-                if (!auth.checkTrialLimit(template.matches.length)) return;
+                const templateSelect = document.getElementById('sched-template-select');
+                const templateId = templateSelect ? templateSelect.value : '';
+                const template = SCHEDULE_TEMPLATES[templateId];
+                if (!template) {
+                    alert("Vyberte prosím platný vzor rozpisu ze seznamu.");
+                    return;
+                }
 
-                // Always replace
+                const count = template.teams;
+                if (!state.teams || state.teams.length < count) {
+                    const currentTeamsCount = state.teams ? state.teams.length : 0;
+                    alert(`Pro toto schéma je potřeba definovat alespoň ${count} družstev. Aktuálně jich máte v seznamu ${currentTeamsCount}.`);
+                    return;
+                }
+
+                // 1. Upozornění / Potvrzení před generováním
+                const hasExisting = state.schedule && state.schedule.length > 0;
+                const hasResults = hasExisting && state.schedule.some(m => m.type === 'match' && (m.homeScore !== null && m.homeScore !== undefined || m.guestScore !== null && m.guestScore !== undefined));
+
+                let confirmMsg = `Opravdu chcete vygenerovat nový rozpis pro ${count} družstev podle vybraného vzoru?`;
+                if (hasResults) {
+                    confirmMsg += `\n\n⚠️ POZOR: V aktuálním rozpisu jsou již odehrané zápasy s výsledky! Vygenerováním nového rozpisu budou všechny stávající zápasy a jejich výsledky SMAZÁNY!`;
+                } else if (hasExisting) {
+                    confirmMsg += `\n\nPozor: Stávající rozpis zápasů bude smazán a nahrazen novým podle aktuálního pořadí družstev.`;
+                }
+                if (!confirm(confirmMsg)) return;
+
+                // 2. TRIAL kontrola (počítá se pouze nově generovaný rozpis, protože starý se maže)
+                if (typeof auth !== 'undefined' && typeof auth.isLicensed === 'function' && !auth.isLicensed()) {
+                    if (template.matches.length > 10) {
+                        alert(`Režim TRIAL je omezen na maximálně 10 zápasů.\nTento vzor obsahuje ${template.matches.length} zápasů.\n\nPro neomezený počet zápasů si prosím zakupte roční licenci.`);
+                        return;
+                    }
+                }
+
+                // 3. Vytvoření nového rozpisu
                 state.schedule = [];
                 state.activeMatchIndex = -1;
 
-                const startIdx = state.schedule.length;
                 const pairs = template.matches;
                 const defaultDuration = (state.times.play * 2) + state.times.break;
                 const refsPerMatch = template.refsPerMatch || 1;
@@ -5747,21 +6290,23 @@
                     // Resolve home team
                     let home = pair[0];
                     if (typeof home === 'number') {
-                        home = state.teams[home - 1].id;
+                        const t = state.teams[home - 1];
+                        home = t ? t.id : `team_${home}`;
                     }
 
                     // Resolve guest team
                     let guest = pair[1];
                     if (typeof guest === 'number') {
-                        guest = state.teams[guest - 1].id;
+                        const t = state.teams[guest - 1];
+                        guest = t ? t.id : `team_${guest}`;
                     }
 
                     // Resolve title (optional 3rd element)
-                    const title = pair[2] || `Zápas ${startIdx + idx + 1}`;
+                    const title = pair[2] || `Zápas ${idx + 1}`;
 
                     // Assign Referees
                     let assignedRefs = [];
-                    if (state.referees.length > 0) {
+                    if (state.referees && state.referees.length > 0) {
                         for (let r = 0; r < refsPerMatch; r++) {
                             const ref = state.referees[(refIdx + r) % state.referees.length];
                             if (ref) assignedRefs.push(ref.id);
@@ -5782,27 +6327,17 @@
                     });
                 });
 
-                // CLEANUP: Keep only used identities and their assets
-                const usedTeamIds = new Set(state.schedule.filter(m => m.type === 'match').flatMap(m => [m.home, m.guest]));
-                const usedRefIds = new Set(state.schedule.filter(m => m.type === 'match').map(m => m.referee));
-
-                state.teams = state.teams.filter(t => usedTeamIds.has(t.id));
-                state.referees = state.referees.filter(r => usedRefIds.has(r.id));
-
-                Object.keys(state.teamLogos).forEach(id => {
-                    if (!usedTeamIds.has(id)) delete state.teamLogos[id];
-                });
-                Object.keys(state.teamAnthems).forEach(id => {
-                    if (!usedTeamIds.has(id)) delete state.teamAnthems[id];
-                });
-
-                admin.saveSettings(false); // Silent save
+                // Uložení do úložiště a kompletní překreslení všech návazností
+                admin.saveToStorage();
+                ui.fillSelects();
                 ui.renderSchedule();
-                admin.renderIdentityInputs(); // Refresh lists
-                admin.renderLogoSettings();   // Refresh logo section
-                game.syncProjection();
-                game.syncProjection();
-                alert(`Rozpis pro ${count} družstev byl vygenerován.`);
+                admin.renderIdentityInputs();
+                admin.renderLogoSettings();
+                if (typeof ui.renderStandings === 'function') {
+                    ui.renderStandings();
+                }
+                game.syncProjection(true);
+                alert(`Rozpis pro ${count} družstev (${pairs.length} zápasů) byl úspěšně vygenerován podle aktuálního pořadí družstev.`);
             },
 
             addMatch: () => {
@@ -6014,7 +6549,7 @@
                 const file = input.files[0];
 
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = async (e) => {
                     try {
                         const data = new Uint8Array(e.target.result);
                         const workbook = XLSX.read(data, { type: 'array' });
@@ -6054,7 +6589,100 @@
                                 input.value = "";
                                 return;
                             }
-                            if (confirm(`Detekována záloha turnaje "${json[0]?.[0] || 'Neznámý'}".\n\nChcete OBNOVIT celý turnaj ze zálohy?\n(Tato akce nahradí všechna data turnaje)`)) {
+
+                            // --- Extrakce metadat ze zálohy pro porovnání ---
+                            const backupTournamentName = json[0]?.[0] || "Neznámý";
+                            let backupSessionId = null;
+                            let backupOwnerUid = null;
+                            let backupTimestamp = null;
+                            let backupPlayedCount = 0;
+
+                            for (let r = 0; r < backupHeaderRow; r++) {
+                                if (!json[r] || !json[r][0]) continue;
+                                const lbl = String(json[r][0]).toLowerCase();
+                                if (lbl.includes("relace")) {
+                                    const v = String(json[r][1] || "").trim().toUpperCase();
+                                    if (v && v !== "-") backupSessionId = v;
+                                } else if (lbl.includes("vlastník") || lbl.includes("owner")) {
+                                    const v = String(json[r][1] || "").trim();
+                                    if (v && v !== "-") backupOwnerUid = v;
+                                } else if (lbl.includes("čas exportu") || lbl.includes("timestamp")) {
+                                    const v = parseFloat(json[r][1]);
+                                    if (!isNaN(v)) backupTimestamp = v;
+                                }
+                            }
+                            // Spočítat odehraná utkání ze zálohy (sloupec Skóre != "-")
+                            for (let r = backupHeaderRow + 1; r < json.length; r++) {
+                                const row = json[r];
+                                if (!row || !row[0]) break;
+                                const score = String(row[4] || "").trim();
+                                if (score && score !== "-" && score.includes(":")) backupPlayedCount++;
+                            }
+
+                            // --- Pokud existuje stejná relace na Cloudu, porovnáme ---
+                            const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+                            const isSameOwner = backupOwnerUid && currentUid && backupOwnerUid === currentUid;
+
+                            if (isSameOwner && backupSessionId && typeof firebase !== 'undefined') {
+                                const cloudSnap = await firebase.database().ref(`users/${currentUid}/sessions/${backupSessionId}`).once('value');
+                                const cloudMeta = cloudSnap.val();
+
+                                if (cloudMeta && cloudMeta.lastUpdate) {
+                                    const cloudTime = cloudMeta.lastUpdate;
+                                    const cloudPlayed = cloudMeta.matchCount || 0;
+                                    const excelTime = backupTimestamp || 0;
+                                    const cloudIsNewer = cloudTime > excelTime;
+
+                                    // Formatování pro zobrazení
+                                    const cloudTimeStr = new Date(cloudTime).toLocaleString('cs-CZ');
+                                    const excelTimeStr = backupTimestamp ? new Date(backupTimestamp).toLocaleString('cs-CZ') : "neznámo";
+
+                                    // Sestavit přehledné hlášení o rozdílu
+                                    let msg = `Detekována záloha turnaje: "${backupTournamentName}"\n`;
+                                    msg += `──────────────────────────\n`;
+                                    msg += `☁️  Cloud (Firebase): ${cloudTimeStr} | ${cloudPlayed} zápasů s výsledkem\n`;
+                                    msg += `📁 Excel (záloha): ${excelTimeStr} | ${backupPlayedCount} zápasů s výsledkem\n`;
+                                    msg += `──────────────────────────\n`;
+
+                                    if (cloudIsNewer) {
+                                        msg += `⚠️ Cloud je NOVĚJŠÍ než záloha!\n\n`;
+                                    } else {
+                                        msg += `📁 Excel záloha je stejně stará nebo novější.\n\n`;
+                                    }
+
+                                    msg += `Zvolte akci:\n`;
+                                    msg += `[OK]  → Přepsat z Excelu (záloha má přednost)\n`;
+                                    msg += `[Storno]  → Zachovat Cloud / jako kopii`;
+
+                                    if (confirm(msg)) {
+                                        // Uživatel potvrdil přepsání z Excelu
+                                        admin._restoreTournamentFromBackup(json, backupHeaderRow);
+                                        input.value = "";
+                                        return;
+                                    } else {
+                                        // Nabídnout nahrání jako kopii
+                                        if (confirm(`Chcete zálohu nahrát jako NOVOU KOPII turnaje?\n\n(Cloud zůstane nedotčen, záloha dostane nový kód relace.)`)) {
+                                            // Přemaskování Owner UID aby se vytvořila nová relace jako kopie
+                                            const fakeJson = json.map(row => [...(row || [])]);
+                                            for (let r = 0; r < backupHeaderRow; r++) {
+                                                if (fakeJson[r] && String(fakeJson[r][0] || "").toLowerCase().includes("vlastník")) {
+                                                    fakeJson[r][1] = "KOPIE_FORCE_NEW"; // Odlišné UID → nová relace
+                                                    break;
+                                                }
+                                            }
+                                            admin._restoreTournamentFromBackup(fakeJson, backupHeaderRow);
+                                            input.value = "";
+                                            return;
+                                        }
+                                        // Storno – nedělat nic, ponechat cloud
+                                        input.value = "";
+                                        return;
+                                    }
+                                }
+                            }
+
+                            // --- Standardní dialog (žádná kolize s cloudem nebo jiný vlastník) ---
+                            if (confirm(`Detekována záloha turnaje "${backupTournamentName}".\n\nChcete OBNOVIT celý turnaj ze zálohy?\n(Tato akce nahradí všechna data turnaje)`)) {
                                 admin._restoreTournamentFromBackup(json, backupHeaderRow);
                                 input.value = "";
                                 return;
@@ -6240,6 +6868,50 @@
                         state.times.play = parseInt(tpt[0]) || 420;
                         state.times.break = parseInt(tpt[1]) || 105;
                         state.times.setup = parseInt(tpt[2]) || 10;
+                    }
+
+                    // Check for saved Session ID and Owner UID in metadata rows
+                    let restoredSessionId = null;
+                    let restoredOwnerUid = null;
+                    for (let r = 0; r < headerRowIndex; r++) {
+                        if (json[r] && json[r][0]) {
+                            const rowLabel = String(json[r][0]).toLowerCase();
+                            if (rowLabel.includes("relace")) {
+                                const val = String(json[r][1] || "").trim().toUpperCase();
+                                if (val && val !== "-" && val.length >= 3) {
+                                    restoredSessionId = val;
+                                }
+                            } else if (rowLabel.includes("vlastník") || rowLabel.includes("owner")) {
+                                const val = String(json[r][1] || "").trim();
+                                if (val && val !== "-") {
+                                    restoredOwnerUid = val;
+                                }
+                            }
+                        }
+                    }
+
+                    const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+                    const isSameOwner = (restoredOwnerUid && currentUid && restoredOwnerUid === currentUid);
+
+                    if (isSameOwner && restoredSessionId) {
+                        // Stejný uživatel na dalším PC: navážeme na identickou relaci
+                        state.sessionId = restoredSessionId;
+                        localStorage.setItem('oms_session_id', restoredSessionId);
+                        if (window.history && window.history.replaceState) {
+                            window.history.replaceState(null, '', window.location.pathname + '?session=' + restoredSessionId);
+                        }
+                        admin._lastRestoreSessionDesc = `Navázáno na původní relaci: ${restoredSessionId}`;
+                        console.log("%c[Restore] Obnoveno původní Session ID (stejný vlastník):", "color:#00a2ff; font-weight:bold;", restoredSessionId);
+                    } else {
+                        // Cizí záloha / jiný účet / šablona turnaje: vytvoříme novou nezávislou relaci
+                        const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
+                        state.sessionId = newId;
+                        localStorage.setItem('oms_session_id', newId);
+                        if (window.history && window.history.replaceState) {
+                            window.history.replaceState(null, '', window.location.pathname + '?session=' + newId);
+                        }
+                        admin._lastRestoreSessionDesc = `Vytvořena nová vlastní relace: ${newId} (šablona turnaje)`;
+                        console.log("%c[Restore] Vytvořena nová vlastní relace pro importovanou šablonu:", "color:#4caf50; font-weight:bold;", newId);
                     }
 
                     // Clear basics
@@ -6431,9 +7103,10 @@
                     ui.renderSchedule();
                     admin.updateSettingsUI(); // Update metadata inputs!
                     ui.renderStandings();
-                    game.syncProjection();
+                    game.syncProjection(true);
 
-                    alert(`Obnovení turnaje dokončeno!\n\nTurnaj: ${state.tournamentName}\nDružstva: ${state.teams.length}\nZápasy: ${state.schedule.filter(m => m.type === 'match').length}\nRozhodčí: ${state.referees.length}`);
+                    const sessionInfo = admin._lastRestoreSessionDesc || `Relace: ${state.sessionId}`;
+                    alert(`Obnovení turnaje dokončeno!\n\nTurnaj: ${state.tournamentName}\n${sessionInfo}\nDružstva: ${state.teams.length}\nZápasy: ${state.schedule.filter(m => m.type === 'match').length}\nRozhodčí: ${state.referees.length}`);
                 } catch (e) {
                     console.error(e);
                     alert("Chyba při obnově ze zálohy: " + e.message);
@@ -6548,7 +7221,7 @@
                         state.teamLogos[teamName] = e.target.result;
                         admin.renderLogoSettings();
                         ui.updateLogos();
-                        game.syncProjection();
+                        game.syncProjection(true);
                     };
                     reader.readAsDataURL(file);
                 }
@@ -6622,8 +7295,8 @@
                     homeName: m.home || "",
                     guestName: m.guest || "",
                     referee: m.referee || "",
-                    homeScore: (m.homeScore !== null) ? m.homeScore : 0,
-                    guestScore: (m.guestScore !== null) ? m.guestScore : 0,
+                    homeScore: (typeof m.homeScore === 'number' && !isNaN(m.homeScore)) ? m.homeScore : ((m.homeScore !== null && m.homeScore !== undefined && m.homeScore !== "") ? Number(m.homeScore) : 0),
+                    guestScore: (typeof m.guestScore === 'number' && !isNaN(m.guestScore)) ? m.guestScore : ((m.guestScore !== null && m.guestScore !== undefined && m.guestScore !== "") ? Number(m.guestScore) : 0),
                     duration: m.duration || 600
                 };
 
@@ -7154,11 +7827,7 @@
                 }
 
                 // Ensure Rules are locked on load
-                const lockToggle = document.getElementById('rule-lock-toggle');
-                if (lockToggle) {
-                    lockToggle.checked = false;
-                    admin.toggleRulesLock();
-                }
+                admin.toggleRulesLock(true);
 
                 state.isLoading = false;
             },
@@ -7183,7 +7852,536 @@
                 if (!qrWindow) alert("Vyskakovací okno bylo zablokováno.");
             },
 
-            // --- GARBAGE COLLECTOR ---
+            // ===================================================================================
+            // REGION: CLOUDOVÁ SPRÁVA RELACÍ A TURNAJŮ (FIREBASE CLOUD SESSIONS)
+            // ===================================================================================
+            _lastMetaSync: 0,
+            updateUserSessionMetadataThrottled: (force = false) => {
+                if (typeof firebase === 'undefined' || !auth.currentUser || !auth.isLicensed()) return;
+                const now = Date.now();
+                if (!force && (now - (admin._lastMetaSync || 0) < 30000)) return; // Throttling: max jednou za 30 s
+                admin._lastMetaSync = now;
+
+                const meta = {
+                    sessionId: state.sessionId,
+                    tournamentName: state.tournamentName || "Nepojmenovaný turnaj",
+                    tournamentCategory: state.tournamentCategory || "-",
+                    tournamentDate: state.tournamentDate || "-",
+                    matchCount: (state.schedule || []).filter(m => m.type === 'match').length,
+                    teamCount: (state.teams || []).length,
+                    lastUpdate: Date.now()
+                };
+
+                firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${state.sessionId}`).set(meta)
+                    .catch(e => console.warn("[Cloud] Metadata sync failed:", e));
+            },
+
+            openCloudSessionsModal: () => {
+                if (typeof firebase === 'undefined') {
+                    alert("Firebase není k dispozici.");
+                    return;
+                }
+                if (!auth.currentUser) {
+                    alert("Pro správu cloudových turnajů se nejprve přihlaste přes Google účet.");
+                    auth.login();
+                    return;
+                }
+                if (!auth.isLicensed()) {
+                    alert("Cloudová správa turnajů a synchronizace je dostupná v placené verzi / VIP.");
+                    return;
+                }
+
+                const modal = document.getElementById('modal-cloud-sessions');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    const activeSpan = document.getElementById('cloud-active-session-id');
+                    if (activeSpan) activeSpan.innerText = state.sessionId;
+                    admin.refreshCloudSessionsList();
+                }
+            },
+
+            closeCloudSessionsModal: () => {
+                const modal = document.getElementById('modal-cloud-sessions');
+                if (modal) modal.style.display = 'none';
+            },
+
+            escapeHtml: (str) => {
+                return String(str || '').replace(/[&<>"']/g, m => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                })[m]);
+            },
+
+            sanitizeSessionId: (str) => {
+                if (!str) return "";
+                return str
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "") // odstranění diakritiky
+                    .trim()
+                    .replace(/\s+/g, '-') // mezery na pomlčky
+                    .replace(/[^a-zA-Z0-9_-]/g, '') // pouze bezpečné znaky pro Firebase a URL
+                    .substring(0, 96);
+            },
+
+            renameCloudSessionTitle: async (targetId, currentName) => {
+                if (!auth.currentUser || !auth.isLicensed()) {
+                    alert("Pro úpravu turnaje se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+
+                const newTitle = window.prompt("Zadejte nový název turnaje:", currentName || "");
+                if (newTitle === null) return;
+                const finalTitle = newTitle.trim();
+                if (!finalTitle) {
+                    alert("Název turnaje nesmí být prázdný.");
+                    return;
+                }
+                if (finalTitle === currentName) return;
+
+                try {
+                    // Aktualizace v metadatech uživatele
+                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${targetId}/tournamentName`).set(finalTitle);
+                    // Aktualizace v datech turnaje
+                    await firebase.database().ref(`sessions/${targetId}/tournamentName`).set(finalTitle);
+
+                    // Pokud je to aktuálně otevřený turnaj, promítnout do aplikace
+                    if (targetId === state.sessionId) {
+                        state.tournamentName = finalTitle;
+                        const input = document.getElementById('tournament-name');
+                        if (input) input.value = finalTitle;
+                        admin.saveToStorage();
+                        game.syncProjection();
+                    }
+
+                    admin.refreshCloudSessionsList();
+                } catch (e) {
+                    console.error("Chyba při přejmenování turnaje:", e);
+                    alert("Nepodařilo se přejmenovat turnaj: " + e.message);
+                }
+            },
+
+            changeCloudSessionId: async (oldId) => {
+                if (!auth.currentUser || !auth.isLicensed()) {
+                    alert("Pro změnu kódu relace se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+
+                const promptText = `Zadejte nový Kód relace (ID) pro turnaj:\n\n• Délka: 8 až 96 znaků\n• Povolené znaky: písmena (a-z, A-Z), číslice (0-9), pomlčka (-), podtržítko (_)\n• Příklad: 2026-liga-olomouc nebo cesky-pohar-2026\n\nAktuální kód: ${oldId}`;
+                const rawInput = window.prompt(promptText, oldId);
+                if (rawInput === null) return;
+
+                const newId = admin.sanitizeSessionId(rawInput);
+                if (newId === oldId) return;
+
+                if (newId.length < 8 || newId.length > 96) {
+                    alert(`Neplatná délka kódu relace: ${newId.length} znaků.\n\nVlastní kód relace musí mít délku 8 až 96 znaků a může obsahovat pouze písmena, číslice, pomlčku (-) a podtržítko (_).`);
+                    return;
+                }
+
+                try {
+                    // 1. Kontrola unikátnosti ve Firebase
+                    const checkSnap = await firebase.database().ref('sessions/' + newId).once('value');
+                    if (checkSnap.exists()) {
+                        alert(`⚠️ Kód relace "${newId}" je již v cloudu obsazen!\n\nZvolte prosím jiný unikátní kód.`);
+                        return;
+                    }
+
+                    // 2. Načtení dat ze starého ID
+                    const snapData = await firebase.database().ref('sessions/' + oldId).once('value');
+                    const sourceData = snapData.val();
+                    if (!sourceData) {
+                        alert("Nepodařilo se načíst data zdrojového turnaje.");
+                        return;
+                    }
+
+                    // 3. Načtení metadat ze starého ID
+                    const snapMeta = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${oldId}`).once('value');
+                    const sourceMeta = snapMeta.val() || {};
+
+                    // 4. Zápis pod nové ID
+                    const now = Date.now();
+                    const updatedData = { ...sourceData, sessionId: newId, lastUpdate: now };
+                    const updatedMeta = { ...sourceMeta, sessionId: newId, lastUpdate: now };
+
+                    await firebase.database().ref('sessions/' + newId).set(updatedData);
+                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${newId}`).set(updatedMeta);
+
+                    // 5. Smazání starého ID
+                    await firebase.database().ref('sessions/' + oldId).remove();
+                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${oldId}`).remove();
+
+                    // 6. Pokud byl změněn právě aktivní turnaj v tomto okně
+                    if (oldId === state.sessionId) {
+                        state.sessionId = newId;
+                        localStorage.setItem('oms_session_id', newId);
+                        admin.saveToStorage();
+                        game.syncProjection(true);
+
+                        const activeSpan = document.getElementById('cloud-active-session-id');
+                        if (activeSpan) activeSpan.innerText = newId;
+
+                        const footerSpan = document.getElementById('admin-footer-session');
+                        if (footerSpan) footerSpan.innerText = newId;
+
+                        if (window.history && window.history.replaceState) {
+                            window.history.replaceState(null, '', window.location.pathname + '?session=' + newId);
+                        }
+                    }
+
+                    admin.refreshCloudSessionsList();
+                    alert(`Kód relace byl úspěšně změněn na "${newId}".`);
+                } catch (e) {
+                    console.error("Chyba při změně kódu relace:", e);
+                    alert("Nepodařilo se změnit kód relace: " + e.message);
+                }
+            },
+
+            refreshCloudSessionsList: async () => {
+                const container = document.getElementById('cloud-sessions-list-container');
+                const infoEl = document.getElementById('cloud-sessions-user-info');
+                if (!container || !auth.currentUser) return;
+
+                container.innerHTML = '<div style="text-align:center; padding:30px; color:#aaa;">🔄 Načítám seznam turnajů z cloudu...</div>';
+
+                try {
+                    const snap = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions`).once('value');
+                    const sessionsMap = snap.val() || {};
+                    const sessionKeys = Object.keys(sessionsMap);
+
+                    // Seřadit od nejnovějšího podle lastUpdate
+                    const list = sessionKeys.map(k => sessionsMap[k]).sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
+
+                    if (infoEl) {
+                        const userEmail = auth.currentUser.email || auth.currentUser.displayName || "Uživatel";
+                        infoEl.innerHTML = `Přihlášen: <b>${admin.escapeHtml(userEmail)}</b> | Využito: <b style="color:${list.length >= 20 ? 'var(--accent-red)' : 'var(--accent-green)'};">${list.length} / 20 turnajů</b>`;
+                    }
+
+                    if (list.length === 0) {
+                        container.innerHTML = `
+                            <div style="text-align:center; padding:40px 20px; color:#888;">
+                                <div style="font-size:2.5em; margin-bottom:10px;">☁️</div>
+                                <div style="font-size:1.1em; color:#ddd; font-weight:bold; margin-bottom:8px;">Zatím nemáte v cloudu uložený žádný turnaj.</div>
+                                <div>Klikněte na tlačítko <b>„💾 Uložit aktuální turnaj“</b> výše a uložte rozpracovaný turnaj do svého účtu.</div>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    let html = `
+                        <table style="width:100%; min-width:820px; border-collapse:collapse; font-size:0.9em;">
+                            <thead>
+                                <tr style="border-bottom:2px solid #333; text-align:left; color:#888;">
+                                    <th style="padding:10px 8px; width:29%; min-width:200px;">Turnaj</th>
+                                    <th style="padding:10px 8px; width:15%; min-width:110px;">Kategorie / Datum</th>
+                                    <th style="padding:10px 8px; width:11%; min-width:85px;">Zápasů / Týmů</th>
+                                    <th style="padding:10px 8px; width:29%; min-width:200px;">Kód relace</th>
+                                    <th style="padding:10px 8px; width:10%; min-width:90px;">Poslední úprava</th>
+                                    <th style="padding:10px 8px; width:6%; min-width:85px; text-align:center;">Akce</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    list.forEach(item => {
+                        const isCurrent = (item.sessionId === state.sessionId);
+                        const safeName = admin.escapeHtml(item.tournamentName || "Nepojmenovaný turnaj");
+                        const safeCat = admin.escapeHtml(item.tournamentCategory || "-");
+                        const safeDate = item.tournamentDate ? new Date(item.tournamentDate).toLocaleDateString('cs-CZ') : "-";
+                        const updated = item.lastUpdate ? new Date(item.lastUpdate).toLocaleString('cs-CZ') : "-";
+
+                        html += `
+                            <tr style="border-bottom:1px solid #282828; ${isCurrent ? 'background:rgba(76,175,80,0.22); border-left:4px solid var(--accent-green);' : 'border-left:4px solid transparent;'}">
+                                <td style="padding:8px 8px; font-weight:bold; color:#fff;">
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <span>${safeName}</span>
+                                        <button class="small-btn" onclick="admin.renameCloudSessionTitle('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="padding:1px 5px; font-size:0.8em; background:#333; color:#aaa; border:1px solid #444; cursor:pointer; flex-shrink:0;" title="Upravit název turnaje">✏️</button>
+                                    </div>
+                                </td>
+                                <td style="padding:8px 8px; color:#bbb;">
+                                    ${safeCat}<br><small style="color:#777;">${safeDate}</small>
+                                </td>
+                                <td style="padding:8px 8px; color:#bbb;">
+                                    ${item.matchCount || 0} zápasů<br><small style="color:#777;">${item.teamCount || 0} týmů</small>
+                                </td>
+                                <td style="padding:8px 8px;">
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <code style="background:#222; padding:3px 6px; border-radius:4px; color:var(--accent-blue); font-weight:bold; font-size:1.05em; word-break:break-all;">${item.sessionId}</code>
+                                        <button class="small-btn" onclick="admin.changeCloudSessionId('${item.sessionId}')" style="padding:1px 5px; font-size:0.8em; background:#333; color:#aaa; border:1px solid #444; cursor:pointer; flex-shrink:0;" title="Změnit kód relace (ID)">✏️</button>
+                                    </div>
+                                </td>
+                                <td style="padding:8px 8px; font-size:0.85em; color:#888;">
+                                    ${updated}
+                                </td>
+                                <td style="padding:8px 8px; text-align:center; vertical-align:middle;">
+                                    <div style="display:flex; flex-direction:column; gap:4px; align-items:stretch; min-width:80px;">
+                                        ${isCurrent ? '<span style="display:flex; align-items:center; justify-content:center; background:var(--accent-green); color:#000; font-size:0.75em; padding:3px 4px; border-radius:3px; font-weight:bold;">✓ AKTIVNÍ</span>' : `<button class="small-btn btn-subtle" onclick="admin.loadCloudSession('${item.sessionId}')" style="display:flex; align-items:center; gap:5px; padding:3px 8px; font-size:0.78em; text-align:left; width:100%;" title="Otevřít a načíst tento turnaj"><span style="width:16px; text-align:center; display:inline-block; flex-shrink:0;">📂</span> <span>Otevřít</span></button>`}
+                                        <button class="small-btn btn-subtle" onclick="admin.duplicateCloudSession('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="display:flex; align-items:center; gap:5px; padding:3px 8px; font-size:0.78em; text-align:left; width:100%;" title="Vytvořit kopii tohoto turnaje"><span style="width:16px; text-align:center; display:inline-block; flex-shrink:0;">📋</span> <span>Kopie</span></button>
+                                        <button class="small-btn btn-subtle" onclick="admin.deleteCloudSession('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="display:flex; align-items:center; gap:5px; padding:3px 8px; font-size:0.78em; text-align:left; width:100%;" title="Smazat z cloudu"><span style="width:16px; text-align:center; display:inline-block; flex-shrink:0;">🗑️</span> <span>Smazat</span></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `
+                            </tbody>
+                        </table>
+                    `;
+                    container.innerHTML = html;
+                } catch (e) {
+                    console.error("Chyba při načítání seznamu turnajů:", e);
+                    container.innerHTML = `<div style="color:var(--accent-red); padding:20px; text-align:center;">Chyba při stahování seznamu turnajů: ${admin.escapeHtml(e.message)}</div>`;
+                }
+            },
+
+            saveCurrentSessionToCloud: async (showFeedback = true) => {
+                if (typeof firebase === 'undefined' || !auth.currentUser || !auth.isLicensed()) {
+                    alert("Pro uložení do cloudu se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+
+                try {
+                    // Kontrola limitu 20 turnajů
+                    const snap = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions`).once('value');
+                    const userSessions = snap.val() || {};
+                    const isExisting = !!userSessions[state.sessionId];
+                    const currentCount = Object.keys(userSessions).length;
+
+                    if (!isExisting && currentCount >= 20) {
+                        alert("Nelze uložit nový turnaj: Dosáhli jste maximálního limitu 20 uložených turnajů na účtu.\n\nSmažte prosím některý ze starších turnajů v seznamu.");
+                        return;
+                    }
+
+                    game.syncProjection(true);
+                    admin.updateUserSessionMetadataThrottled(true);
+
+                    if (showFeedback) {
+                        alert(`Turnaj "${state.tournamentName || 'Nepojmenovaný turnaj'}" byl úspěšně uložen do cloudu Firebase!\n\nKód relace: ${state.sessionId}`);
+                        admin.refreshCloudSessionsList();
+                    }
+                } catch (e) {
+                    console.error("Chyba při ukládání do cloudu:", e);
+                    alert("Uložení se nezdařilo: " + e.message);
+                }
+            },
+
+            loadCloudSession: async (targetId) => {
+                if (targetId === state.sessionId) {
+                    alert("Tento turnaj je již v aplikaci otevřen.");
+                    return;
+                }
+
+                if (!confirm(`Opravdu chcete načíst turnaj (${targetId}) z cloudu?\n\nNeuložené lokální změny v aktuálním turnaji budou nahrazeny.`)) {
+                    return;
+                }
+
+                try {
+                    const snap = await firebase.database().ref('sessions/' + targetId).once('value');
+                    const data = snap.val();
+                    if (!data) {
+                        alert("Data turnaje nebyla na cloudu nalezena.");
+                        return;
+                    }
+
+                    localStorage.setItem('oms_session_id', targetId);
+                    localStorage.setItem('scoreboardState', JSON.stringify({ ...data, sessionId: targetId }));
+
+                    // Přesměrování s novým parametrem session – čistý start bez kolizí
+                    window.location.href = window.location.pathname + '?session=' + targetId;
+                } catch (e) {
+                    console.error("Chyba při načítání turnaje:", e);
+                    alert("Chyba při stahování turnaje z cloudu: " + e.message);
+                }
+            },
+
+            deleteCloudSession: async (targetId, name) => {
+                if (!confirm(`Opravdu chcete trvale smazat turnaj "${name || targetId}" z cloudu Firebase?\n\nTato akce je nevratná.`)) {
+                    return;
+                }
+
+                try {
+                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${targetId}`).remove();
+                    await firebase.database().ref(`sessions/${targetId}`).remove();
+
+                    // Pokud byla smazána aktuálně otevřená relace, vygenerujeme nové čisté ID
+                    if (targetId === state.sessionId) {
+                        const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
+                        state.sessionId = newId;
+                        localStorage.setItem('oms_session_id', newId);
+                        admin.saveToStorage();
+                        game.syncProjection(true);
+                        const activeSpan = document.getElementById('cloud-active-session-id');
+                        if (activeSpan) activeSpan.innerText = newId;
+                        if (window.history && window.history.replaceState) {
+                            window.history.replaceState(null, '', window.location.pathname + '?session=' + newId);
+                        }
+                    }
+
+                    admin.refreshCloudSessionsList();
+                } catch (e) {
+                    console.error("Chyba při mazání turnaje:", e);
+                    alert("Nepodařilo se smazat turnaj: " + e.message);
+                }
+            },
+
+            // --- DUPLIKACE CLOUDOVÉHO TURNAJE ---
+            duplicateCloudSession: async (sourceId, sourceName) => {
+                if (!auth.currentUser || !auth.isLicensed()) {
+                    alert("Pro duplikaci turnaje se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+
+                try {
+                    // Kontrola limitu
+                    const snapMeta = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions`).once('value');
+                    const userSessions = snapMeta.val() || {};
+                    if (Object.keys(userSessions).length >= 20) {
+                        alert("Dosáhli jste maximálního limitu 20 uložených turnajů.\n\nPro vytvoření kopie nejprve smažte některý starší turnaj ze seznamu.");
+                        return;
+                    }
+
+                    // Vyzvat uživatele k pojmenování kopie
+                    const baseName = sourceName || "Turnaj";
+                    const suggestedName = baseName + " (kopie)";
+                    const newName = window.prompt(
+                        `Zadejte název kopie turnaje:\n(Původní: "${baseName}")`,
+                        suggestedName
+                    );
+                    if (newName === null) return; // Uživatel dal Storno
+                    const finalName = newName.trim() || suggestedName;
+
+                    // Stáhnout celý stav turnaje z Firebase
+                    const snapData = await firebase.database().ref('sessions/' + sourceId).once('value');
+                    const sourceData = snapData.val();
+                    if (!sourceData) {
+                        alert("Nepodařilo se načíst data zdrojového turnaje. Pravděpodobně nebyl turnaj uložen do cloudu pomocí 'Uložit aktuální turnaj'.");
+                        return;
+                    }
+
+                    // Nové Session ID pro kopii
+                    const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
+
+                    // Sestavit kopii dat s novým ID a upraveným názvem
+                    const copiedData = {
+                        ...sourceData,
+                        sessionId: newId,
+                        tournamentName: finalName,
+                        lastUpdate: Date.now(),
+                        ownerUid: auth.currentUser.uid
+                    };
+
+                    // Uložit kopii do Firebase sessions a do metadat uživatele
+                    await firebase.database().ref('sessions/' + newId).set(copiedData);
+                    const meta = {
+                        sessionId: newId,
+                        tournamentName: finalName,
+                        tournamentCategory: sourceData.tournamentCategory || "-",
+                        tournamentDate: sourceData.tournamentDate || "-",
+                        matchCount: (sourceData.schedule || []).filter(m => m.type === 'match').length,
+                        teamCount: (sourceData.teams || []).length,
+                        lastUpdate: Date.now()
+                    };
+                    await firebase.database().ref(`users/${auth.currentUser.uid}/sessions/${newId}`).set(meta);
+
+                    admin.refreshCloudSessionsList();
+                    if (confirm(`Kopie turnaje "${finalName}" byla vytvořena!\n\nKód nové relace: ${newId}\n\nChcete přejít na tuto kopii a otevřít ji?`)) {
+                        admin.closeCloudSessionsModal();
+                        admin.loadCloudSession(newId);
+                    }
+                } catch (e) {
+                    console.error("Chyba při duplikaci turnaje:", e);
+                    alert("Nepodařilo se vytvořit kopii: " + e.message);
+                }
+            },
+
+            createNewCloudSession: async () => {
+                if (!auth.currentUser || !auth.isLicensed()) {
+                    alert("Pro založení nového cloudového turnaje se prosím přihlaste s platnou licencí.");
+                    return;
+                }
+
+                try {
+                    const snap = await firebase.database().ref(`users/${auth.currentUser.uid}/sessions`).once('value');
+                    const userSessions = snap.val() || {};
+                    const count = Object.keys(userSessions).length;
+
+                    if (count >= 20) {
+                        alert("Dosáhli jste maximálního limitu 20 uložených turnajů na účtu.\n\nPro vytvoření nového turnaje nejprve smažte některý starší turnaj ze seznamu.");
+                        return;
+                    }
+
+                    const randomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+                    const promptText = `Založit nový turnaj?\n\nZadejte Kód relace (ID):\n• Ponechte navržený 5místný kód: ${randomId}\n• Nebo zadejte vlastní název o délce 8 až 96 znaků (např. 2026-liga-olomouc)\n\nStávající turnaj zůstane v cloudu bezpečně uložen.`;
+                    const rawInput = window.prompt(promptText, randomId);
+                    if (rawInput === null) return;
+
+                    let newId = rawInput.trim();
+                    if (newId === randomId) {
+                        // Uživatel ponechal automatický 5místný kód
+                    } else {
+                        newId = admin.sanitizeSessionId(newId);
+                        if (newId.length < 8 || newId.length > 96) {
+                            alert(`Neplatná délka kódu relace: ${newId.length} znaků.\n\nVlastní kód relace musí mít délku 8 až 96 znaků a může obsahovat pouze písmena, číslice, pomlčku (-) a podtržítko (_).`);
+                            return;
+                        }
+                    }
+
+                    // Kontrola unikátnosti ve Firebase
+                    const checkSnap = await firebase.database().ref('sessions/' + newId).once('value');
+                    if (checkSnap.exists()) {
+                        alert(`⚠️ Kód relace "${newId}" je již v cloudu obsazen!\n\nZvolte prosím jiný unikátní název.`);
+                        return;
+                    }
+
+                    // Vyčištění stavu turnaje
+                    state.tournamentName = "";
+                    state.tournamentCategory = "";
+                    state.tournamentDate = new Date().toISOString().split('T')[0];
+                    state.tournamentLocation = "";
+                    state.tournamentOrganizer = "";
+                    state.pitchSize = "11 x 14 (m)";
+                    state.officialChiefReferee = "";
+                    state.officialRecorder = "";
+                    state.officialTimekeeper = "";
+                    state.teams = [];
+                    state.players = [];
+                    state.referees = [];
+                    state.schedule = [];
+                    state.misc = [];
+                    state.teamLogos = {};
+                    state.teamAnthems = {};
+                    state.activeMatchIndex = -1;
+                    state.pendingEditIndex = -1;
+                    state.selectedIndices = [];
+                    state.currentMatch = {
+                        title: "",
+                        homeName: "Domácí",
+                        guestName: "Hosté",
+                        homeScore: 0,
+                        guestScore: 0,
+                        referee: "",
+                        phaseIndex: 0,
+                        isEvent: false,
+                        duration: 600
+                    };
+                    state.timer.timeLeft = state.times.play || 420;
+                    state.sessionId = newId;
+
+                    localStorage.setItem('oms_session_id', newId);
+                    admin.saveToStorage();
+
+                    // Přesměrování na novou relaci
+                    window.location.href = window.location.pathname + '?session=' + newId;
+                } catch (e) {
+                    console.error("Chyba při zakládání turnaje:", e);
+                    alert("Chyba: " + e.message);
+                }
+            },
+
+            // --- GARBAGE COLLECTOR (OCHRANA UŽIVATELSKÝCH TURNAJŮ) ---
             cleanupOldSessions: async (maxHours = 168) => {
                 if (typeof firebase === 'undefined' || !auth.currentUser) return;
                 
@@ -7204,17 +8402,23 @@
                     }
                     
                     const keys = Object.keys(oldSessions);
-                    console.log(`[Cleanup] Nalezeno ${keys.length} expirovaných relací. Odstraňuji...`);
+                    console.log(`[Cleanup] Nalezeno ${keys.length} expirovaných relací. Kontroluji vlastníky...`);
                     
                     let deletedCount = 0;
                     for (const key of keys) {
                         // Nikdy nemažeme vlastní aktuální relaci!
                         if (key === state.sessionId) continue;
                         
+                        const item = oldSessions[key];
+                        // OCHRANA: Nikdy nemažeme relaci, která má registrovaného vlastníka (uložený turnaj uživatele)!
+                        if (item && item.ownerUid) {
+                            continue;
+                        }
+                        
                         await firebase.database().ref('sessions/' + key).remove();
                         deletedCount++;
                     }
-                    console.log(`%c[Cleanup] Hotovo. Odstraněno ${deletedCount} relací.`, "color: #4caf50;");
+                    console.log(`%c[Cleanup] Hotovo. Odstraněno ${deletedCount} anonymních relací.`, "color: #4caf50;");
                 } catch (e) {
                     console.error("[Cleanup] Chyba při úklidu:", e);
                 }
@@ -7249,6 +8453,9 @@
                     ["Minitabulky:", state.rules.useMiniTables ? "Ano" : "Ne"],
                     ["Časy (Hra/Přest./Úkl.):", `${state.times.play}/${state.times.break}/${state.times.setup}`],
                     ["Exportováno:", new Date().toLocaleString('cs-CZ')],
+                    ["Čas exportu (timestamp):", Date.now()],
+                    ["Relace (Session ID):", state.sessionId || "-"],
+                    ["Vlastník (Owner UID):", (auth.currentUser ? auth.currentUser.uid : "-")],
                     [] // divider row
                 ];
 
@@ -7264,8 +8471,9 @@
                     };
                 });
 
+                const scheduleStartRow = metaRows.length + 1; // 1-based index pro Excel
                 const ws = XLSX.utils.aoa_to_sheet(metaRows);
-                XLSX.utils.sheet_add_json(ws, scheduleData, { origin: "A13" });
+                XLSX.utils.sheet_add_json(ws, scheduleData, { origin: "A" + scheduleStartRow });
                 XLSX.utils.book_append_sheet(wb, ws, "Rozpis");
 
                 const filename = (state.tournamentName || "Export") + " (OmS).xlsx";
@@ -7274,7 +8482,7 @@
 
                 // 0. Standings
                 const standings = admin.calculateStandings();
-                const standingsStartRow = 13 + scheduleData.length + 2;
+                const standingsStartRow = scheduleStartRow + scheduleData.length + 2;
                 const standingsData = [["TABULKA TURNAJE", "Z", "V", "R", "P", "Skóre", "Rozdíl", "Body"]];
                 standings.forEach(s => {
                     standingsData.push([s.name, s.gp, s.w, s.d, s.l, `${s.gf}:${s.ga}`, s.gd, s.pts]);
@@ -7549,7 +8757,7 @@
                 const sess = document.getElementById('admin-footer-session');
                 const lic = document.getElementById('admin-footer-license');
 
-                if (prog) prog.innerText = `\u00A0\u00A0\u00A0\u00A0${telemetry.progress}`;
+                if (prog) prog.innerText = telemetry.progress;
                 if (end) end.innerText = telemetry.end;
                 if (time) time.innerText = telemetry.time;
                 if (sess) sess.innerText = state.sessionId;
@@ -7598,21 +8806,6 @@
             renderStandings: () => {
                 const container = document.getElementById('standings-container');
                 if (!container) return;
-
-                // Update tab buttons style
-                const btnS = document.getElementById('tab-btn-standings');
-                const btnC = document.getElementById('tab-btn-cross');
-                if (btnS && btnC) {
-                    const activeStyle = "background: var(--accent-blue); color: #fff; transform: translateY(-1px); border: 1px solid #555;";
-                    const inactiveStyle = "background: #333; color: #aaa; border: 1px solid #444;";
-                    btnS.style = (state.activeStandingsTab !== 'cross') ? activeStyle : inactiveStyle;
-                    btnC.style = (state.activeStandingsTab === 'cross') ? activeStyle : inactiveStyle;
-                }
-
-                if (state.activeStandingsTab === 'cross') {
-                    ui.renderCrossTable(container);
-                    return;
-                }
 
                 const standings = admin.calculateStandings();
                 if (standings.length === 0) {
@@ -7746,20 +8939,33 @@
                     li.style.display = "flex";
                     li.style.alignItems = "center";
                     li.style.padding = "5px 10px";
-                    li.draggable = true;
+                    li.draggable = false;
                     li.dataset.index = idx;
 
                     li.innerHTML = `
-                        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:move;">${track.name}</span>
+                        <span class="match-drag-handle" title="Přetažením myší změníte pořadí skladby" style="cursor: grab; font-size: 1.2em; color: #aaa; padding: 0 6px 0 0; user-select: none; flex-shrink: 0;">&#x283f;</span>
+                        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;">${track.name}</span>
                         <span style="font-size:1.2em; cursor:pointer;" onclick="event.stopPropagation(); music.play(${idx})">${idx === currentMusicIndex && !currentMusicAudio.paused ? '♫' : '▶'}</span>
                     `;
 
+                    // Drag pouze přes úchyt ⠿
+                    const dragHandle = li.querySelector('.match-drag-handle');
+                    if (dragHandle) {
+                        dragHandle.onmouseenter = () => { li.draggable = true; };
+                        dragHandle.onmouseleave = () => { if (!li.classList.contains('is-dragging')) li.draggable = false; };
+                    }
+
                     // Drag & Drop
                     li.addEventListener('dragstart', (e) => {
+                        li.classList.add('is-dragging');
                         e.dataTransfer.setData('text/plain', idx);
                         li.style.opacity = '0.5';
                     });
-                    li.addEventListener('dragend', () => li.style.opacity = '1');
+                    li.addEventListener('dragend', () => {
+                        li.classList.remove('is-dragging');
+                        li.draggable = false;
+                        li.style.opacity = '1';
+                    });
                     li.addEventListener('dragover', (e) => {
                         e.preventDefault();
                         li.classList.add('drag-over');
@@ -7775,7 +8981,10 @@
                         }
                     });
 
-                    li.onclick = () => music.play(idx);
+                    li.onclick = (e) => {
+                        if (e.target.closest('.match-drag-handle')) return;
+                        music.play(idx);
+                    };
                     list.appendChild(li);
                 });
             },
@@ -7859,8 +9068,10 @@
             },
 
             updateScores: () => {
-                document.getElementById('home-score-disp').textContent = state.currentMatch.homeScore;
-                document.getElementById('guest-score-disp').textContent = state.currentMatch.guestScore;
+                const hs = (state.currentMatch.homeScore !== null && state.currentMatch.homeScore !== undefined && !isNaN(state.currentMatch.homeScore)) ? state.currentMatch.homeScore : 0;
+                const gs = (state.currentMatch.guestScore !== null && state.currentMatch.guestScore !== undefined && !isNaN(state.currentMatch.guestScore)) ? state.currentMatch.guestScore : 0;
+                document.getElementById('home-score-disp').textContent = hs;
+                document.getElementById('guest-score-disp').textContent = gs;
             },
 
             updateNames: () => {
@@ -7894,7 +9105,7 @@
             },
 
             updateTimer: () => {
-                const timeLeft = Math.floor(state.timer.timeLeft);
+                const timeLeft = Math.ceil(state.timer.timeLeft);
                 const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                 const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
                 document.getElementById('main-timer').textContent = `${m}:${s}`;
@@ -7977,9 +9188,9 @@
                 state.schedule.forEach((m, idx) => {
                     const li = document.createElement('li');
                     li.className = "match-item";
-                    li.draggable = true;
+                    li.draggable = false;
                     li.dataset.index = idx;
-                    li.title = "Dvojklik pro editaci, Tažením změň pořadí";
+                    li.title = "Klik pro označení, dvojklik pro editaci";
 
                     // Double Click to Edit
                     li.addEventListener('dblclick', (e) => {
@@ -7988,6 +9199,7 @@
 
                     // Drag Events
                     li.addEventListener('dragstart', (e) => {
+                        li.classList.add('is-dragging');
                         // If we are dragging an item that's part of a selection, move the whole selection
                         // If not, select just this item and move it
                         if (!state.selectedIndices.includes(idx)) {
@@ -8005,7 +9217,9 @@
                         li.style.opacity = '0.5';
                     });
 
-                    li.addEventListener('dragend', (e) => {
+                    li.addEventListener('dragend', () => {
+                        li.classList.remove('is-dragging');
+                        li.draggable = false;
                         li.style.opacity = '1';
                         // Remove drop indicator styles from all items
                         document.querySelectorAll('.match-item').forEach(item => {
@@ -8082,6 +9296,7 @@
                     if (isEvent) {
                         const durMin = Math.floor((m.duration || 600) / 60);
                         li.innerHTML = `
+                            <span class="match-drag-handle" title="Přetažením myší změníte pořadí" style="cursor: grab; font-size: 1.2em; color: #aaa; padding: 0 4px 0 0; user-select: none; flex-shrink: 0;">&#x283f;</span>
                             <div style="flex:1; display:grid; grid-template-columns: 120px 1fr 15px 1fr 60px 1fr; align-items:center; font-size:0.85em; gap:5px; padding-right:10px; overflow:hidden;">
                                 <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.title || "Událost"}</div>
                                 <div style="grid-column: 2 / 5; text-align:center; color:#aaa; white-space:nowrap;">⏱ ${durMin}m</div>
@@ -8092,6 +9307,7 @@
                     } else {
                         const matchNum = admin.getMatchNumber(idx, state.schedule);
                         li.innerHTML = `
+                            <span class="match-drag-handle" title="Přetažením myší změníte pořadí zápasu" style="cursor: grab; font-size: 1.2em; color: #aaa; padding: 0 4px 0 0; user-select: none; flex-shrink: 0;">&#x283f;</span>
                             <div style="flex:1; display:grid; grid-template-columns: 120px 1fr 15px 1fr 60px 1fr; align-items:center; font-size:0.85em; gap:5px; padding-right:10px; overflow:hidden;">
                                 <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${matchNum !== null ? matchNum + '.' : ''}</b> ${m.title}</div>
                                 <div style="text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
@@ -8107,7 +9323,15 @@
                         `;
                     }
 
+                    const dragHandle = li.querySelector('.match-drag-handle');
+                    if (dragHandle) {
+                        dragHandle.onmouseenter = () => { li.draggable = true; };
+                        dragHandle.onmouseleave = () => { if (!li.classList.contains('is-dragging')) li.draggable = false; };
+                    }
+
                     li.onclick = (e) => {
+                        // Neklikat výběr při kliku na úchyt přetahování
+                        if (e.target.closest('.match-drag-handle')) return;
                         admin.toggleSelection(idx, e.shiftKey, e.ctrlKey);
                     };
 
@@ -8312,10 +9536,14 @@
 
                     const timerEl = document.getElementById('p-timer');
                     if (timerEl) {
-                        let timeLeft = Math.floor(usedState.timer.timeLeft);
-                        if (usedState.timer && usedState.timer.running && usedState.timer.targetEndTime > 0) {
-                            const remMs = usedState.timer.targetEndTime - Date.now();
-                            timeLeft = Math.max(0, Math.floor(remMs / 1000));
+                        let timeLeft;
+                        // Pokud čas běží a máme zaznamenán čas příjmu, interpolujeme plynule
+                        if (usedState.timer && usedState.timer.running && usedState._localReceivedAt > 0) {
+                            const elapsed = (Date.now() - usedState._localReceivedAt) / 1000;
+                            timeLeft = Math.max(0, Math.ceil(usedState._localReceivedTimeLeft - elapsed));
+                        } else {
+                            // Čas stojí – zobrazit statickou hodnotu
+                            timeLeft = Math.ceil(usedState.timer ? usedState.timer.timeLeft : 0);
                         }
                         const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
                         const s = Math.floor(timeLeft % 60).toString().padStart(2, '0');
@@ -8343,9 +9571,9 @@
                         const gn = document.getElementById('p-guest-name');
                         if (gn) gn.innerText = truncate(getTName(matchData.guestName), 20);
                         const hs = document.getElementById('p-home-score');
-                        if (hs) hs.innerText = matchData.homeScore;
+                        if (hs) hs.innerText = (matchData.homeScore !== null && matchData.homeScore !== undefined && !isNaN(matchData.homeScore)) ? matchData.homeScore : 0;
                         const gs = document.getElementById('p-guest-score');
-                        if (gs) gs.innerText = matchData.guestScore;
+                        if (gs) gs.innerText = (matchData.guestScore !== null && matchData.guestScore !== undefined && !isNaN(matchData.guestScore)) ? matchData.guestScore : 0;
 
                         const scoreBox = document.getElementById('p-score-box');
                         if (scoreBox) scoreBox.classList.toggle('p-row-blink', isBlinking);
@@ -8773,6 +10001,49 @@
         window.addEventListener('load', game.init);
 
     </script>
+
+    <!-- Cloud Sessions Manager Modal -->
+    <div id="modal-cloud-sessions" class="modal-overlay"
+        style="display:none; z-index: 10000; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); align-items:center; justify-content:center;">
+        <div style="background:var(--bg-dark); border:1px solid #444; width:94%; max-width:900px; max-height:85vh; border-radius:8px; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.7);">
+            <div style="padding:16px 20px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h3 style="margin:0; color:var(--accent-blue); display:flex; align-items:center; gap:8px;">
+                        ☁️ Cloudové turnaje na Firebase
+                    </h3>
+                    <div id="cloud-sessions-user-info" style="font-size:0.85em; color:#aaa; margin-top:4px;">
+                        Načítám informace o účtu...
+                    </div>
+                </div>
+                <button class="small-btn btn-yellow" onclick="admin.closeCloudSessionsModal()" style="font-size:1.1em; padding:4px 10px;">✕</button>
+            </div>
+
+            <div style="padding:12px 20px; background:#1c2430; border-bottom:1px solid #2b394d; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="font-size:0.88em; color:#ddd;">
+                    Aktivní relace v tomto okně: <code id="cloud-active-session-id" style="color:var(--accent-green); background:#111; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:1.1em; word-break:break-all;">---</code>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="small-btn btn-green" onclick="admin.saveCurrentSessionToCloud(true)" style="padding:6px 14px; font-weight:bold;" title="Uložit rozpracovaný turnaj do cloudu">
+                        💾 Uložit aktuální turnaj
+                    </button>
+                    <button class="small-btn" onclick="admin.createNewCloudSession()" style="background:#00a2ff; color:#fff; padding:6px 14px; font-weight:bold;" title="Založit nový turnaj s novým kódem relace">
+                        + Nový turnaj / relace
+                    </button>
+                </div>
+            </div>
+
+            <div id="cloud-sessions-list-container" style="flex:1; overflow:auto; padding:15px 20px;">
+                <!-- Seznam uložených relací -->
+            </div>
+
+            <div style="padding:12px 20px; border-top:1px solid #333; display:flex; justify-content:space-between; align-items:center; background:#1a1a1a; border-bottom-left-radius:8px; border-bottom-right-radius:8px;">
+                <div style="font-size:0.78em; color:#888;">
+                    Každý účet má limit maximálně 20 uložených relací. Smazáním uvolníte místo pro další turnaje.
+                </div>
+                <button class="small-btn btn-yellow" onclick="admin.closeCloudSessionsModal()" style="padding:6px 20px;">Zavřít</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Conflict Resolution Modal -->
     <div id="modal-player-conflicts" class="modal-overlay"
