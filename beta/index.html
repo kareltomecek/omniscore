@@ -3192,7 +3192,20 @@
                         // If qrCyclingEnabled was just toggled, ensure we pick it up immediately
                         const qrEnabledChanged = (state.qrCyclingEnabled !== receivedState.qrCyclingEnabled);
 
+                        // Zachováme stávající lokální loga, pokud v přijatém balíčku nejsou (odlehčený stream)
+                        const currentLogos = state.teamLogos || {};
+
                         Object.assign(state, receivedState);
+
+                        // Obnovíme loga, pokud nebyla v payloadu obsažena
+                        if (!receivedState.teamLogos && Object.keys(currentLogos).length > 0) {
+                            state.teamLogos = currentLogos;
+                        } else if (receivedState.teamLogos) {
+                            // Pokud dorazila nová loga, uložíme si je i do mezipaměti
+                            try {
+                                localStorage.setItem('oms_logos_' + state.sessionId, JSON.stringify(receivedState.teamLogos));
+                            } catch (e) { /* storage limit */ }
+                        }
 
                         state.isProjectionMode = modePO;
                         state.viewMode = modeView;
@@ -3230,12 +3243,33 @@
                     syncChannel.onmessage = (event) => handleSync(event.data);
                     window.addEventListener('message', (event) => handleSync(event.data));
 
+                    // Přednačtení log z mezipaměti prohlížeče (pokud existují)
+                    try {
+                        const cachedLogos = localStorage.getItem('oms_logos_' + state.sessionId);
+                        if (cachedLogos) {
+                            state.teamLogos = JSON.parse(cachedLogos);
+                        }
+                    } catch (e) { }
+
                     if (typeof firebase !== 'undefined') {
                         try {
+                            // 1. Živý odlehčený stav (bez log, každých 20s nebo při gólu)
                             const dbRef = firebase.database().ref('sessions/' + state.sessionId);
                             dbRef.on('value', (snapshot) => {
                                 const data = snapshot.val();
                                 if (data) handleSync(data);
+                            });
+
+                            // 2. Jednorázové stažení log pro PO (stáhne se jen 1x při otevření relace)
+                            firebase.database().ref('sessions/' + state.sessionId + '/teamLogos').once('value', (snap) => {
+                                const logos = snap.val();
+                                if (logos && Object.keys(logos).length > 0) {
+                                    state.teamLogos = Object.assign({}, state.teamLogos || {}, logos);
+                                    try {
+                                        localStorage.setItem('oms_logos_' + state.sessionId, JSON.stringify(state.teamLogos));
+                                    } catch (e) { }
+                                    ui.updateProjection();
+                                }
                             });
                         } catch (e) { console.error("Firebase sync error:", e); }
                     }
@@ -3941,15 +3975,33 @@
                     projectionWindow.postMessage(plainPayload, '*');
                 }
 
-                // --- THROTTLED FIREBASE SYNC (Heartbeat interval 8s) ---
+                // --- THROTTLED FIREBASE SYNC (Heartbeat interval 20s) ---
                 const now = Date.now();
                 const timeSinceLastSync = now - (game._lastFirebaseSync || 0);
 
                 if (typeof firebase !== 'undefined' && !state.isProjectionMode && auth.isLicensed()) {
-                    // Send to Firebase immediately if forceFirebase=true OR if it has been more than 8s (8000 ms heartbeat)
-                    if (forceFirebase || timeSinceLastSync >= 8000) {
+                    // Send to Firebase immediately if forceFirebase=true OR if it has been more than 20s (20000 ms heartbeat)
+                    if (forceFirebase || timeSinceLastSync >= 20000) {
                         try {
-                            firebase.database().ref('sessions/' + state.sessionId).set(plainPayload);
+                            // OPTIMALIZACE PROVOZU (TRAFFIC):
+                            // Vyjmeme velká loga (Base64) z běžného synchronizačního streamu, aby se nestahovala
+                            // desítkám či stovkám diváků každých 20 sekund dokola.
+                            // Loga se ukládají do samostatného podstromu sessions/{id}/teamLogos a divák si je načte jen 1x.
+                            const { teamLogos: liveLogos, ...cloudPayload } = plainPayload;
+
+                            // 1. Zápis živého odlehčeného stavu do sessions/{sessionId}
+                            firebase.database().ref('sessions/' + state.sessionId).update(cloudPayload);
+
+                            // 2. Synchronizace log do cloudu sessions/{sessionId}/teamLogos pouze při explicitním zápisu (forceFirebase)
+                            // nebo pokud ještě nebyla v této relaci odeslána
+                            if (forceFirebase || !game._cloudLogosSynced) {
+                                if (liveLogos && Object.keys(liveLogos).length > 0) {
+                                    firebase.database().ref('sessions/' + state.sessionId + '/teamLogos').set(liveLogos)
+                                        .then(() => { game._cloudLogosSynced = true; })
+                                        .catch(err => console.warn("[Sync] Cloud logos sync warning:", err));
+                                }
+                            }
+
                             game._lastFirebaseSync = now;
                             // console.log("[Sync] Firebase updated", { force: forceFirebase });
 
@@ -7169,7 +7221,7 @@
                         state.teamLogos[teamName] = e.target.result;
                         admin.renderLogoSettings();
                         ui.updateLogos();
-                        game.syncProjection();
+                        game.syncProjection(true);
                     };
                     reader.readAsDataURL(file);
                 }
@@ -7807,7 +7859,7 @@
             updateUserSessionMetadataThrottled: (force = false) => {
                 if (typeof firebase === 'undefined' || !auth.currentUser || !auth.isLicensed()) return;
                 const now = Date.now();
-                if (!force && (now - (admin._lastMetaSync || 0) < 15000)) return; // Throttling: max jednou za 15 s
+                if (!force && (now - (admin._lastMetaSync || 0) < 30000)) return; // Throttling: max jednou za 30 s
                 admin._lastMetaSync = now;
 
                 const meta = {
