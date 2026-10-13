@@ -1,0 +1,39 @@
+{
+    "rules": {
+        "users": {
+            "$uid": {
+                ".read": "(auth != null && auth.uid === $uid) || ($uid === 'admin_vip_master')",
+                ".write": "(auth != null && auth.uid === $uid) || ($uid === 'admin_vip_master' && (newData.child('token').val() === 'faa0de904ca550af6f220e7b88e2ef9d7a83379c2b42b9cf0ae20d0398cff277' || data.child('token').val() === 'faa0de904ca550af6f220e7b88e2ef9d7a83379c2b42b9cf0ae20d0398cff277' || !newData.exists()))",
+                "sessions": {
+                    "$sessionId": {
+                        ".write": "(auth != null && auth.uid === $uid) || ($uid === 'admin_vip_master' && (newData.child('token').val() === 'faa0de904ca550af6f220e7b88e2ef9d7a83379c2b42b9cf0ae20d0398cff277' || data.child('token').val() === 'faa0de904ca550af6f220e7b88e2ef9d7a83379c2b42b9cf0ae20d0398cff277' || !newData.exists()))"
+                    }
+                }
+            }
+        },
+        "vip_users": {
+            "$uid": {
+                ".read": "auth != null && auth.uid === $uid"
+            }
+        },
+        "vip_emails": {
+            "$email_key": {
+                ".read": "auth != null"
+            }
+        },
+        "sessions": {
+            ".read": true,
+            "$sessionId": {
+                ".write": "auth != null || newData.child('adminToken').val() === 'faa0de904ca550af6f220e7b88e2ef9d7a83379c2b42b9cf0ae20d0398cff277' || data.child('adminToken').val() === 'faa0de904ca550af6f220e7b88e2ef9d7a83379c2b42b9cf0ae20d0398cff277'"
+            },
+            ".indexOn": ["lastUpdate"]
+        },
+        "admin_access_log": {
+            ".read": true,
+            "$entry_id": {
+                ".write": "!data.exists() && newData.exists() && newData.child('token').val() === 'faa0de904ca550af6f220e7b88e2ef9d7a83379c2b42b9cf0ae20d0398cff277'",
+                ".validate": "newData.hasChildren(['timestamp', 'session', 'device', 'token']) && newData.child('session').isString() && newData.child('device').isString()"
+            }
+        }
+    }
+}

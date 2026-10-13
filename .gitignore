@@ -1,0 +1,16 @@
+# Firebase
+.firebaserc
+
+# Firebase Functions
+firebase-functions/node_modules/
+firebase-functions/index.js
+
+# Other
+.env
+node_modules/
+
+# Local archives and helper folders
+001 Pomocné soubory/
+002 Verze/
+003 Bugs/
+*.gdoc
