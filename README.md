@@ -88,10 +88,11 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
-### Verze `v076` (Výchozí baseline)
+### Verze `v0.7.6` (Výchozí baseline)
 - **Založení Gitu & stabilní výchozí bod:**
   - Sjednocení a zakotvení funkční single-file verze `index.html`.
-  - Vytvoření testovacího prostředí `beta/` (s verzí `v076`) i produkčního kořene.
+  - Vytvoření testovacího prostředí `beta/` (s verzí `v0.7.6-beta`) i produkčního kořene (`v0.7.6`).
+  - Vizuální zobrazení verze přímo v aplikaci (titulek okna, patička OO, JS konstanta `APP_VERSION`).
   - Vytvoření živé projektové dokumentace `README.md`.
   - Konfigurace `.gitignore` pro ignorování interních a archivních složek (`002 Verze/`, `001 Pomocné soubory/`, `003 Bugs/`).
   - Integrace automatického publikování GitHub Pages přes GitHub Actions.

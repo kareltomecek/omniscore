@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS)</title>
+    <title>OmniScore (OmS) v0.7.6</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -2500,7 +2500,7 @@
                 style="font-weight:bold; color:var(--accent-blue); cursor:pointer; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom;" title="Klikněte pro správu cloudových turnajů">---</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:32px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS)</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.6</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2650,6 +2650,8 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
+        const APP_VERSION = "0.7.6";
+
         // --- DATA STRUCTURES ---
         const PHASES = [
             { id: 0, name: "Nastupuje", timeKey: 'setup' },
