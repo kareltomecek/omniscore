@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.6-beta</title>
+    <title>OmniScore (OmS) v0.7.7-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -1689,6 +1689,14 @@
                                 style="background: var(--accent-green); color: #000; font-weight: bold; margin-top:0;">📂
                                 Vybrat soubor (Rozpis nebo Záloha)</button>
 
+                            <button class="btn-full" id="btn-save-cloud-direct" onclick="admin.saveCurrentSessionToCloud(true)"
+                                style="background: #2e7d32; color: #fff; font-weight: bold; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:8px;"
+                                title="Uložit aktuální stav turnaje do cloudu Firebase">
+                                ☁️ Uložit turnaj do cloudu
+                            </button>
+                            <div id="cloud-save-status-info" style="font-size:0.8em; color:#aaa; margin-top:5px; margin-bottom:4px; text-align:center;">
+                            </div>
+
                             <button class="btn-full" onclick="admin.openCloudSessionsModal()"
                                 style="background: #2b4b7c; color: #fff; font-weight: bold; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:8px;">
                                 ☁️ Cloudové turnaje na Firebase (Moje relace)
@@ -2492,15 +2500,16 @@
 
 
     <div id="admin-footer">
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
             <span id="admin-footer-license" onclick="admin.openAdminVipModal()"
                 style="font-size:0.75em; padding:2px 6px; border-radius:4px; font-weight:bold; background:#333; color:#aaa; text-transform:uppercase; cursor:pointer;"
                 title="Klikněte pro administrátorský VIP přístup">...</span>
             <span id="admin-footer-session" onclick="admin.openCloudSessionsModal()"
                 style="font-weight:bold; color:var(--accent-blue); cursor:pointer; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom;" title="Klikněte pro správu cloudových turnajů">---</span>
-            <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:32px;">-</span>
+            <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
+            <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.6-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.7-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2650,7 +2659,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.6-beta";
+        const APP_VERSION = "0.7.7-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -2716,6 +2725,9 @@
             lastUpdate: 0,
             isProjectionMode: false, // Will be set in KOMUNIKACE
             sessionId: "", // Will be set in KOMUNIKACE
+            isMaster: true, // Default: true; ověřuje se při startu vůči cloudu
+            clientTabId: 'client_' + Math.random().toString(36).substring(2, 9),
+            cloudChecked: false, // Zabraňuje odeslání lokálních dat do cloudu před dokončením porovnání verzí
             isLoading: false,
             tournamentName: "",
             tournamentCategory: "", // Add category field
@@ -3388,6 +3400,7 @@
 
                     ui.renderSchedule();
                     ui.render();
+                    admin.updateCloudSaveStatusInfo();
 
                     // Ochrana před nechtěným zavřením okna (Admin)
                     window.addEventListener('beforeunload', (e) => {
@@ -3398,8 +3411,15 @@
                         }
                     });
 
-                    // Force broadcast state immediately after load so opened windows get data
+                    // Force broadcast state immediately after load so opened windows get data (pouze lokální broadcast, cloudChecked je zatím false)
                     game.syncProjection();
+
+                    // Záchranná brzda a kontrola cloudové relace před zápisem do cloudu
+                    if (typeof firebase !== 'undefined') {
+                        admin.checkCloudSessionConflict();
+                    } else {
+                        state.cloudChecked = true;
+                    }
 
                     // Listen for sync requests from projection windows
                     syncChannel.onmessage = (event) => {
@@ -4014,7 +4034,9 @@
                 const now = Date.now();
                 const timeSinceLastSync = now - (game._lastFirebaseSync || 0);
 
-                if (typeof firebase !== 'undefined' && !state.isProjectionMode && auth.isLicensed()) {
+                // Synchronizace do Firebase proběhne POUZE pokud je dokončena úvodní kontrola cloudu (cloudChecked)
+                // a pouze pokud má toto zařízení roli Master (není v bezpečném režimu Divák)
+                if (typeof firebase !== 'undefined' && !state.isProjectionMode && auth.isLicensed() && state.cloudChecked && state.isMaster) {
                     // Send to Firebase immediately if forceFirebase=true OR if it has been more than 20s (20000 ms heartbeat)
                     if (forceFirebase || timeSinceLastSync >= 20000) {
                         try {
@@ -7884,6 +7906,7 @@
                 const loaded = localStorage.getItem('scoreboardState');
                 if (loaded) {
                     const parsed = JSON.parse(loaded);
+                    if (typeof parsed.lastUpdate !== 'undefined') state.lastUpdate = parsed.lastUpdate;
                     state.tournamentName = parsed.tournamentName || "";
                     state.tournamentCategory = parsed.tournamentCategory || "";
                     if (parsed.times) {
@@ -8436,6 +8459,263 @@
                 }
             },
 
+            // ===============================================================================
+            // SPRÁVA RELACÍ, KONTROLA KONFLIKTŮ A MASTER ROLE (SESSION CONFLICT & MASTER)
+            // ===============================================================================
+            updateCloudSaveStatusInfo: () => {
+                const el = document.getElementById('cloud-save-status-info');
+                if (!el) return;
+                const timeStr = state.lastUpdate ? new Date(state.lastUpdate).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : null;
+                const dateStr = state.lastUpdate ? new Date(state.lastUpdate).toLocaleDateString('cs-CZ') : "";
+                const roleBadge = state.isMaster 
+                    ? '<span style="color:var(--accent-green); font-weight:bold;">👑 Master</span>' 
+                    : '<span style="color:#ff9800; font-weight:bold;">👁️ Divák</span>';
+                if (timeStr) {
+                    el.innerHTML = `🟢 Uloženo v cloudu: <b>${dateStr} ${timeStr}</b> | Relace: <b style="color:var(--accent-blue);">${state.sessionId}</b> (${roleBadge})`;
+                } else {
+                    el.innerHTML = `Relace: <b style="color:var(--accent-blue);">${state.sessionId}</b> (${roleBadge})`;
+                }
+            },
+
+            checkCloudSessionConflict: async () => {
+                if (state.isProjectionMode || state.viewMode || isQR || typeof firebase === 'undefined') {
+                    state.cloudChecked = true;
+                    return;
+                }
+
+                try {
+                    const sessRef = firebase.database().ref('sessions/' + state.sessionId);
+                    const snap = await sessRef.once('value');
+                    const cloudData = snap.val();
+
+                    if (!cloudData) {
+                        // Relace na cloudu ještě neexistuje -> toto zařízení je výchozí Master
+                        state.cloudChecked = true;
+                        state.isMaster = true;
+                        admin.claimMasterRole(false);
+                        admin.updateMasterUI();
+                        return;
+                    }
+
+                    // 1. KONTROLA ČASOVÉHO RAZÍTKA (Cloud vs. LocalStorage)
+                    const cloudTime = cloudData.lastUpdate || 0;
+                    const localTime = state.lastUpdate || 0;
+
+                    // Pokud jsou v cloudu prokazatelně novější data (ochranná rezerva 2000 ms)
+                    if (cloudTime > (localTime + 2000)) {
+                        console.warn("[SessionSync] Novější data v cloudu detekována!", { cloudTime, localTime });
+                        const cloudDateStr = new Date(cloudTime).toLocaleString('cs-CZ');
+                        const localDateStr = localTime ? new Date(localTime).toLocaleString('cs-CZ') : "Žádná (nová lokální relace)";
+
+                        // Vygenerujeme přehledné modální okno pro vyřešení konfliktu
+                        const existingModal = document.getElementById('cloud-conflict-modal');
+                        if (existingModal) existingModal.remove();
+
+                        const modalHtml = `
+                            <div id="cloud-conflict-modal" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+                                <div style="background:#1e1e1e; border:2px solid var(--accent-green); border-radius:10px; padding:25px; max-width:550px; width:90%; color:#fff; box-shadow:0 10px 40px rgba(0,0,0,0.8);">
+                                    <h3 style="margin-top:0; color:var(--accent-green); display:flex; align-items:center; gap:10px;">
+                                        <span>☁️</span> V cloudu nalezena novější data
+                                    </h3>
+                                    <p style="font-size:1.0em; line-height:1.5; color:#ddd;">
+                                        Turnaj v cloudu Firebase má novější záznamy než vaše lokální úložiště v tomto prohlížeči.
+                                    </p>
+                                    <div style="background:#2a2a2a; padding:12px; border-radius:6px; margin:15px 0; font-size:0.9em; line-height:1.6; border-left:4px solid var(--accent-blue);">
+                                        <b>Poslední změna v cloudu:</b> <span style="color:#4caf50; font-weight:bold;">${cloudDateStr}</span><br>
+                                        <b>Vaše lokální verze:</b> <span style="color:#bbb;">${localDateStr}</span><br>
+                                        <b>Název turnaje:</b> ${admin.escapeHtml(cloudData.tournamentName || 'Nepojmenovaný turnaj')}<br>
+                                        <b>Zápasů v cloudu:</b> ${(cloudData.schedule || []).length} | <b>Týmů:</b> ${(cloudData.teams || []).length}
+                                    </div>
+                                    <p style="font-size:0.88em; color:#bbb; margin-bottom:20px; line-height:1.4;">
+                                        Doporučujeme načíst data z cloudu, abyste nepřišli o odehrané zápasy či úpravy provedené na druhém počítači (např. v hale).
+                                    </p>
+                                    <div style="display:flex; gap:10px; justify-content:flex-end;">
+                                        <button class="btn" onclick="admin.resolveConflictKeepLocal()" style="background:#444; color:#ddd; padding:8px 16px;">
+                                            Ponechat lokální data
+                                        </button>
+                                        <button class="btn btn-green" onclick="admin.resolveConflictLoadCloud()" style="padding:8px 20px; font-weight:bold;">
+                                            📥 Načíst z cloudu (Doporučeno)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        document.body.insertAdjacentHTML('beforeend', modalHtml);
+                        return;
+                    }
+
+                    // 2. KONTROLA MASTER ROLE (pokud nebyl zjištěn konflikt dat)
+                    state.cloudChecked = true;
+                    admin.checkMasterRole(cloudData);
+
+                } catch (err) {
+                    console.warn("[SessionSync] Chyba při kontrole cloudové relace:", err);
+                    state.cloudChecked = true;
+                    state.isMaster = true;
+                    admin.updateMasterUI();
+                }
+            },
+
+            resolveConflictLoadCloud: async () => {
+                const m = document.getElementById('cloud-conflict-modal');
+                if (m) m.remove();
+
+                try {
+                    const snap = await firebase.database().ref('sessions/' + state.sessionId).once('value');
+                    const cloudData = snap.val();
+                    if (cloudData) {
+                        admin.applyCloudData(cloudData);
+                    }
+                    state.cloudChecked = true;
+                    admin.checkMasterRole(cloudData);
+                } catch (e) {
+                    console.error("Chyba při stahování novějších dat z cloudu:", e);
+                    alert("Nepodařilo se stáhnout data: " + e.message);
+                    state.cloudChecked = true;
+                }
+            },
+
+            resolveConflictKeepLocal: () => {
+                const m = document.getElementById('cloud-conflict-modal');
+                if (m) m.remove();
+                state.cloudChecked = true;
+                admin.checkMasterRole(null);
+            },
+
+            applyCloudData: (cloudData) => {
+                const mergedState = {
+                    ...cloudData,
+                    sessionId: state.sessionId,
+                    teamAnthems: state.teamAnthems || {},
+                    masterPlayers: (cloudData.masterPlayers && cloudData.masterPlayers.length > 0) ? cloudData.masterPlayers : (state.masterPlayers || []),
+                    musicPlaylist: state.musicPlaylist || []
+                };
+                localStorage.setItem('scoreboardState', JSON.stringify(mergedState));
+                admin.loadFromStorage();
+                if (state.activeMatchIndex > -1) {
+                    admin.loadMatch(state.activeMatchIndex, false);
+                }
+                ui.renderSchedule();
+                ui.render();
+                game.syncProjection();
+                admin.updateCloudSaveStatusInfo();
+                console.log("%c[Sync] Novější stav z cloudu úspěšně načten", "color:#4caf50; font-weight:bold;", { lastUpdate: state.lastUpdate });
+            },
+
+            checkMasterRole: (cloudData) => {
+                const activeMaster = cloudData ? cloudData.activeMaster : null;
+                const now = Date.now();
+                const isOtherMasterActive = activeMaster &&
+                    activeMaster.clientTabId &&
+                    activeMaster.clientTabId !== state.clientTabId &&
+                    (now - (activeMaster.lastHeartbeat || 0) < 45000);
+
+                if (isOtherMasterActive) {
+                    const lastSec = Math.max(1, Math.round((now - activeMaster.lastHeartbeat) / 1000));
+                    const existingModal = document.getElementById('master-conflict-modal');
+                    if (existingModal) existingModal.remove();
+
+                    const modalHtml = `
+                        <div id="master-conflict-modal" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+                            <div style="background:#1e1e1e; border:2px solid var(--accent-blue); border-radius:10px; padding:25px; max-width:540px; width:90%; color:#fff; box-shadow:0 10px 40px rgba(0,0,0,0.8);">
+                                <h3 style="margin-top:0; color:var(--accent-blue); display:flex; align-items:center; gap:10px;">
+                                    <span>🎮</span> Řízení turnaje (Master)
+                                </h3>
+                                <p style="font-size:1.0em; line-height:1.5; color:#ddd;">
+                                    Tento turnaj je momentálně aktivně ovládán jiným počítačem / zařízením (poslední aktivita před ${lastSec} s).
+                                </p>
+                                <p style="font-size:0.95em; color:#bbb; line-height:1.5;">
+                                    Chcete převzít řízení tohoto turnaje na tomto počítači (stát se Masterem)?
+                                </p>
+                                <div style="background:#2a2a2a; padding:12px; border-radius:6px; margin:15px 0; font-size:0.85em; color:#aaa; line-height:1.4;">
+                                    • <b>Převzít řízení (Master):</b> Budete moci plně ovládat časomíru a výsledky. Druhé zařízení bude přepnuto do režimu sledování.<br>
+                                    • <b>Pouze sledovat (Divák):</b> Otevře se rozhraní pouze pro čtení – žádné lokální akce se neodešlou do cloudu.
+                                </div>
+                                <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+                                    <button class="btn" onclick="admin.setSpectatorMode()" style="background:#444; color:#ddd; padding:8px 16px;">
+                                        👁️ Pouze sledovat (Divák)
+                                    </button>
+                                    <button class="btn btn-blue" onclick="admin.claimMasterRole(true)" style="padding:8px 20px; font-weight:bold;">
+                                        👑 Převzít řízení (Master)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+                } else {
+                    state.isMaster = true;
+                    admin.claimMasterRole(false);
+                }
+            },
+
+            claimMasterRole: (dismissModal = false) => {
+                if (dismissModal) {
+                    const m = document.getElementById('master-conflict-modal');
+                    if (m) m.remove();
+                }
+                state.isMaster = true;
+                admin.updateMasterUI();
+                admin.listenToMasterChanges();
+
+                if (typeof firebase !== 'undefined' && auth.isLicensed()) {
+                    firebase.database().ref('sessions/' + state.sessionId + '/activeMaster').set({
+                        clientTabId: state.clientTabId,
+                        lastHeartbeat: Date.now()
+                    }).catch(err => console.warn("[Master] Nastavení mastera selhalo:", err));
+                }
+
+                if (admin._masterHeartbeatInterval) clearInterval(admin._masterHeartbeatInterval);
+                admin._masterHeartbeatInterval = setInterval(() => {
+                    if (state.isMaster && typeof firebase !== 'undefined' && auth.isLicensed()) {
+                        firebase.database().ref('sessions/' + state.sessionId + '/activeMaster').update({
+                            lastHeartbeat: Date.now()
+                        }).catch(() => {});
+                    }
+                }, 15000);
+            },
+
+            setSpectatorMode: () => {
+                const m = document.getElementById('master-conflict-modal');
+                if (m) m.remove();
+                state.isMaster = false;
+                if (admin._masterHeartbeatInterval) {
+                    clearInterval(admin._masterHeartbeatInterval);
+                    admin._masterHeartbeatInterval = null;
+                }
+                admin.updateMasterUI();
+                admin.listenToMasterChanges();
+            },
+
+            listenToMasterChanges: () => {
+                if (typeof firebase === 'undefined' || admin._masterListenerAttached) return;
+                admin._masterListenerAttached = true;
+                const masterRef = firebase.database().ref('sessions/' + state.sessionId + '/activeMaster');
+                masterRef.on('value', snap => {
+                    const masterVal = snap.val();
+                    if (!masterVal) return;
+                    if (masterVal.clientTabId && masterVal.clientTabId !== state.clientTabId) {
+                        const now = Date.now();
+                        if (now - (masterVal.lastHeartbeat || 0) < 45000) {
+                            if (state.isMaster) {
+                                state.isMaster = false;
+                                if (admin._masterHeartbeatInterval) {
+                                    clearInterval(admin._masterHeartbeatInterval);
+                                    admin._masterHeartbeatInterval = null;
+                                }
+                                admin.updateMasterUI();
+                                alert("Řízení tohoto turnaje bylo převzato jiným zařízením.\n\nTento počítač byl přepnut do bezpečného režimu Divák (pouze pro čtení).");
+                            }
+                        }
+                    }
+                });
+            },
+
+            updateMasterUI: () => {
+                ui.updateAdminFooter();
+                admin.updateCloudSaveStatusInfo();
+            },
+
             saveCurrentSessionToCloud: async (showFeedback = true) => {
                 if (typeof firebase === 'undefined' || !auth.isLicensed()) {
                     alert("Pro uložení do cloudu se prosím přihlaste s platnou licencí.");
@@ -8445,6 +8725,13 @@
                 if (!cloudTarget) {
                     alert("Chybí oprávnění pro cloudovou správu turnajů.");
                     return;
+                }
+
+                if (!state.isMaster) {
+                    if (!confirm("Tento počítač je v režimu Divák (pouze pro čtení).\n\nChcete převzít řízení (stát se Masterem) a uložit tento stav turnaje do cloudu?")) {
+                        return;
+                    }
+                    admin.claimMasterRole(false);
                 }
 
                 try {
@@ -8461,6 +8748,7 @@
 
                     game.syncProjection(true);
                     admin.updateUserSessionMetadataThrottled(true);
+                    admin.updateCloudSaveStatusInfo();
 
                     if (showFeedback) {
                         alert(`Turnaj "${state.tournamentName || 'Nepojmenovaný turnaj'}" byl úspěšně uložen do cloudu Firebase!\n\nKód relace: ${state.sessionId}`);
@@ -9083,6 +9371,25 @@
                 if (end) end.innerText = telemetry.end;
                 if (time) time.innerText = telemetry.time;
                 if (sess) sess.innerText = state.sessionId;
+
+                const role = document.getElementById('admin-footer-role');
+                if (role) {
+                    if (state.isMaster) {
+                        role.innerHTML = "👑 MASTER";
+                        role.style.background = "rgba(76, 175, 80, 0.25)";
+                        role.style.color = "var(--accent-green)";
+                        role.style.border = "1px solid var(--accent-green)";
+                        role.title = "Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák.";
+                        role.onclick = () => admin.setSpectatorMode();
+                    } else {
+                        role.innerHTML = "👁️ DIVÁK (Klikněte pro převzetí)";
+                        role.style.background = "#e65100";
+                        role.style.color = "#fff";
+                        role.style.border = "1px solid #ff9800";
+                        role.title = "Režim Divák (pouze pro čtení – změny se do cloudu nezapisují). Klikněte pro převzetí řízení (stát se Masterem).";
+                        role.onclick = () => admin.claimMasterRole(false);
+                    }
+                }
 
                 if (lic) {
                     const status = auth.getLicenseStatus();

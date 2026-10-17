@@ -65,6 +65,24 @@ Základní synchronizovaný datový objekt reprezentuje aktuální stav utkání
 - `penalties`: Aktivní tresty pro domácí i hosty (číslo hráče, délka trestu, zbývající čas).
 - `matchState`: Stav utkání (`stopped`, `running`, `timeout`, `intermission`, `finished`).
 - `overlay`: Aktivní celoobrazovkové překryvy na PO (např. animace gólu, timeout, reklama).
+- `lastUpdate`: Unix timestamp poslední změny stavu turnaje.
+- `activeMaster`: Informace o zařízení, které aktivně řídí turnaj (`clientTabId`, `lastHeartbeat`).
+
+---
+
+## 🔒 Správa relací a synchronizace (Multi-device ochrana)
+
+Aplikace řeší souběh více zařízení pod jedním uživatelským účtem:
+1. **Záchranná brzda při startu (Cloud vs. LocalStorage):**
+   - Při startu OO se data z `localStorage` automaticky nevysílají do cloudu.
+   - Proběhne kontrola `lastUpdate` v cloudu vs. lokálně.
+   - Pokud jsou v cloudu novější data (např. z turnaje v hale), aplikace nabídne načtení novějších dat z cloudu.
+2. **Řízení Master vs. Divák:**
+   - Každá relace eviduje aktivní řídicí zařízení (`activeMaster`).
+   - Při otevření turnaje na dalším počítači je uživatel dotázán na převzetí řízení (Master) nebo otevření pouze pro čtení (Divák).
+   - Zařízení v režimu Divák má zablokovaný zápis do cloudu, aby nedošlo k přepsání běžícího turnaje.
+3. **Přímé ukládání do cloudu:**
+   - V akordeonu *Nastavení Turnaje* je k dispozici přímé tlačítko *„☁️ Uložit turnaj do cloudu“* s indikací času posledního uložení a kódu relace.
 
 ---
 
@@ -87,6 +105,17 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 ---
 
 ## 📝 Changelog
+
+### Verze `v0.7.7-beta` (Testovací větev)
+- **Inteligentní správa relací a ochrana dat při práci z více počítačů:**
+  - Implementována záchranná brzda při startu OO: porovnání časových razítek (`lastUpdate`) v cloudu Firebase a lokálním úložišti `localStorage`.
+  - Pokud jsou v cloudu novější data (např. odehraný turnaj z haly), aplikace zobrazí modální dialog s možností okamžitého načtení dat z cloudu a zamezí automatickému přepsání staršími lokálními daty.
+  - Implementován mechanismus řízení **Master vs. Divák**:
+    - Detekce aktivně řízeného turnaje jiným zařízením s dotazem na převzetí řízení.
+    - Režim Divák (pouze pro čtení) má zablokovaný zápis do cloudu pro maximální bezpečnost.
+    - Vizuální stavový štítek role v patičce OO (`👑 MASTER` / `👁️ DIVÁK`) s možností přepnutí jedním klikem.
+  - Přidáno přímé tlačítko **„☁️ Uložit turnaj do cloudu“** přímo do akordeonu *Nastavení Turnaje* (sekce *Rychlý start / Import / Obnova*) včetně zobrazení času posledního uložení.
+  - Opravena obnova časového razítka `lastUpdate` při načítání z `localStorage`.
 
 ### Verze `v0.7.6` (Výchozí baseline)
 - **Založení Gitu & stabilní výchozí bod:**
