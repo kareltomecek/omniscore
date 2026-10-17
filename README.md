@@ -106,6 +106,10 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.14-beta` (Testovací větev)
+- **Zpřesnění textu v informační liště a hlášení:**
+  - Text v horní žluté liště `#spectator-banner` upraven na: *„REŽIM DIVÁK: Turnaj aktivně řídí jiné zařízení. Ovládací prvky jsou uzamčeny (můžete pouze číst).“*
+
 ### Verze `v0.7.13-beta` (Testovací větev)
 - **Dokonalá vizuální symetrie přepínače rolí v patičce:**
   - Tlačítko `👁️ DIVÁK` v patičce bylo upraveno tak, aby mělo identický kompaktní formát jako tlačítko `👑 MASTER`.

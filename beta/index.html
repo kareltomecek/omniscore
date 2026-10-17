@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.13-beta</title>
+    <title>OmniScore (OmS) v0.7.14-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -1580,7 +1580,7 @@
     <div id="spectator-banner">
         <div style="display:flex; align-items:center; gap:10px;">
             <span style="font-size:1.3em;">👁️</span>
-            <span><b>REŽIM DIVÁK:</b> Turnaj aktivně řídí jiné zařízení. Ovládací prvky jsou uzamčeny (pouze pro čtení).</span>
+            <span><b>REŽIM DIVÁK:</b> Turnaj aktivně řídí jiné zařízení. Ovládací prvky jsou uzamčeny (můžete pouze číst).</span>
         </div>
         <button onclick="admin.claimMasterRole(false)" style="background:#111; color:#fff; border:1px solid #333; padding:7px 16px; border-radius:5px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
             👑 Převzít řízení (Master)
@@ -2597,7 +2597,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.13-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.14-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2747,7 +2747,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.13-beta";
+        const APP_VERSION = "0.7.14-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -8859,7 +8859,7 @@
                                     admin._masterHeartbeatInterval = null;
                                 }
                                 admin.updateMasterUI();
-                                alert("Řízení tohoto turnaje bylo převzato jiným zařízením.\n\nTento počítač byl přepnut do bezpečného režimu Divák (pouze pro čtení) a ovládací prvky byly uzamčeny.");
+                                alert("Řízení tohoto turnaje bylo převzato jiným zařízením.\n\nTento počítač byl přepnut do bezpečného režimu Divák (můžete pouze číst) a ovládací prvky byly uzamčeny.");
                             }
                         }
                     }
