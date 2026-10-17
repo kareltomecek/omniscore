@@ -106,6 +106,11 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.10-beta` (Testovací větev)
+- **Kompletní neprodyšné uzamčení režimu Divák (Spectator Lockdown):**
+  - Uzamčeny všechny zbývající interaktivní prvky: klikací obrázky log družstev v `#acc-logos`, popisky (`<label>`) a checkboxy automatického režimu a posuvníky v `#acc-music`.
+  - Přidány bezpečnostní pojistky přímo do JavaScriptových funkcí nahrávání log (`handleLogoUpload`, `handleDefaultLogo`), znělek (`handleAnthemUpload`) a nastavení hudby (`pickDirectory`, `setAutoEnabled`, `setMode`, `setFadeDuration`, `setAutoChangeStrategy`), které v režimu Divák akci striktně zablokují.
+
 ### Verze `v0.7.9-beta` (Testovací větev)
 - **Rozšíření předvoleb názvů zápasů o umístění:**
   - Do výběrového pole *Název / Skupina* v rozpisu zápasů přidány předvolby: *O 3. místo*, *O 5. místo*, *O 7. místo*, *O 9. místo*, *O 11. místo*, *O 13. místo* a *O 15. místo*.

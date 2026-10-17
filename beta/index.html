@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.9-beta</title>
+    <title>OmniScore (OmS) v0.7.10-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -1505,21 +1505,41 @@
         }
 
         /* === REŽIM DIVÁK (SPECTATOR MODE) === */
-        body.mode-spectator #game-controls .phase-nav button,
-        body.mode-spectator #game-controls .score-controls button,
-        body.mode-spectator #game-controls .timer-controls button,
-        body.mode-spectator #game-controls .audio-controls button,
-        body.mode-spectator #admin-panel input,
-        body.mode-spectator #admin-panel select,
-        body.mode-spectator #admin-panel textarea,
-        body.mode-spectator #acc-settings button,
-        body.mode-spectator #acc-players button,
-        body.mode-spectator #acc-logos button,
-        body.mode-spectator #acc-schedule button,
-        body.mode-spectator #acc-music button {
-            opacity: 0.35 !important;
+        body.mode-spectator #game-controls .phase-nav,
+        body.mode-spectator #game-controls .scoreboard-interface,
+        body.mode-spectator #game-controls .timer-interface,
+        body.mode-spectator #game-controls .audio-controls,
+        body.mode-spectator #acc-settings .accordion-content,
+        body.mode-spectator #acc-players .accordion-content,
+        body.mode-spectator #acc-logos .accordion-content,
+        body.mode-spectator #acc-music .accordion-content,
+        body.mode-spectator #acc-schedule #sched-form-container,
+        body.mode-spectator #acc-schedule .schedule-toolbar,
+        body.mode-spectator #acc-schedule .match-item button,
+        body.mode-spectator #admin-panel input:not(.allow-spectator),
+        body.mode-spectator #admin-panel select:not(.allow-spectator),
+        body.mode-spectator #admin-panel textarea:not(.allow-spectator) {
+            opacity: 0.38 !important;
             pointer-events: none !important;
-            filter: grayscale(80%) !important;
+            filter: grayscale(70%) !important;
+            cursor: not-allowed !important;
+            user-select: none !important;
+        }
+
+        body.mode-spectator #acc-logos .accordion-content img,
+        body.mode-spectator #acc-logos .accordion-content input,
+        body.mode-spectator #acc-logos .accordion-content button,
+        body.mode-spectator #acc-music .accordion-content label,
+        body.mode-spectator #acc-music .accordion-content input,
+        body.mode-spectator #acc-music .accordion-content select,
+        body.mode-spectator #acc-music .accordion-content button,
+        body.mode-spectator #acc-settings .accordion-content label,
+        body.mode-spectator #acc-settings .accordion-content input,
+        body.mode-spectator #acc-settings .accordion-content button,
+        body.mode-spectator #acc-players .accordion-content label,
+        body.mode-spectator #acc-players .accordion-content input,
+        body.mode-spectator #acc-players .accordion-content button {
+            pointer-events: none !important;
             cursor: not-allowed !important;
         }
 
@@ -2570,7 +2590,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.9-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.10-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2720,7 +2740,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.9-beta";
+        const APP_VERSION = "0.7.10-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -4231,6 +4251,7 @@
                 } catch (e) { return null; }
             },
             async pickDirectory() {
+                if (!state.isMaster) return;
                 try {
                     directoryHandle = await window.showDirectoryPicker();
                     await music.saveHandle(directoryHandle);
@@ -4310,19 +4331,23 @@
                 admin.saveToStorage(); game.syncProjection();
             },
             setAutoEnabled(val) {
+                if (!state.isMaster) return;
                 state.musicAutoEnabled = val;
                 admin.saveToStorage(); game.syncProjection();
             },
             setMode(val) {
+                if (!state.isMaster) return;
                 state.musicMode = val;
                 admin.saveToStorage(); game.syncProjection();
             },
             setFadeDuration(val) {
+                if (!state.isMaster) return;
                 state.musicFadeDuration = parseFloat(val);
                 document.getElementById('fade-dur-disp').innerText = state.musicFadeDuration;
                 admin.saveToStorage(); game.syncProjection();
             },
             setAutoChangeStrategy(val) {
+                if (!state.isMaster) return;
                 state.musicAutoChangeStrategy = val;
                 admin.saveToStorage(); game.syncProjection();
             },
@@ -7527,6 +7552,11 @@
             },
 
             handleAnthemUpload: (teamName, input) => {
+                if (!state.isMaster) {
+                    alert("Jste v režimu Divák (pouze pro čtení). Pro změny nejprve převezměte řízení (Master).");
+                    input.value = "";
+                    return;
+                }
                 if (input.files && input.files[0]) {
                     const file = input.files[0];
                     if (file.size > 1024 * 1024) {
@@ -7544,6 +7574,11 @@
             },
 
             handleLogoUpload: (teamName, input) => {
+                if (!state.isMaster) {
+                    alert("Jste v režimu Divák (pouze pro čtení). Pro změny nejprve převezměte řízení (Master).");
+                    input.value = "";
+                    return;
+                }
                 if (input.files && input.files[0]) {
                     const file = input.files[0];
                     if (file.size > 500 * 1024) {
@@ -7563,6 +7598,11 @@
             },
 
             handleDefaultLogo: (input) => {
+                if (!state.isMaster) {
+                    alert("Jste v režimu Divák (pouze pro čtení). Pro změny nejprve převezměte řízení (Master).");
+                    input.value = "";
+                    return;
+                }
                 if (input.files && input.files[0]) {
                     const file = input.files[0];
                     if (file.size > 500 * 1024) {
