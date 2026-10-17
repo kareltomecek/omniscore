@@ -106,6 +106,11 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.12-beta` (Testovací větev)
+- **Vyladění rozhraní a vizuální sjednocení režimu Divák:**
+  - **Skrytí nastavení projekce ve Veřejných zobrazeních:** Spodní blok *Nastavení zobrazení* (volba tématu, velikost času v projekci, zpoždění kroku, střídání QR kódů, interval a prolínání) je v režimu Divák zcela skryt (`display: none`). V sekci tak zůstávají pouze čisté odkazy a tlačítka pro QR kódy a veřejné pohledy.
+  - **Barevné sjednocení stavového tlačítka:** Spodní tlačítko `👁️ DIVÁK (Klikněte pro převzetí)` v patičce bylo přebarveno na stejný teplý žlutý odstín (`#ff9800`) s kontrastním černým textem jako horní informační lišta.
+
 ### Verze `v0.7.11-beta` (Testovací větev)
 - **Kompletní a neprodyšné uzamčení režimu Divák (Spectator Lockdown Fix):**
   - **Oprava CSS selektorů:** Opraveny selektory akordeonů (`#acc-settings`, `#acc-logos`, `#acc-players`, `#acc-music`, `#acc-app-settings`), které se dříve chybně dotazovaly na neexistujícího potomka `.accordion-content`. Nyní jsou všechny interaktivní prvky uvnitř těchto sekcí (tlačítka `+ Přidat družstvo`, `🎲 Vylosovat pořadí`, `🔒 Pořadí zamčeno`, klikací loga týmů, audio checkboxy atd.) 100% zablokované proti kliknutí (`pointer-events: none`) a zašedlé.

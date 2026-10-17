@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.11-beta</title>
+    <title>OmniScore (OmS) v0.7.12-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -1543,6 +1543,11 @@
             user-select: none !important;
         }
 
+        /* V režimu Divák skrýt editační nastavení projekce ve Veřejných zobrazeních */
+        body.mode-spectator #public-views-display-settings {
+            display: none !important;
+        }
+
         #spectator-banner {
             display: none;
             background: #ff9800;
@@ -2443,51 +2448,53 @@
                         </div>
                     </div>
 
-                    <h4 style="margin: 20px 0 10px 0; border:none; padding-bottom:5px; border-bottom:1px solid #333;">
-                        Nastavení zobrazení</h4>
-                    <div style="display:grid; grid-template-columns:1fr; gap:10px;">
-                        <div class="form-group">
-                            <label>Téma (Vzhled)</label>
-                            <select id="input-theme" onchange="admin.saveSettings(false); game.syncProjection()">
-                                <option value="light">Světlý režim</option>
-                                <option value="dark">Tmavý režim</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="input-po-timer-size">Velikost času v Projekci Skóre</label>
-                            <select id="input-po-timer-size" onchange="admin.saveSettings(false)">
-                                <option value="small">Menší (-20 %)</option>
-                                <option value="standard" selected>Standardní (100 %)</option>
-                                <option value="large">Větší (+20 %)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Zpoždění 1. kroku (s) v Projekci Skóre</label>
-                            <input type="number" id="input-po-delay" value="10" min="1" max="20"
-                                oninput="admin.validateInputRange(this, 20)"
-                                onkeydown="return admin.restrictToNumbers(event)">
-                        </div>
-                        <div class="form-group" style="border-top: 1px solid #333; padding-top: 10px; margin-top: 5px;">
-                            <label
-                                style="display:flex; align-items:center; gap:10px; cursor:pointer; color: var(--accent-yellow); font-weight: bold;">
-                                <input type="checkbox" id="input-qr-cycling"
-                                    onchange="admin.saveSettings(false); game.syncProjection()" style="width:auto;">
-                                Střídat QR kódy v projekci
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>Interval střídání (s)</label>
-                            <input type="number" id="input-qr-interval" value="8" min="5" max="60"
-                                oninput="admin.validateInputRange(this, 60)"
-                                onchange="admin.saveSettings(false); game.syncProjection()"
-                                onkeydown="return admin.restrictToNumbers(event)">
-                        </div>
-                        <div class="form-group">
-                            <label>Délka prolínání (s)</label>
-                            <input type="number" id="input-qr-transition" value="2" min="1" max="8" step="1"
-                                oninput="admin.validateInputRange(this, 8)"
-                                onchange="admin.saveSettings(false); game.syncProjection()"
-                                onkeydown="return admin.restrictToNumbers(event)">
+                    <div id="public-views-display-settings">
+                        <h4 style="margin: 20px 0 10px 0; border:none; padding-bottom:5px; border-bottom:1px solid #333;">
+                            Nastavení zobrazení</h4>
+                        <div style="display:grid; grid-template-columns:1fr; gap:10px;">
+                            <div class="form-group">
+                                <label>Téma (Vzhled)</label>
+                                <select id="input-theme" onchange="admin.saveSettings(false); game.syncProjection()">
+                                    <option value="light">Světlý režim</option>
+                                    <option value="dark">Tmavý režim</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="input-po-timer-size">Velikost času v Projekci Skóre</label>
+                                <select id="input-po-timer-size" onchange="admin.saveSettings(false)">
+                                    <option value="small">Menší (-20 %)</option>
+                                    <option value="standard" selected>Standardní (100 %)</option>
+                                    <option value="large">Větší (+20 %)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Zpoždění 1. kroku (s) v Projekci Skóre</label>
+                                <input type="number" id="input-po-delay" value="10" min="1" max="20"
+                                    oninput="admin.validateInputRange(this, 20)"
+                                    onkeydown="return admin.restrictToNumbers(event)">
+                            </div>
+                            <div class="form-group" style="border-top: 1px solid #333; padding-top: 10px; margin-top: 5px;">
+                                <label
+                                    style="display:flex; align-items:center; gap:10px; cursor:pointer; color: var(--accent-yellow); font-weight: bold;">
+                                    <input type="checkbox" id="input-qr-cycling"
+                                        onchange="admin.saveSettings(false); game.syncProjection()" style="width:auto;">
+                                    Střídat QR kódy v projekci
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>Interval střídání (s)</label>
+                                <input type="number" id="input-qr-interval" value="8" min="5" max="60"
+                                    oninput="admin.validateInputRange(this, 60)"
+                                    onchange="admin.saveSettings(false); game.syncProjection()"
+                                    onkeydown="return admin.restrictToNumbers(event)">
+                            </div>
+                            <div class="form-group">
+                                <label>Délka prolínání (s)</label>
+                                <input type="number" id="input-qr-transition" value="2" min="1" max="8" step="1"
+                                    oninput="admin.validateInputRange(this, 8)"
+                                    onchange="admin.saveSettings(false); game.syncProjection()"
+                                    onkeydown="return admin.restrictToNumbers(event)">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2590,7 +2597,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.11-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.12-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2740,7 +2747,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.11-beta";
+        const APP_VERSION = "0.7.12-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -9543,9 +9550,9 @@
                         role.onclick = () => admin.setSpectatorMode();
                     } else {
                         role.innerHTML = "👁️ DIVÁK (Klikněte pro převzetí)";
-                        role.style.background = "#e65100";
-                        role.style.color = "#fff";
-                        role.style.border = "1px solid #ff9800";
+                        role.style.background = "#ff9800";
+                        role.style.color = "#000";
+                        role.style.border = "1px solid #ffb74d";
                         role.title = "Režim Divák (pouze pro čtení – změny se do cloudu nezapisují). Klikněte pro převzetí řízení (stát se Masterem).";
                         role.onclick = () => admin.claimMasterRole(false);
                     }
