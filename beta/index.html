@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.10-beta</title>
+    <title>OmniScore (OmS) v0.7.11-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -1505,20 +1505,29 @@
         }
 
         /* === REŽIM DIVÁK (SPECTATOR MODE) === */
+        /* Zašednutí a zablokování ovládání zápasu a časomíry */
         body.mode-spectator #game-controls .phase-nav,
+        body.mode-spectator #game-controls .phase-nav *,
         body.mode-spectator #game-controls .scoreboard-interface,
-        body.mode-spectator #game-controls .timer-interface,
-        body.mode-spectator #game-controls .audio-controls,
-        body.mode-spectator #acc-settings .accordion-content,
-        body.mode-spectator #acc-players .accordion-content,
-        body.mode-spectator #acc-logos .accordion-content,
-        body.mode-spectator #acc-music .accordion-content,
+        body.mode-spectator #game-controls .scoreboard-interface *,
+        /* Kompletní zablokování editovatelných sekcí turnajové správy (obsah akordeonů) */
+        body.mode-spectator #acc-settings,
+        body.mode-spectator #acc-settings *,
+        body.mode-spectator #acc-players,
+        body.mode-spectator #acc-players *,
+        body.mode-spectator #acc-logos,
+        body.mode-spectator #acc-logos *,
+        body.mode-spectator #acc-music,
+        body.mode-spectator #acc-music *,
+        body.mode-spectator #acc-app-settings,
+        body.mode-spectator #acc-app-settings *,
+        /* Zablokování generátoru a editačních nástrojů rozpisu zápasů */
+        body.mode-spectator #acc-schedule #sched-section-gen,
+        body.mode-spectator #acc-schedule #sched-section-gen *,
         body.mode-spectator #acc-schedule #sched-form-container,
+        body.mode-spectator #acc-schedule #sched-form-container *,
         body.mode-spectator #acc-schedule .schedule-toolbar,
-        body.mode-spectator #acc-schedule .match-item button,
-        body.mode-spectator #admin-panel input:not(.allow-spectator),
-        body.mode-spectator #admin-panel select:not(.allow-spectator),
-        body.mode-spectator #admin-panel textarea:not(.allow-spectator) {
+        body.mode-spectator #acc-schedule .schedule-toolbar * {
             opacity: 0.38 !important;
             pointer-events: none !important;
             filter: grayscale(70%) !important;
@@ -1526,21 +1535,12 @@
             user-select: none !important;
         }
 
-        body.mode-spectator #acc-logos .accordion-content img,
-        body.mode-spectator #acc-logos .accordion-content input,
-        body.mode-spectator #acc-logos .accordion-content button,
-        body.mode-spectator #acc-music .accordion-content label,
-        body.mode-spectator #acc-music .accordion-content input,
-        body.mode-spectator #acc-music .accordion-content select,
-        body.mode-spectator #acc-music .accordion-content button,
-        body.mode-spectator #acc-settings .accordion-content label,
-        body.mode-spectator #acc-settings .accordion-content input,
-        body.mode-spectator #acc-settings .accordion-content button,
-        body.mode-spectator #acc-players .accordion-content label,
-        body.mode-spectator #acc-players .accordion-content input,
-        body.mode-spectator #acc-players .accordion-content button {
+        /* V rozpisu zápasů ponechat seznam čitelný a scrollovatelný, ale zablokovat kliknutí a přetahování položek */
+        body.mode-spectator #acc-schedule .match-item,
+        body.mode-spectator #acc-schedule .match-item * {
             pointer-events: none !important;
-            cursor: not-allowed !important;
+            cursor: default !important;
+            user-select: none !important;
         }
 
         #spectator-banner {
@@ -2590,7 +2590,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.10-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.11-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2740,7 +2740,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.10-beta";
+        const APP_VERSION = "0.7.11-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -3612,6 +3612,7 @@
             },
 
             toggleTimer: () => {
+                if (!state.isMaster) return;
                 state.timer.running = !state.timer.running;
                 if (state.timer.running) {
                     requestScreenWakeLock();
@@ -3661,6 +3662,7 @@
             },
 
             resetTimer: () => {
+                if (!state.isMaster) return;
                 state.timer.running = false;
                 releaseScreenWakeLock();
                 if (state.currentMatch.isEvent) {
@@ -3677,6 +3679,7 @@
             },
 
             adjustTime: (seconds) => {
+                if (!state.isMaster) return;
                 state.timer.timeLeft += seconds;
                 if (state.timer.timeLeft < 0) state.timer.timeLeft = 0;
                 if (state.timer.running) {
@@ -3687,6 +3690,10 @@
             },
 
             manualTimeEntry: () => {
+                if (!state.isMaster) {
+                    ui.updateTimer();
+                    return;
+                }
                 const el = document.getElementById('main-timer');
                 const raw = el.textContent.trim();
 
@@ -3736,6 +3743,7 @@
             },
 
             adjustScore: (team, delta, playSound = false) => {
+                if (!state.isMaster) return;
                 const isHome = team === 'home';
                 if (isHome) {
                     state.currentMatch.homeScore += delta;
@@ -3826,6 +3834,7 @@
             },
 
             step: (direction) => {
+                if (!state.isMaster) return;
                 let newPhaseIndex = state.currentMatch.phaseIndex + direction;
                 const phaseCount = game.getPhaseCount();
 
@@ -4726,12 +4735,14 @@
             },
 
             toggleTeamsLock: () => {
+                if (!state.isMaster) return;
                 admin.syncTeamsFromDOM();
                 admin.teamsOrderLocked = !admin.teamsOrderLocked;
                 admin.renderIdentityInputs();
             },
 
             moveTeam: (fromIndex, direction) => {
+                if (!state.isMaster) return;
                 admin.syncTeamsFromDOM();
                 const toIndex = fromIndex + direction;
                 if (toIndex < 0 || toIndex >= state.teams.length) return;
@@ -4741,6 +4752,7 @@
             },
 
             swapTeamPosition: (fromIndex, toIndex) => {
+                if (!state.isMaster) return;
                 admin.syncTeamsFromDOM();
                 if (toIndex < 0 || toIndex >= state.teams.length || fromIndex === toIndex) return;
                 const temp = state.teams[fromIndex];
@@ -4750,6 +4762,7 @@
             },
 
             shuffleTeams: () => {
+                if (!state.isMaster) return;
                 if (state.teams.length < 2) return;
                 if (!confirm("Opravdu chcete náhodně vylosovat pořadí družstev?")) return;
                 admin.syncTeamsFromDOM();
@@ -4771,7 +4784,7 @@
             // =======================================================================
 
             saveSettings: (showAlert = true) => {
-                if (state.isLoading) return;
+                if (!state.isMaster || state.isLoading) return;
                 state.tournamentName = document.getElementById('input-tournament-name').value;
                 state.tournamentCategory = document.getElementById('input-tournament-category').value;
 
@@ -5771,6 +5784,7 @@
             },
 
             addTeamSlot: () => {
+                if (!state.isMaster) return;
                 admin.syncTeamsFromDOM();
                 const id = "team_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
                 state.teams.push({ id, name: "", playerIds: [] });
@@ -5779,6 +5793,7 @@
             },
 
             addRefereeSlot: () => {
+                if (!state.isMaster) return;
                 const id = "ref_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
                 state.referees.push({ id, surname: "", firstName: "" });
                 admin.renderIdentityInputs();
@@ -5786,6 +5801,7 @@
             },
 
             addMiscSlot: () => {
+                if (!state.isMaster) return;
                 const id = "misc_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
                 state.misc.push({ id, text: "" });
                 admin.renderIdentityInputs();
@@ -5793,6 +5809,7 @@
             },
 
             addPlayerSlot: () => {
+                if (!state.isMaster) return;
                 const id = "player_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
                 const newPlayer = { id, surname: "", firstName: "", uciId: "" };
                 state.players.push({ ...newPlayer });
@@ -6078,6 +6095,10 @@
             },
 
             updatePlayersFromCloud: async () => {
+                if (!state.isMaster) {
+                    alert("Jste v režimu Divák (pouze pro čtení). Pro změny nejprve převezměte řízení (Master).");
+                    return;
+                }
                 if (!auth.isLicensed()) {
                     alert("Cloudová synchronizace je dostupná pouze v placené verzi.");
                     return;
@@ -6226,12 +6247,21 @@
 
             // --- Nahrát JSON přímo z tlačítka v sekci Hráči (spouštěno přes onchange na skrytém inputu) ---
             uploadPlayersFromFile: (inputEl) => {
+                if (!state.isMaster) {
+                    alert("Jste v režimu Divák (pouze pro čtení). Pro změny nejprve převezměte řízení (Master).");
+                    if (inputEl) inputEl.value = "";
+                    return;
+                }
                 if (!inputEl || !inputEl.files || inputEl.files.length === 0) return;
                 admin._processPlayerJsonFile(inputEl.files[0], () => { inputEl.value = ""; });
             },
 
             // --- Starší ruční nahrání z Nastavení aplikace (zachováno pro zpětnou kompatibilitu) ---
             uploadManualCloudData: async () => {
+                if (!state.isMaster) {
+                    alert("Jste v režimu Divák (pouze pro čtení). Pro změny nejprve převezměte řízení (Master).");
+                    return;
+                }
                 const input = document.getElementById('input-manual-cloud-json');
                 if (!input || !input.files || input.files.length === 0) {
                     alert("Vyberte prosím JSON soubor s databází.");
@@ -6493,6 +6523,7 @@
             },
 
             resetTournament: () => {
+                if (!state.isMaster) return;
                 if (confirm("Opravdu chcete resetovat TURNAJ? Vymaže se rozpis, družstva a výsledky. Nastavení aplikace (zvuky, téma, master databáze) zůstane zachováno.")) {
                     // 1. Stop timer
                     if (state.timer.running) {
@@ -6594,6 +6625,7 @@
             },
 
             generateScheduleFromTemplate: () => {
+                if (!state.isMaster) return;
                 admin.syncTeamsFromDOM();
 
                 // Kontrola: generování je povoleno pouze při zamčeném pořadí družstev
@@ -6701,6 +6733,7 @@
             },
 
             addMatch: () => {
+                if (!state.isMaster) return;
                 if (!auth.checkTrialLimit(1)) return;
                 const type = document.getElementById('sched-type').value;
                 const isEvent = type === 'event';
@@ -6767,6 +6800,7 @@
             },
 
             editScheduleMatch: (index) => {
+                if (!state.isMaster) return;
                 state.pendingEditIndex = index;
                 const m = state.schedule[index];
                 const type = m.type || 'match';
@@ -6816,6 +6850,7 @@
             },
 
             saveEditedMatch: () => {
+                if (!state.isMaster) return;
                 if (state.pendingEditIndex > -1) {
                     const type = document.getElementById('sched-type').value;
                     const isEvent = type === 'event';
@@ -6862,6 +6897,7 @@
             },
 
             deleteMatch: () => {
+                if (!state.isMaster) return;
                 if (state.pendingEditIndex > -1 && confirm("Opravdu smazat tento zápas?")) {
                     state.schedule.splice(state.pendingEditIndex, 1);
                     // Adjust active index if needed
@@ -6905,6 +6941,11 @@
             },
 
             handleScheduleImport: (input) => {
+                if (!state.isMaster) {
+                    alert("Jste v režimu Divák (pouze pro čtení). Pro import turnaje nejprve převezměte řízení (Master).");
+                    if (input) input.value = "";
+                    return;
+                }
                 if (!input.files || !input.files[0]) return;
                 const file = input.files[0];
 
@@ -7722,6 +7763,7 @@
             },
 
             moveSelected: (direction) => {
+                if (!state.isMaster) return;
                 if (state.selectedIndices.length === 0) return;
 
                 // Direction: -1 (up), 1 (down)
@@ -7757,6 +7799,7 @@
             },
 
             deleteSelected: () => {
+                if (!state.isMaster) return;
                 if (state.selectedIndices.length === 0) return;
                 if (!confirm(`Opravdu smazat vybrané zápasy (${state.selectedIndices.length})?`)) return;
 
@@ -7774,6 +7817,7 @@
             },
 
             resetSelectedScores: () => {
+                if (!state.isMaster) return;
                 if (state.selectedIndices.length === 0) return;
                 state.selectedIndices.forEach(idx => {
                     if (state.schedule[idx]) {
@@ -7787,11 +7831,13 @@
             },
 
             loadSelected: () => {
+                if (!state.isMaster) return;
                 if (state.selectedIndices.length === 0) return;
                 admin.loadMatch(state.selectedIndices[0], true);
             },
 
             editSelected: () => {
+                if (!state.isMaster) return;
                 if (state.selectedIndices.length === 0) return;
                 const index = state.selectedIndices[0];
                 if (state.pendingEditIndex === index) {
@@ -7999,6 +8045,7 @@
             },
 
             saveToStorage: () => {
+                if (!state.isMaster) return;
                 localStorage.setItem('scoreboardState', JSON.stringify(state));
             },
 
@@ -8819,6 +8866,10 @@
                     const banner = document.getElementById('spectator-banner');
                     if (banner) {
                         banner.style.display = isSpectator ? 'flex' : 'none';
+                    }
+                    const mainTimer = document.getElementById('main-timer');
+                    if (mainTimer) {
+                        mainTimer.contentEditable = isSpectator ? "false" : "true";
                     }
                 }
                 ui.updateAdminFooter();

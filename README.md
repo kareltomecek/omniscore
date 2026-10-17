@@ -106,6 +106,14 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.11-beta` (Testovací větev)
+- **Kompletní a neprodyšné uzamčení režimu Divák (Spectator Lockdown Fix):**
+  - **Oprava CSS selektorů:** Opraveny selektory akordeonů (`#acc-settings`, `#acc-logos`, `#acc-players`, `#acc-music`, `#acc-app-settings`), které se dříve chybně dotazovaly na neexistujícího potomka `.accordion-content`. Nyní jsou všechny interaktivní prvky uvnitř těchto sekcí (tlačítka `+ Přidat družstvo`, `🎲 Vylosovat pořadí`, `🔒 Pořadí zamčeno`, klikací loga týmů, audio checkboxy atd.) 100% zablokované proti kliknutí (`pointer-events: none`) a zašedlé.
+  - **Proklikávání menu zachováno:** Hlavičky akordeonů zůstávají plně interaktivní – uživatel může volně rozklikávat a prohlížet všechny sekce.
+  - **Dostupnost čtení a QR kódů:** Tabulky, Exporty (Excel, tisk) a Veřejná zobrazení / QR kódy zůstávají v režimu Divák plně funkční a použitelné.
+  - **Rozpis zápasů:** Seznam zápasů je čitelný a scrollovatelný, ale položky nelze editovat, proklikávat ani přetahovat.
+  - **Vícevrstvá obrana v JS (Defense-in-Depth):** Pojistka `if (!state.isMaster) return;` doplněna do všech mutačních metod (`addTeamSlot`, `shuffleTeams`, `toggleTeamsLock`, `saveSettings`, `resetTournament`, `generateScheduleFromTemplate`, `addMatch`, `saveEditedMatch`, `deleteMatch`, `deleteSelected`, `resetSelectedScores`, `moveSelected`, `handleScheduleImport`, `updatePlayersFromCloud`, `uploadPlayersFromFile`, `game.step`, `game.adjustScore`, `game.toggleTimer`, `game.resetTimer`, `game.adjustTime`, `game.manualTimeEntry`, `admin.saveToStorage`).
+
 ### Verze `v0.7.10-beta` (Testovací větev)
 - **Kompletní neprodyšné uzamčení režimu Divák (Spectator Lockdown):**
   - Uzamčeny všechny zbývající interaktivní prvky: klikací obrázky log družstev v `#acc-logos`, popisky (`<label>`) a checkboxy automatického režimu a posuvníky v `#acc-music`.
