@@ -106,6 +106,13 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.8-beta` (Testovací větev)
+- **Vizuální a funkční uzamčení OO v režimu Divák (Spectator Lock):**
+  - V režimu Divák jsou všechny akční a editační prvky (góly, časomíra, změny rozpisu, nastavení časů a týmů) zašedlé a uzamčené proti nechtěnému klikání.
+  - Plně zachována možnost proklikávání menu, akordeonů, generování/kopírování QR kódů a odkazů na veřejná zobrazení/projekci.
+  - Přidána horní žlutá informační lišta (`#spectator-banner`) s tlačítkem **„👑 Převzít řízení (Master)“**.
+  - Při převzetí řízení jiným počítačem se na dosavadní řídicí stanici zobrazí upozornění a stanice se automaticky přepne do uzamčeného režimu Divák s horním žlutým pruhem.
+
 ### Verze `v0.7.7-beta` (Testovací větev)
 - **Inteligentní správa relací a ochrana dat při práci z více počítačů:**
   - Implementována záchranná brzda při startu OO: porovnání časových razítek (`lastUpdate`) v cloudu Firebase a lokálním úložišti `localStorage`.

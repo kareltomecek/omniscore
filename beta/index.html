@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.7-beta</title>
+    <title>OmniScore (OmS) v0.7.8-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -1503,10 +1503,64 @@
         .pv-container div::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
+
+        /* === REŽIM DIVÁK (SPECTATOR MODE) === */
+        body.mode-spectator #game-controls .phase-nav button,
+        body.mode-spectator #game-controls .score-controls button,
+        body.mode-spectator #game-controls .timer-controls button,
+        body.mode-spectator #game-controls .audio-controls button,
+        body.mode-spectator #admin-panel input,
+        body.mode-spectator #admin-panel select,
+        body.mode-spectator #admin-panel textarea,
+        body.mode-spectator #acc-settings button,
+        body.mode-spectator #acc-players button,
+        body.mode-spectator #acc-logos button,
+        body.mode-spectator #acc-schedule button,
+        body.mode-spectator #acc-music button {
+            opacity: 0.35 !important;
+            pointer-events: none !important;
+            filter: grayscale(80%) !important;
+            cursor: not-allowed !important;
+        }
+
+        #spectator-banner {
+            display: none;
+            background: #ff9800;
+            color: #000;
+            font-weight: bold;
+            padding: 9px 18px;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.5);
+            z-index: 10000;
+            position: sticky;
+            top: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        body.mode-projection #spectator-banner,
+        body.mode-qr #spectator-banner,
+        body.mode-view-schedule #spectator-banner,
+        body.mode-view-standings #spectator-banner,
+        body.mode-view-cross #spectator-banner {
+            display: none !important;
+        }
     </style>
 </head>
 
 <body>
+
+    <!-- HORNÍ INFORMAČNÍ LIŠTA PRO REŽIM DIVÁK -->
+    <div id="spectator-banner">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:1.3em;">👁️</span>
+            <span><b>REŽIM DIVÁK:</b> Turnaj aktivně řídí jiné zařízení. Ovládací prvky jsou uzamčeny (pouze pro čtení).</span>
+        </div>
+        <button onclick="admin.claimMasterRole(false)" style="background:#111; color:#fff; border:1px solid #333; padding:7px 16px; border-radius:5px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
+            👑 Převzít řízení (Master)
+        </button>
+    </div>
 
     <div id="app-container">
         <!-- LEFT PANEL: Game Controls -->
@@ -2509,7 +2563,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.7-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.8-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2659,7 +2713,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.7-beta";
+        const APP_VERSION = "0.7.8-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -8704,7 +8758,7 @@
                                     admin._masterHeartbeatInterval = null;
                                 }
                                 admin.updateMasterUI();
-                                alert("Řízení tohoto turnaje bylo převzato jiným zařízením.\n\nTento počítač byl přepnut do bezpečného režimu Divák (pouze pro čtení).");
+                                alert("Řízení tohoto turnaje bylo převzato jiným zařízením.\n\nTento počítač byl přepnut do bezpečného režimu Divák (pouze pro čtení) a ovládací prvky byly uzamčeny.");
                             }
                         }
                     }
@@ -8712,6 +8766,14 @@
             },
 
             updateMasterUI: () => {
+                const isSpectator = !state.isMaster;
+                if (!state.isProjectionMode && !state.viewMode && !isQR) {
+                    document.body.classList.toggle('mode-spectator', isSpectator);
+                    const banner = document.getElementById('spectator-banner');
+                    if (banner) {
+                        banner.style.display = isSpectator ? 'flex' : 'none';
+                    }
+                }
                 ui.updateAdminFooter();
                 admin.updateCloudSaveStatusInfo();
             },
