@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.12-beta</title>
+    <title>OmniScore (OmS) v0.7.13-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -2597,7 +2597,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.12-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.13-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2747,7 +2747,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.12-beta";
+        const APP_VERSION = "0.7.13-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -9549,10 +9549,10 @@
                         role.title = "Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák.";
                         role.onclick = () => admin.setSpectatorMode();
                     } else {
-                        role.innerHTML = "👁️ DIVÁK (Klikněte pro převzetí)";
-                        role.style.background = "#ff9800";
-                        role.style.color = "#000";
-                        role.style.border = "1px solid #ffb74d";
+                        role.innerHTML = "👁️ DIVÁK";
+                        role.style.background = "rgba(255, 152, 0, 0.25)";
+                        role.style.color = "#ff9800";
+                        role.style.border = "1px solid #ff9800";
                         role.title = "Režim Divák (pouze pro čtení – změny se do cloudu nezapisují). Klikněte pro převzetí řízení (stát se Masterem).";
                         role.onclick = () => admin.claimMasterRole(false);
                     }

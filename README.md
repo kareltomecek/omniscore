@@ -106,6 +106,12 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.13-beta` (Testovací větev)
+- **Dokonalá vizuální symetrie přepínače rolí v patičce:**
+  - Tlačítko `👁️ DIVÁK` v patičce bylo upraveno tak, aby mělo identický kompaktní formát jako tlačítko `👑 MASTER`.
+  - Odstraněn dlouhý text v závorce, který způsoboval zalamování řádků – tlačítko nese čistý název `👁️ DIVÁK`, má stejný tvar, zaoblení i velikost, a liší se pouze textem a oranžovým motivem (`rgba(255, 152, 0, 0.25)` s ohraničením a textem `#ff9800`).
+  - Podrobná nápověda pro převzetí řízení zůstává k dispozici jako tooltip při najetí myší a horní žlutá lišta zůstává beze změn.
+
 ### Verze `v0.7.12-beta` (Testovací větev)
 - **Vyladění rozhraní a vizuální sjednocení režimu Divák:**
   - **Skrytí nastavení projekce ve Veřejných zobrazeních:** Spodní blok *Nastavení zobrazení* (volba tématu, velikost času v projekci, zpoždění kroku, střídání QR kódů, interval a prolínání) je v režimu Divák zcela skryt (`display: none`). V sekci tak zůstávají pouze čisté odkazy a tlačítka pro QR kódy a veřejné pohledy.
