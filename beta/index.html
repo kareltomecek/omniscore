@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.8-beta</title>
+    <title>OmniScore (OmS) v0.7.9-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -2145,6 +2145,13 @@
                                     <option value="Semifinále">Semifinále</option>
                                     <option value="Finále">Finále</option>
                                     <option value="O umístění">O umístění</option>
+                                    <option value="O 3. místo">O 3. místo</option>
+                                    <option value="O 5. místo">O 5. místo</option>
+                                    <option value="O 7. místo">O 7. místo</option>
+                                    <option value="O 9. místo">O 9. místo</option>
+                                    <option value="O 11. místo">O 11. místo</option>
+                                    <option value="O 13. místo">O 13. místo</option>
+                                    <option value="O 15. místo">O 15. místo</option>
                                 </select>
                                 <input type="text" id="sched-custom-title" placeholder="Vlastní název..." maxlength="32"
                                     style="flex:1; display:none;" oninput="admin.sanitizeInput(this)">
@@ -2563,7 +2570,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.8-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.9-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2713,7 +2720,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.8-beta";
+        const APP_VERSION = "0.7.9-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [

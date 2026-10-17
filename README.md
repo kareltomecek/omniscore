@@ -106,6 +106,10 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.9-beta` (Testovací větev)
+- **Rozšíření předvoleb názvů zápasů o umístění:**
+  - Do výběrového pole *Název / Skupina* v rozpisu zápasů přidány předvolby: *O 3. místo*, *O 5. místo*, *O 7. místo*, *O 9. místo*, *O 11. místo*, *O 13. místo* a *O 15. místo*.
+
 ### Verze `v0.7.8-beta` (Testovací větev)
 - **Vizuální a funkční uzamčení OO v režimu Divák (Spectator Lock):**
   - V režimu Divák jsou všechny akční a editační prvky (góly, časomíra, změny rozpisu, nastavení časů a týmů) zašedlé a uzamčené proti nechtěnému klikání.
