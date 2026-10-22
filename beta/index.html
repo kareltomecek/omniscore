@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.14-beta</title>
+    <title>OmniScore (OmS) v0.7.15-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -2597,7 +2597,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.14-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.15-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2747,7 +2747,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.14-beta";
+        const APP_VERSION = "0.7.15-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -3499,8 +3499,8 @@
                         }
                     });
 
-                    // Force broadcast state immediately after load so opened windows get data (pouze lokální broadcast, cloudChecked je zatím false)
-                    game.syncProjection();
+                    // Force broadcast state immediately after load so opened windows get data (pouze lokální broadcast, cloudChecked je zatím false, nepřebíjet lastUpdate)
+                    game.syncProjection(false, false);
 
                     // Záchranná brzda a kontrola cloudové relace před zápisem do cloudu
                     if (typeof firebase !== 'undefined') {
@@ -4096,7 +4096,7 @@
                 };
             },
 
-            syncProjection: (forceFirebase = false) => {
+            syncProjection: (forceFirebase = false, updateTimestamp = true) => {
                 // IMPORTANT: Prevent projection/public windows from broadcasting their (empty) state
                 if (state.isProjectionMode || state.viewMode) {
                     console.log("syncProjection: Skipping broadcast (not in admin mode)");
@@ -4104,7 +4104,9 @@
                 }
 
                 // --- TIMESTAMP GENERATION ---
-                state.lastUpdate = Date.now();
+                if (updateTimestamp) {
+                    state.lastUpdate = Date.now();
+                }
 
                 // --- ODLEHČENÝ SYNCHRONIZAČNÍ PAYLOAD PRO PO A CLOUD ---
                 // Vyřadíme objemná data, která PO ani veřejná zobrazení nepotřebují (MP3 znělky v base64, globální databázi hráčů apod.)
@@ -8652,15 +8654,33 @@
                         return;
                     }
 
-                    // 1. KONTROLA ČASOVÉHO RAZÍTKA (Cloud vs. LocalStorage)
+                    // 1. KONTROLA ODLIŠNOSTÍ A ČASOVÉHO RAZÍTKA (Cloud vs. LocalStorage)
                     const cloudTime = cloudData.lastUpdate || 0;
                     const localTime = state.lastUpdate || 0;
 
-                    // Pokud jsou v cloudu prokazatelně novější data (ochranná rezerva 2000 ms)
-                    if (cloudTime > (localTime + 2000)) {
-                        console.warn("[SessionSync] Novější data v cloudu detekována!", { cloudTime, localTime });
-                        const cloudDateStr = new Date(cloudTime).toLocaleString('cs-CZ');
-                        const localDateStr = localTime ? new Date(localTime).toLocaleString('cs-CZ') : "Žádná (nová lokální relace)";
+                    // Spočítáme odehraná utkání (s výsledkem) pro obě strany
+                    const countPlayed = (sch) => (sch || []).filter(m => m && m.type === 'match' && m.homeScore !== null && m.guestScore !== null && m.homeScore !== "" && m.guestScore !== "" && m.homeScore !== "-").length;
+                    const cloudPlayed = countPlayed(cloudData.schedule);
+                    const localPlayed = countPlayed(state.schedule);
+
+                    const cloudMatchCount = (cloudData.schedule || []).filter(m => m && m.type === 'match').length;
+                    const localMatchCount = (state.schedule || []).filter(m => m && m.type === 'match').length;
+
+                    const cloudTeamsCount = (cloudData.teams || []).length;
+                    const localTeamsCount = (state.teams || []).length;
+
+                    // Detekce nesouladu mezi cloudem a lokálním stavem:
+                    const cloudIsNewer = cloudTime > (localTime + 2000);
+                    const cloudHasMorePlayed = cloudPlayed > localPlayed;
+                    const localHasNoResults = (localPlayed === 0 && cloudPlayed > 0);
+                    const localIsEmpty = (localMatchCount === 0 && cloudMatchCount > 0);
+                    const localNeverSaved = (!localTime && cloudTime > 0);
+
+                    // Pokud v cloudu existují data a lokální stav je odlišný nebo zastaralý
+                    if (cloudIsNewer || cloudHasMorePlayed || localHasNoResults || localIsEmpty || localNeverSaved) {
+                        console.warn("[SessionSync] Odlišná data v cloudu detekována!", { cloudTime, localTime, cloudPlayed, localPlayed });
+                        const cloudDateStr = cloudTime ? new Date(cloudTime).toLocaleString('cs-CZ') : "Neznámý čas";
+                        const localDateStr = localTime ? new Date(localTime).toLocaleString('cs-CZ') : "Žádná (nová/prázdná lokální relace)";
 
                         // Vygenerujeme přehledné modální okno pro vyřešení konfliktu
                         const existingModal = document.getElementById('cloud-conflict-modal');
@@ -8668,25 +8688,35 @@
 
                         const modalHtml = `
                             <div id="cloud-conflict-modal" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-                                <div style="background:#1e1e1e; border:2px solid var(--accent-green); border-radius:10px; padding:25px; max-width:550px; width:90%; color:#fff; box-shadow:0 10px 40px rgba(0,0,0,0.8);">
-                                    <h3 style="margin-top:0; color:var(--accent-green); display:flex; align-items:center; gap:10px;">
-                                        <span>☁️</span> V cloudu nalezena novější data
+                                <div style="background:#1e1e1e; border:2px solid var(--accent-green); border-radius:10px; padding:25px; max-width:580px; width:90%; color:#fff; box-shadow:0 10px 40px rgba(0,0,0,0.8);">
+                                    <h3 style="margin-top:0; color:var(--accent-green); display:flex; align-items:center; gap:10px; font-size:1.3em;">
+                                        <span>☁️</span> V cloudu nalezena existující data turnaje
                                     </h3>
-                                    <p style="font-size:1.0em; line-height:1.5; color:#ddd;">
-                                        Turnaj v cloudu Firebase má novější záznamy než vaše lokální úložiště v tomto prohlížeči.
+                                    <p style="font-size:0.95em; line-height:1.5; color:#ddd; margin-bottom:12px;">
+                                        Pro relaci <b style="color:var(--accent-blue);">${state.sessionId}</b> jsou v cloudu Firebase uložena data. Zde je srovnání stavu v cloudu a v tomto počítači:
                                     </p>
-                                    <div style="background:#2a2a2a; padding:12px; border-radius:6px; margin:15px 0; font-size:0.9em; line-height:1.6; border-left:4px solid var(--accent-blue);">
-                                        <b>Poslední změna v cloudu:</b> <span style="color:#4caf50; font-weight:bold;">${cloudDateStr}</span><br>
-                                        <b>Vaše lokální verze:</b> <span style="color:#bbb;">${localDateStr}</span><br>
-                                        <b>Název turnaje:</b> ${admin.escapeHtml(cloudData.tournamentName || 'Nepojmenovaný turnaj')}<br>
-                                        <b>Zápasů v cloudu:</b> ${(cloudData.schedule || []).length} | <b>Týmů:</b> ${(cloudData.teams || []).length}
+                                    <div style="background:#262626; padding:14px; border-radius:8px; margin:12px 0; font-size:0.9em; line-height:1.6; border-left:4px solid var(--accent-green); display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                                        <div style="border-right:1px solid #444; padding-right:10px;">
+                                            <div style="color:var(--accent-green); font-weight:bold; margin-bottom:4px;">☁️ Cloud (Firebase):</div>
+                                            <b>Poslední změna:</b> ${cloudDateStr}<br>
+                                            <b>Název:</b> ${admin.escapeHtml(cloudData.tournamentName || 'Nepojmenovaný')}<br>
+                                            <b>Odehráno zápasů:</b> <span style="color:#4caf50; font-weight:bold;">${cloudPlayed}</span> z ${cloudMatchCount}<br>
+                                            <b>Týmů:</b> ${cloudTeamsCount}
+                                        </div>
+                                        <div style="padding-left:4px;">
+                                            <div style="color:var(--accent-blue); font-weight:bold; margin-bottom:4px;">💻 Tento počítač (Lokální):</div>
+                                            <b>Poslední změna:</b> ${localDateStr}<br>
+                                            <b>Název:</b> ${admin.escapeHtml(state.tournamentName || 'Nepojmenovaný')}<br>
+                                            <b>Odehráno zápasů:</b> <span style="font-weight:bold;">${localPlayed}</span> z ${localMatchCount}<br>
+                                            <b>Týmů:</b> ${localTeamsCount}
+                                        </div>
                                     </div>
                                     <p style="font-size:0.88em; color:#bbb; margin-bottom:20px; line-height:1.4;">
-                                        Doporučujeme načíst data z cloudu, abyste nepřišli o odehrané zápasy či úpravy provedené na druhém počítači (např. v hale).
+                                        Doporučujeme <b>Načíst z cloudu</b>, abyste získali odehrané zápasy, skóre a úpravy provedené na druhém počítači (např. v hale).
                                     </p>
-                                    <div style="display:flex; gap:10px; justify-content:flex-end;">
+                                    <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
                                         <button class="btn" onclick="admin.resolveConflictKeepLocal()" style="background:#444; color:#ddd; padding:8px 16px;">
-                                            Ponechat lokální data
+                                            ⚠️ Ponechat lokální data (přepíše cloud)
                                         </button>
                                         <button class="btn btn-green" onclick="admin.resolveConflictLoadCloud()" style="padding:8px 20px; font-weight:bold;">
                                             📥 Načíst z cloudu (Doporučeno)
@@ -8714,6 +8744,8 @@
             resolveConflictLoadCloud: async () => {
                 const m = document.getElementById('cloud-conflict-modal');
                 if (m) m.remove();
+                const b = document.getElementById('cloud-conflict-banner');
+                if (b) b.remove();
 
                 try {
                     const snap = await firebase.database().ref('sessions/' + state.sessionId).once('value');
@@ -8731,10 +8763,55 @@
             },
 
             resolveConflictKeepLocal: () => {
+                if (!confirm("Opravdu chcete PONECHAT data z tohoto počítače?\n\nJakmile provedete jakoukoli změnu, přepíšete tím data na cloudu Firebase (včetně výsledků z haly).")) {
+                    return;
+                }
                 const m = document.getElementById('cloud-conflict-modal');
                 if (m) m.remove();
+
+                // Zobrazíme informační lištu v záhlaví pro případ, že si to uživatel rozmyslí
+                admin.showCloudSyncBanner();
+
                 state.cloudChecked = true;
                 admin.checkMasterRole(null);
+            },
+
+            showCloudSyncBanner: async () => {
+                const existing = document.getElementById('cloud-conflict-banner');
+                if (existing) existing.remove();
+
+                try {
+                    const snap = await firebase.database().ref('sessions/' + state.sessionId).once('value');
+                    const cloudData = snap.val();
+                    if (!cloudData) return;
+
+                    const cloudTime = cloudData.lastUpdate ? new Date(cloudData.lastUpdate).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : "";
+                    const countPlayed = (sch) => (sch || []).filter(m => m && m.type === 'match' && m.homeScore !== null && m.guestScore !== null && m.homeScore !== "" && m.guestScore !== "" && m.homeScore !== "-").length;
+                    const cloudPlayed = countPlayed(cloudData.schedule);
+
+                    const bannerHtml = `
+                        <div id="cloud-conflict-banner" style="background:rgba(21, 101, 192, 0.95); color:#fff; padding:8px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:0.88em; box-shadow:0 2px 8px rgba(0,0,0,0.4); z-index:9000; position:relative;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:1.2em;">☁️</span>
+                                <span>V cloudu Firebase existují data turnaje${cloudTime ? ` (zápis v ${cloudTime})` : ''} s <b>${cloudPlayed} odehranými zápasy</b>.</span>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <button class="btn btn-green" onclick="admin.resolveConflictLoadCloud()" style="padding:4px 12px; font-size:0.85em; font-weight:bold; margin:0;">
+                                    📥 Stáhnout čerstvá data z cloudu
+                                </button>
+                                <button class="small-btn btn-subtle" onclick="document.getElementById('cloud-conflict-banner')?.remove()" style="padding:4px 8px; color:#fff; margin:0;" title="Zavřít lištu">✕</button>
+                            </div>
+                        </div>
+                    `;
+                    const appCont = document.getElementById('app-container');
+                    if (appCont) {
+                        appCont.insertAdjacentHTML('beforebegin', bannerHtml);
+                    } else {
+                        document.body.insertAdjacentHTML('afterbegin', bannerHtml);
+                    }
+                } catch (e) {
+                    console.warn("Chyba při zobrazení banneru cloudu:", e);
+                }
             },
 
             applyCloudData: (cloudData) => {
@@ -8750,11 +8827,17 @@
                 if (state.activeMatchIndex > -1) {
                     admin.loadMatch(state.activeMatchIndex, false);
                 }
+                admin.renderSettings();
                 ui.renderSchedule();
                 ui.render();
+                ui.renderTeamsList();
+                ui.renderPlayersList();
+                ui.renderRefereesList();
+                ui.renderStandings();
+                admin.renderAppSettingTimes();
                 game.syncProjection();
                 admin.updateCloudSaveStatusInfo();
-                console.log("%c[Sync] Novější stav z cloudu úspěšně načten", "color:#4caf50; font-weight:bold;", { lastUpdate: state.lastUpdate });
+                console.log("%c[Sync] Stav z cloudu úspěšně načten", "color:#4caf50; font-weight:bold;", { lastUpdate: state.lastUpdate });
             },
 
             checkMasterRole: (cloudData) => {

@@ -106,6 +106,14 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.15-beta` (Testovací větev)
+- **Oprava a rozšíření detekce konfliktu dat z cloudu Firebase:**
+  - **Oprava přebíjení časového razítka při startu:** Odstraněna chyba, kdy počáteční volání `game.syncProjection()` přepsalo `state.lastUpdate` aktuálním časem ještě před dotazem na Firebase, což způsobilo, že cloudová data se vždy jevila jako starší a varovný dialog se nezobrazil.
+  - **Komplexní detekce odlišností:** Porovnání se již nespoléhá pouze na časové razítko, ale detekuje i vyšší počet odehraných zápasů v cloudu, prázdný lokální stav vůči cloudu a odlišnosti v odehraných výsledcích.
+  - **Přehledné porovnání (Cloud vs. Tento počítač):** Modální dialog zobrazuje vedle sebe počet odehraných zápasů, celkový počet utkání, počet týmů a čas změn s doporučením načíst čerstvá data z cloudu.
+  - **Informační lišta (Cloud Sync Banner):** Pokud uživatel zvolí ponechání lokálních dat, v záhlaví zůstává dostupná modrá lišta umožňující kdykoli jedním kliknutím stáhnout čerstvá data z cloudu.
+  - **Kompletní překreslení po načtení:** Při aplikaci cloudových dat se spolehlivě překreslí nastavení, rozpis, výsledky, týmy, hráči, rozhodčí, tabulky i časy.
+
 ### Verze `v0.7.14-beta` (Testovací větev)
 - **Zpřesnění textu v informační liště a hlášení:**
   - Text v horní žluté liště `#spectator-banner` upraven na: *„REŽIM DIVÁK: Turnaj aktivně řídí jiné zařízení. Ovládací prvky jsou uzamčeny (můžete pouze číst).“*
