@@ -106,6 +106,13 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.17-beta` (Testovací větev)
+- **Nová favicon aplikace (Base64 data URI):**
+  - Nahrazena původní dočasná emoji ikona novou grafickou faviconou se sportovním motivem digitálního skóre `0:0`.
+  - Ikona je optimalizována, převedena do formátu PNG a vložena přímo do hlavičky `<head>` v souboru `beta/index.html` jako kompaktní Base64 řetězec.
+  - Plně zachována single-file architektura aplikace bez nutnosti externích souborů.
+
+
 ### Verze `v0.7.16-beta` (Testovací větev)
 - **Oprava překreslení po načtení dat z cloudu (Hotfix):**
   - Opravena chyba `admin.renderSettings is not a function` v `applyCloudData`, kde se volaly neexistující metody namísto standardního interního cyklu `admin.loadFromStorage()`.
