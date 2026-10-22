@@ -106,6 +106,14 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.19-beta` (Testovací větev)
+- **Korektní správa a volba po smazání aktivní cloudové relace:**
+  - **Odstranění nechtěného znovuvytvoření smazaných dat:** Při smazání aktivního turnaje se již data turnaje nekopírují pod nové náhodné ID. Paměť aplikace (`state`), lokální úložiště i rozhraní se kompletně a bezpečně vyčistí (`resetTournamentStateInMemory`).
+  - **Interaktivní dialog volby dalšího kroku:** Pokud uživatel smaže právě otevřený turnaj a v cloudu má ještě další turnaje, zobrazí se přehledné modální okno (`#modal-post-delete-choice`) nabízející dvě volby:
+    1. **📂 Vybrat a otevřít jiný existující turnaj z cloudu:** Ponechá otevřený seznam se zbývajícími turnaji, kde lze jedním kliknutím otevřít kterýkoli jiný turnaj.
+    2. **➕ Založit nový čistý turnaj:** Spustí proces vytvoření nového prázdného turnaje s možností zadání vlastního kódu relace.
+  - **Automatické přepnutí při prázdném účtu:** Pokud byl smazán poslední turnaj v účtu, aplikace uživatele informuje a automaticky inicializuje novou čistou relaci bez pozůstatků předchozího turnaje.
+
 ### Verze `v0.7.18-beta` (Testovací větev)
 - **Přechod na fyzické favicon soubory v `beta/`:**
   - Z důvodu bezpečnostních omezení a chování prohlížeče Chrome (který data URI v záložce často ignoruje nebo přebíjí chybou 404) byl Base64 řetězec nahrazen přímými soubory `beta/favicon.png` a `beta/favicon.ico`.

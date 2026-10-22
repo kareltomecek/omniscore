@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="cs">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.18-beta</title>
+    <title>OmniScore (OmS) v0.7.19-beta</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="shortcut icon" href="favicon.ico">
@@ -2601,7 +2601,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.18-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.19-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2751,7 +2751,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.18-beta";
+        const APP_VERSION = "0.7.19-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -9038,8 +9038,66 @@
                 }
             },
 
+            resetTournamentStateInMemory: () => {
+                if (state.timer && state.timer.running && typeof game !== 'undefined' && game.toggleTimer) {
+                    game.toggleTimer();
+                }
+                state.tournamentName = "";
+                state.tournamentCategory = "";
+                state.tournamentDate = new Date().toISOString().split('T')[0];
+                state.tournamentLocation = "";
+                state.tournamentOrganizer = "";
+                state.pitchSize = "11 x 14 (m)";
+                state.officialChiefReferee = "";
+                state.officialRecorder = "";
+                state.officialTimekeeper = "";
+
+                state.teams = [];
+                state.players = [];
+                state.referees = [];
+                state.schedule = [];
+                state.misc = [];
+
+                state.teamLogos = {};
+                state.teamAnthems = {};
+
+                state.currentMatch = {
+                    title: "",
+                    homeName: "Domácí",
+                    guestName: "Hosté",
+                    homeScore: 0,
+                    guestScore: 0,
+                    referee: "",
+                    phaseIndex: 0,
+                    isEvent: false,
+                    duration: 600
+                };
+                state.activeMatchIndex = -1;
+                state.pendingEditIndex = -1;
+                state.selectedIndices = [];
+
+                if (state.timer) {
+                    state.timer.timeLeft = (state.times && state.times.play) ? state.times.play : 420;
+                    state.timer.lastTick = 0;
+                }
+                state.playTimeAccumulated = 0;
+                state.tournamentStartTime = null;
+                state.lastUpdate = null;
+
+                if (typeof admin.updateSettingsUI === 'function') admin.updateSettingsUI();
+                if (typeof admin.renderIdentityInputs === 'function') admin.renderIdentityInputs();
+                if (typeof admin.renderLogoSettings === 'function') admin.renderLogoSettings();
+                if (typeof ui !== 'undefined' && typeof ui.render === 'function') ui.render();
+            },
+
             deleteCloudSession: async (targetId, name) => {
-                if (!confirm(`Opravdu chcete trvale smazat turnaj "${name || targetId}" z cloudu Firebase?\n\nTato akce je nevratná.`)) {
+                const isCurrentSession = (targetId === state.sessionId);
+                const safeName = name || targetId;
+                const confirmMsg = isCurrentSession
+                    ? `⚠️ POZOR: Turnaj "${safeName}" je právě AKTIVNÍ (otevřený v této aplikaci)!\n\nOpravdu jej chcete trvale smazat z cloudu Firebase?\nTato akce je nevratná.`
+                    : `Opravdu chcete trvale smazat turnaj "${safeName}" z cloudu Firebase?\n\nTato akce je nevratná.`;
+
+                if (!confirm(confirmMsg)) {
                     return;
                 }
                 const cloudTarget = admin.getCloudSessionsDbRef(targetId);
@@ -9051,29 +9109,97 @@
                 try {
                     await cloudTarget.ref.remove();
                     await firebase.database().ref(`sessions/${targetId}`).remove();
+                    localStorage.removeItem('oms_logos_' + targetId);
 
-                    // Pokud byla smazána aktuálně otevřená relace, vygenerujeme nové čisté ID
-                    if (targetId === state.sessionId) {
-                        const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
-                        state.sessionId = newId;
-                        localStorage.setItem('oms_session_id', newId);
-                        admin.saveToStorage();
-                        game.syncProjection(true);
-                        const activeSpan = document.getElementById('cloud-active-session-id');
-                        if (activeSpan) activeSpan.innerText = newId;
-                        if (window.history && window.history.replaceState) {
-                            window.history.replaceState(null, '', window.location.pathname + '?session=' + newId);
-                        }
+                    // Pokud byl smazán NEAKTIVNÍ turnaj ze seznamu, pouze obnovíme seznam
+                    if (!isCurrentSession) {
+                        admin.refreshCloudSessionsList();
+                        return;
                     }
 
-                    admin.refreshCloudSessionsList();
+                    // --- SMAZÁNÍ PRÁVĚ AKTIVNÍHO TURNAJE ---
+                    // 1. Kompletní reset stavu turnaje v paměti aplikace
+                    admin.resetTournamentStateInMemory();
+
+                    // 2. Nastavení čistého ID relace a uložení čistého stavu
+                    const newTempId = Math.random().toString(36).substring(2, 7).toUpperCase();
+                    state.sessionId = newTempId;
+                    localStorage.setItem('oms_session_id', newTempId);
+                    admin.saveToStorage();
+                    game.syncProjection(true);
+
+                    if (window.history && window.history.replaceState) {
+                        window.history.replaceState(null, '', window.location.pathname + '?session=' + newTempId);
+                    }
+
+                    const activeSpan = document.getElementById('cloud-active-session-id');
+                    if (activeSpan) activeSpan.innerText = newTempId;
+
+                    const footerSpan = document.getElementById('admin-footer-session');
+                    if (footerSpan) footerSpan.innerText = newTempId;
+
+                    // 3. Zjistíme, zda v cloudu zbývají další turnaje uživatele
+                    const mainCloudTarget = admin.getCloudSessionsDbRef();
+                    let remainingCount = 0;
+                    if (mainCloudTarget) {
+                        const snapRemaining = await mainCloudTarget.ref.once('value');
+                        const remainingSessions = snapRemaining.val() || {};
+                        remainingCount = Object.keys(remainingSessions).length;
+                    }
+
+                    if (remainingCount > 0) {
+                        // Nabídnout volbu uživateli
+                        admin.showPostDeleteChoiceModal(safeName, remainingCount);
+                    } else {
+                        // Žádný další turnaj v cloudu nezbyl
+                        alert(`Aktivní turnaj "${safeName}" byl trvale smazán z cloudu a data v aplikaci byla vyčištěna.\n\nV cloudu nemáte žádný další uložený turnaj – byla vytvořena nová prázdná relace (${newTempId}).`);
+                        admin.refreshCloudSessionsList();
+                    }
                 } catch (e) {
                     console.error("Chyba při mazání turnaje:", e);
                     alert("Nepodařilo se smazat turnaj: " + e.message);
                 }
             },
 
-            // --- DUPLIKACE CLOUDOVÉHO TURNAJE ---
+            showPostDeleteChoiceModal: (deletedName, remainingCount) => {
+                const modal = document.getElementById('modal-post-delete-choice');
+                const msg = document.getElementById('post-delete-choice-msg');
+                if (msg) {
+                    msg.innerHTML = `Aktivní turnaj <b>"${admin.escapeHtml(deletedName)}"</b> byl trvale smazán a data v aplikaci byla vyčištěna.<br><br>V cloudu máte k dispozici ještě <b>${remainingCount}</b> ${remainingCount === 1 ? 'turnaj' : (remainingCount < 5 ? 'turnaje' : 'turnajů')}.<br><br><b>Jak si přejete pokračovat?</b>`;
+                }
+                if (modal) {
+                    modal.style.display = 'flex';
+                }
+            },
+
+            closePostDeleteChoiceModal: () => {
+                const choiceModal = document.getElementById('modal-post-delete-choice');
+                if (choiceModal) choiceModal.style.display = 'none';
+                admin.refreshCloudSessionsList();
+            },
+
+            chooseOpenExistingAfterDelete: () => {
+                const choiceModal = document.getElementById('modal-post-delete-choice');
+                if (choiceModal) choiceModal.style.display = 'none';
+
+                // Ponecháme otevřený správce turnajů se zbývajícími relacemi
+                const listModal = document.getElementById('modal-cloud-sessions');
+                if (listModal) listModal.style.display = 'flex';
+                admin.refreshCloudSessionsList();
+            },
+
+            chooseCreateNewAfterDelete: () => {
+                const choiceModal = document.getElementById('modal-post-delete-choice');
+                if (choiceModal) choiceModal.style.display = 'none';
+
+                const listModal = document.getElementById('modal-cloud-sessions');
+                if (listModal) listModal.style.display = 'none';
+
+                // Vyvoláme založení nového turnaje
+                admin.createNewCloudSession();
+            },
+
+// --- DUPLIKACE CLOUDOVÉHO TURNAJE ---
             duplicateCloudSession: async (sourceId, sourceName) => {
                 if (!auth.isLicensed()) {
                     alert("Pro duplikaci turnaje se prosím přihlaste s platnou licencí.");
@@ -10930,6 +11056,36 @@
                     Každý účet má limit maximálně 20 uložených relací. Smazáním uvolníte místo pro další turnaje.
                 </div>
                 <button class="small-btn btn-yellow" onclick="admin.closeCloudSessionsModal()" style="padding:6px 20px;">Zavřít</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Po Smazání Aktivního Turnaje (Volba dalšího kroku) -->
+    <div id="modal-post-delete-choice" class="modal-overlay"
+        style="display:none; z-index: 10005; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+        <div style="background:var(--bg-dark); border:2px solid var(--accent-yellow); width:92%; max-width:540px; border-radius:10px; padding:25px; box-shadow:0 10px 40px rgba(0,0,0,0.85); text-align:center; color:#fff;">
+            <div style="font-size:2.6em; margin-bottom:8px;">🗑️</div>
+            <h3 style="margin-top:0; color:var(--accent-yellow); font-size:1.3em;">
+                Aktivní turnaj byl smazán
+            </h3>
+            <p id="post-delete-choice-msg" style="font-size:0.95em; color:#ddd; line-height:1.5; margin-bottom:20px;">
+                Právě otevřený turnaj byl trvale odstraněn a data byla vyčištěna.
+            </p>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button class="btn-full btn-green" onclick="admin.chooseOpenExistingAfterDelete()"
+                    style="padding:12px; font-size:1em; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
+                    📂 Vybrat a otevřít jiný existující turnaj z cloudu
+                </button>
+                <button class="btn-full" onclick="admin.chooseCreateNewAfterDelete()"
+                    style="background:#00a2ff; color:#fff; padding:12px; font-size:1em; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
+                    ➕ Založit nový čistý turnaj
+                </button>
+            </div>
+            <div style="margin-top:16px;">
+                <button class="small-btn btn-subtle" onclick="admin.closePostDeleteChoiceModal()"
+                    style="color:#aaa; font-size:0.85em; padding:4px 12px; cursor:pointer;">
+                    Zavřít dialog a zůstat v seznamu
+                </button>
             </div>
         </div>
     </div>
