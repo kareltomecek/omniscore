@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.22-beta</title>
+    <title>OmniScore (OmS) v0.7.23-beta</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="shortcut icon" href="favicon.ico">
@@ -2601,7 +2601,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.22-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.23-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2751,7 +2751,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.22-beta";
+        const APP_VERSION = "0.7.23-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -6978,21 +6978,34 @@
                         }
 
                         // --- INTELLIGENT DETECTION: Backup vs Schedule ---
-
-                        // Check for Backup Signature:
-                        // 1. Row 12 (index 12) usually contains header "Pořadí" | "Název / Skupina" | "Domácí družstvo"
-                        // 2. Row 0 (index 0) usually has tournament name
                         let isBackup = false;
                         let backupHeaderRow = -1;
 
-                        // Scan specifically for Backup Header signature around row 12 (allow some slack)
-                        for (let r = 10; r < 15; r++) {
+                        // Scan for Header row with "domácí družstvo" and "hostující družstvo" in the first 40 rows
+                        for (let r = 0; r < Math.min(json.length, 40); r++) {
                             if (json[r]) {
                                 const rowStr = json[r].join(" ").toLowerCase();
-                                if (rowStr.includes("pořadí") && rowStr.includes("domácí družstvo") && rowStr.includes("hostující družstvo")) {
-                                    isBackup = true;
-                                    backupHeaderRow = r;
-                                    break;
+                                if ((rowStr.includes("domácí družstvo") || rowStr.includes("domácí")) &&
+                                    (rowStr.includes("hostující družstvo") || rowStr.includes("hostující") || rowStr.includes("hosté"))) {
+                                    if (rowStr.includes("pořadí") || rowStr.includes("skóre") || rowStr.includes("název") || rowStr.includes("skupina")) {
+                                        backupHeaderRow = r;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        // If header was found and it's not the very first row, check if rows above contain tournament metadata
+                        if (backupHeaderRow > 0) {
+                            for (let r = 0; r < backupHeaderRow; r++) {
+                                if (json[r] && json[r][0]) {
+                                    const lbl = String(json[r][0]).toLowerCase().trim();
+                                    if (lbl.includes("kategorie") || lbl.includes("pořadatel") || lbl.includes("relace") ||
+                                        lbl.includes("exportováno") || lbl.includes("pravidla") || lbl.includes("verze") ||
+                                        lbl.includes("časy") || lbl.includes("rozhodčí")) {
+                                        isBackup = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -7009,99 +7022,140 @@
                             let backupSessionId = null;
                             let backupOwnerUid = null;
                             let backupTimestamp = null;
+                            let backupAppVersion = null;
                             let backupPlayedCount = 0;
 
                             for (let r = 0; r < backupHeaderRow; r++) {
                                 if (!json[r] || !json[r][0]) continue;
                                 const lbl = String(json[r][0]).toLowerCase();
+                                const val = (json[r][1] !== undefined && json[r][1] !== null) ? json[r][1] : "";
                                 if (lbl.includes("relace")) {
-                                    const v = String(json[r][1] || "").trim().toUpperCase();
+                                    const v = String(val).trim().toUpperCase();
                                     if (v && v !== "-") backupSessionId = v;
                                 } else if (lbl.includes("vlastník") || lbl.includes("owner")) {
-                                    const v = String(json[r][1] || "").trim();
+                                    const v = String(val).trim();
                                     if (v && v !== "-") backupOwnerUid = v;
                                 } else if (lbl.includes("čas exportu") || lbl.includes("timestamp")) {
-                                    const v = parseFloat(json[r][1]);
+                                    const v = parseFloat(val);
                                     if (!isNaN(v)) backupTimestamp = v;
+                                } else if (lbl.includes("verze") || lbl.includes("version")) {
+                                    const v = String(val).trim();
+                                    if (v && v !== "-") backupAppVersion = v;
                                 }
                             }
+
+                            // Zjistit index sloupce Skóre v hlavičce
+                            let scoreColIndex = -1;
+                            if (json[backupHeaderRow]) {
+                                json[backupHeaderRow].forEach((cell, idx) => {
+                                    const cStr = String(cell || "").toLowerCase().trim();
+                                    if (cStr.includes("skóre") || cStr.includes("score")) {
+                                        scoreColIndex = idx;
+                                    }
+                                });
+                            }
+                            if (scoreColIndex === -1) scoreColIndex = 4; // výchozí 5. sloupec
+
                             // Spočítat odehraná utkání ze zálohy (sloupec Skóre != "-")
                             for (let r = backupHeaderRow + 1; r < json.length; r++) {
                                 const row = json[r];
                                 if (!row || !row[0]) break;
-                                const score = String(row[4] || "").trim();
-                                if (score && score !== "-" && score.includes(":")) backupPlayedCount++;
-                            }
-
-                            // --- Pokud existuje stejná relace na Cloudu, porovnáme ---
-                            const currentUid = auth.currentUser ? auth.currentUser.uid : null;
-                            const isSameOwner = backupOwnerUid && currentUid && backupOwnerUid === currentUid;
-
-                            if (isSameOwner && backupSessionId && typeof firebase !== 'undefined') {
-                                const cloudSnap = await firebase.database().ref(`users/${currentUid}/sessions/${backupSessionId}`).once('value');
-                                const cloudMeta = cloudSnap.val();
-
-                                if (cloudMeta && cloudMeta.lastUpdate) {
-                                    const cloudTime = cloudMeta.lastUpdate;
-                                    const cloudPlayed = cloudMeta.matchCount || 0;
-                                    const excelTime = backupTimestamp || 0;
-                                    const cloudIsNewer = cloudTime > excelTime;
-
-                                    // Formatování pro zobrazení
-                                    const cloudTimeStr = new Date(cloudTime).toLocaleString('cs-CZ');
-                                    const excelTimeStr = backupTimestamp ? new Date(backupTimestamp).toLocaleString('cs-CZ') : "neznámo";
-
-                                    // Sestavit přehledné hlášení o rozdílu
-                                    let msg = `Detekována záloha turnaje: "${backupTournamentName}"\n`;
-                                    msg += `──────────────────────────\n`;
-                                    msg += `☁️  Cloud (Firebase): ${cloudTimeStr} | ${cloudPlayed} zápasů s výsledkem\n`;
-                                    msg += `📁 Excel (záloha): ${excelTimeStr} | ${backupPlayedCount} zápasů s výsledkem\n`;
-                                    msg += `──────────────────────────\n`;
-
-                                    if (cloudIsNewer) {
-                                        msg += `⚠️ Cloud je NOVĚJŠÍ než záloha!\n\n`;
-                                    } else {
-                                        msg += `📁 Excel záloha je stejně stará nebo novější.\n\n`;
-                                    }
-
-                                    msg += `Zvolte akci:\n`;
-                                    msg += `[OK]  → Přepsat z Excelu (záloha má přednost)\n`;
-                                    msg += `[Storno]  → Zachovat Cloud / jako kopii`;
-
-                                    if (confirm(msg)) {
-                                        // Uživatel potvrdil přepsání z Excelu
-                                        admin._restoreTournamentFromBackup(json, backupHeaderRow);
-                                        input.value = "";
-                                        return;
-                                    } else {
-                                        // Nabídnout nahrání jako kopii
-                                        if (confirm(`Chcete zálohu nahrát jako NOVOU KOPII turnaje?\n\n(Cloud zůstane nedotčen, záloha dostane nový kód relace.)`)) {
-                                            // Přemaskování Owner UID aby se vytvořila nová relace jako kopie
-                                            const fakeJson = json.map(row => [...(row || [])]);
-                                            for (let r = 0; r < backupHeaderRow; r++) {
-                                                if (fakeJson[r] && String(fakeJson[r][0] || "").toLowerCase().includes("vlastník")) {
-                                                    fakeJson[r][1] = "KOPIE_FORCE_NEW"; // Odlišné UID → nová relace
-                                                    break;
-                                                }
-                                            }
-                                            admin._restoreTournamentFromBackup(fakeJson, backupHeaderRow);
-                                            input.value = "";
-                                            return;
-                                        }
-                                        // Storno – nedělat nic, ponechat cloud
-                                        input.value = "";
-                                        return;
+                                const c0 = String(row[0]).trim().toUpperCase();
+                                if (c0.includes("TABULKA") || c0.includes("SBOR") || c0.includes("SOUPISKY") || c0.includes("RŮZNÉ")) {
+                                    break;
+                                }
+                                const score = String(row[scoreColIndex] || "").trim();
+                                if (score && score !== "-" && score.includes(":")) {
+                                    const parts = score.split(":");
+                                    if (!isNaN(parseInt(parts[0])) && !isNaN(parseInt(parts[1]))) {
+                                        backupPlayedCount++;
                                     }
                                 }
                             }
 
-                            // --- Standardní dialog (žádná kolize s cloudem nebo jiný vlastník) ---
-                            if (confirm(`Detekována záloha turnaje "${backupTournamentName}".\n\nChcete OBNOVIT celý turnaj ze zálohy?\n(Tato akce nahradí všechna data turnaje)`)) {
-                                admin._restoreTournamentFromBackup(json, backupHeaderRow);
+                            // --- Pokud existuje stejná relace na Cloudu, porovnáme ---
+                            const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+                            let cloudMeta = null;
+
+                            if (backupSessionId && typeof firebase !== 'undefined') {
+                                try {
+                                    if (currentUid) {
+                                        const userSnap = await firebase.database().ref(`users/${currentUid}/sessions/${backupSessionId}`).once('value');
+                                        if (userSnap.exists()) {
+                                            cloudMeta = userSnap.val();
+                                        }
+                                    }
+                                    if (!cloudMeta) {
+                                        const rootSnap = await firebase.database().ref(`sessions/${backupSessionId}`).once('value');
+                                        if (rootSnap.exists()) {
+                                            cloudMeta = rootSnap.val();
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn("[Import] Ověření relace v cloudu selhalo:", e);
+                                }
+                            }
+
+                            if (cloudMeta && backupSessionId) {
+                                const cloudTime = cloudMeta.lastUpdate || 0;
+                                const cloudPlayed = (cloudMeta.matchCount !== undefined)
+                                    ? cloudMeta.matchCount
+                                    : (cloudMeta.schedule ? cloudMeta.schedule.filter(m => m.type === 'match' && m.homeScore !== null).length : 0);
+                                const excelTime = backupTimestamp || 0;
+                                const cloudIsNewer = cloudTime > excelTime;
+
+                                const cloudTimeStr = cloudTime ? new Date(cloudTime).toLocaleString('cs-CZ') : "neznámo";
+                                const excelTimeStr = backupTimestamp ? new Date(backupTimestamp).toLocaleString('cs-CZ') : "neznámo";
+
+                                let msg = `Pozor: Kód relace "${backupSessionId}" už v cloudu existuje!\n`;
+                                msg += `──────────────────────────\n`;
+                                msg += `Turnaj: "${backupTournamentName}"\n`;
+                                if (backupAppVersion) msg += `Verze aplikace zálohy: ${backupAppVersion}\n`;
+                                msg += `☁️  Cloud (Firebase): ${cloudTimeStr} | ${cloudPlayed} odehraných zápasů\n`;
+                                msg += `📁 Excel (záloha):   ${excelTimeStr} | ${backupPlayedCount} odehraných zápasů\n`;
+                                msg += `──────────────────────────\n`;
+
+                                if (cloudIsNewer) {
+                                    msg += `⚠️ Cloudová verze je NOVĚJŠÍ než soubor zálohy!\n\n`;
+                                } else {
+                                    msg += `📁 Soubor zálohy je stejně starý nebo novější než cloud.\n\n`;
+                                }
+
+                                msg += `Zvolte akci:\n`;
+                                msg += `[OK]     → PŘEPSAT relaci daty z Excelu (záloha má přednost)\n`;
+                                msg += `[Storno] → Zvolit jinou možnost (např. nahrát jako novou kopii)`;
+
+                                if (confirm(msg)) {
+                                    admin._restoreTournamentFromBackup(json, backupHeaderRow, backupSessionId);
+                                    input.value = "";
+                                    return;
+                                } else {
+                                    if (confirm(`Chcete zálohu nahrát jako NOVOU KOPII turnaje?\n\n(Původní cloudová relace ${backupSessionId} zůstane nedotčena a záloha dostane nový kód relace.)`)) {
+                                        const newSessionId = Math.random().toString(36).substring(2, 7).toUpperCase();
+                                        admin._restoreTournamentFromBackup(json, backupHeaderRow, newSessionId);
+                                        input.value = "";
+                                        return;
+                                    }
+                                    input.value = "";
+                                    return;
+                                }
+                            }
+
+                            // --- Standardní dialog (žádná kolize s cloudem) ---
+                            let restorePrompt = `Detekována kompletní záloha turnaje:\n"${backupTournamentName}"\n`;
+                            if (backupSessionId) restorePrompt += `Kód relace: ${backupSessionId}\n`;
+                            if (backupAppVersion) restorePrompt += `Vytvořeno ve verzi: ${backupAppVersion}\n`;
+                            restorePrompt += `Zápasů s výsledkem: ${backupPlayedCount}\n\n`;
+                            restorePrompt += `Chcete OBNOVIT celý turnaj z této zálohy?\n(Tato akce nahradí aktuální turnaj)`;
+
+                            if (confirm(restorePrompt)) {
+                                admin._restoreTournamentFromBackup(json, backupHeaderRow, backupSessionId);
+                                input.value = "";
+                                return;
+                            } else {
                                 input.value = "";
                                 return;
                             }
-                            // If user cancels, we fall through to try standard schedule import
                         }
 
                         // --- STANDARD SCHEDULE IMPORT LOGIC (Original) ---
@@ -7109,19 +7163,20 @@
                         let colMap = { title: 0, home: 1, guest: 2, referee: 3, duration: 4 };
                         let headerRowIndex = -1;
 
-                        // Smart Header Detection: Scan first 20 rows
-                        for (let r = 0; r < Math.min(json.length, 20); r++) {
+                        // Smart Header Detection: Scan first 25 rows
+                        for (let r = 0; r < Math.min(json.length, 25); r++) {
                             const row = json[r];
                             if (!row || row.length < 2) continue;
 
                             let detected = {};
                             row.forEach((cell, c) => {
-                                const val = String(cell || "").toLowerCase();
+                                const val = String(cell || "").toLowerCase().trim();
                                 if (val.includes("domácí") || val.includes("home")) detected.home = c;
                                 if (val.includes("host") || val.includes("guest")) detected.guest = c;
                                 if (val.includes("rozhodčí") || val.includes("ref")) detected.referee = c;
                                 if (val.includes("název") || val.includes("skupina") || val.includes("fáze")) detected.title = c;
                                 if (val.includes("délka") || val.includes("duration") || val.includes("minut")) detected.duration = c;
+                                if (val.includes("skóre") || val.includes("score") || val.includes("výsledek")) detected.score = c;
                             });
 
                             // If we found at least 2 key columns (Home & Guest), consider this the header row
@@ -7145,6 +7200,12 @@
                             const row = json[i];
                             if (!row || row.length < 2) continue;
 
+                            const firstCell = String(row[0] || "").trim().toUpperCase();
+                            if (firstCell.includes("TABULKA") || firstCell.includes("SBOR ROZHODČÍCH") ||
+                                firstCell.includes("SOUPISKY") || firstCell.includes("RŮZNÉ")) {
+                                break;
+                            }
+
                             const title = String(row[colMap.title] || "Zápas").trim();
                             const home = String(row[colMap.home] || "").trim();
                             const guest = String(row[colMap.guest] || "").trim();
@@ -7155,6 +7216,22 @@
                             if (colMap.duration !== undefined) {
                                 const dVal = parseInt(row[colMap.duration]);
                                 if (!isNaN(dVal) && dVal > 0) duration = dVal;
+                            }
+
+                            // Parse score if column exists
+                            let homeScore = null;
+                            let guestScore = null;
+                            if (colMap.score !== undefined && row[colMap.score]) {
+                                const sStr = String(row[colMap.score]).trim();
+                                if (sStr && sStr !== "-" && sStr.includes(":")) {
+                                    const parts = sStr.split(":");
+                                    const h = parseInt(parts[0]);
+                                    const g = parseInt(parts[1]);
+                                    if (!isNaN(h) && !isNaN(g)) {
+                                        homeScore = h;
+                                        guestScore = g;
+                                    }
+                                }
                             }
 
                             const resHome = admin.ensureIdentityExists(home, 'team');
@@ -7179,8 +7256,8 @@
                                 home: resHome || home,
                                 guest: resGuest || guest,
                                 referee: resRef || ref,
-                                homeScore: null,
-                                guestScore: null,
+                                homeScore: homeScore,
+                                guestScore: guestScore,
                                 duration: duration
                             });
                         }
@@ -7221,35 +7298,56 @@
                 reader.readAsArrayBuffer(file);
             },
 
-            _restoreTournamentFromBackup: (json, headerRowIndex) => {
+            _restoreTournamentFromBackup: (json, headerRowIndex, preferredSessionId = null) => {
                 try {
-                    // Parse metadata (rows 0-10)
-                    state.tournamentName = json[0][0] || "";
-                    state.tournamentCategory = json[1][1] || "";
-                    state.tournamentOrganizer = json[2][1] || "";
+                    // 1. Build metadata dictionary dynamically from all rows before headerRowIndex
+                    const metaMap = {};
+                    for (let r = 0; r < headerRowIndex; r++) {
+                        const row = json[r];
+                        if (!row || !row[0]) continue;
+                        const key = String(row[0]).trim().replace(/:$/, "").toLowerCase();
+                        const val = (row[1] !== undefined && row[1] !== null) ? row[1] : "";
+                        metaMap[key] = val;
+                    }
 
-                    let dateStr = json[3][1];
+                    const getMeta = (...keywords) => {
+                        for (const [k, v] of Object.entries(metaMap)) {
+                            for (const kw of keywords) {
+                                if (k.includes(kw.toLowerCase())) {
+                                    return v;
+                                }
+                            }
+                        }
+                        return null;
+                    };
+
+                    // Tournament Name (Row 0 first cell, or from metadata)
+                    state.tournamentName = String(json[0]?.[0] || getMeta("turnaj") || "").trim();
+                    state.tournamentCategory = String(getMeta("kategorie") || "").trim();
+                    state.tournamentOrganizer = String(getMeta("pořadatel") || "").trim();
+
+                    let dateStr = getMeta("datum");
                     if (dateStr && dateStr !== "-") {
                         if (dateStr instanceof Date) {
                             state.tournamentDate = dateStr.toISOString().split('T')[0];
                         } else {
-                            // Robust parsing of "D. M. YYYY" or "D.M.YYYY"
                             const cleanDate = String(dateStr).replace(/\s/g, '');
                             const parts = cleanDate.split('.');
                             if (parts.length === 3) {
                                 const d = parts[0].padStart(2, '0');
                                 const m = parts[1].padStart(2, '0');
                                 const y = parts[2];
-                                // Check if year is 4 digits
                                 if (y.length === 4) {
                                     state.tournamentDate = `${y}-${m}-${d}`;
                                 }
+                            } else if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+                                state.tournamentDate = cleanDate;
                             }
                         }
                     }
 
-                    state.tournamentLocation = json[4][1] || "";
-                    state.pitchSize = json[5][1] || "";
+                    state.tournamentLocation = String(getMeta("místo") || "").trim();
+                    state.pitchSize = String(getMeta("plocha") || "").trim();
 
                     const splitName = (val) => {
                         if (!val || val === "-") return { surname: "", firstName: "" };
@@ -7257,12 +7355,12 @@
                         return { surname: p[0] || "", firstName: p.slice(1).join(" ") || "" };
                     };
 
-                    state.officialChiefReferee = splitName(json[6][1]);
-                    state.officialTimekeeper = splitName(json[7][1]);
-                    state.officialRecorder = splitName(json[8][1]);
+                    state.officialChiefReferee = splitName(getMeta("hlavní"));
+                    state.officialTimekeeper = splitName(getMeta("časoměřič"));
+                    state.officialRecorder = splitName(getMeta("zapisovatel"));
 
                     // Scoring Rules
-                    const ruleStr = json[9][1];
+                    const ruleStr = getMeta("pravidla");
                     if (ruleStr && String(ruleStr).includes("/")) {
                         const pts = String(ruleStr).split("/");
                         if (!state.rules) state.rules = {};
@@ -7270,12 +7368,12 @@
                         state.rules.drawPoints = parseInt(pts[1]) || 1;
                         state.rules.lossPoints = parseInt(pts[2]) || 0;
                     }
-                    const miniStr = json[10][1];
+                    const miniStr = getMeta("minitabulky");
                     if (!state.rules) state.rules = {};
-                    state.rules.useMiniTables = (miniStr === "Ano");
+                    state.rules.useMiniTables = (String(miniStr).trim().toLowerCase() === "ano");
 
                     // Times
-                    const timeStr = json[11][1];
+                    const timeStr = getMeta("časy");
                     if (timeStr && String(timeStr).includes("/")) {
                         const tpt = String(timeStr).split("/");
                         if (!state.times) state.times = {};
@@ -7284,48 +7382,28 @@
                         state.times.setup = parseInt(tpt[2]) || 10;
                     }
 
-                    // Check for saved Session ID and Owner UID in metadata rows
-                    let restoredSessionId = null;
-                    let restoredOwnerUid = null;
-                    for (let r = 0; r < headerRowIndex; r++) {
-                        if (json[r] && json[r][0]) {
-                            const rowLabel = String(json[r][0]).toLowerCase();
-                            if (rowLabel.includes("relace")) {
-                                const val = String(json[r][1] || "").trim().toUpperCase();
-                                if (val && val !== "-" && val.length >= 3) {
-                                    restoredSessionId = val;
-                                }
-                            } else if (rowLabel.includes("vlastník") || rowLabel.includes("owner")) {
-                                const val = String(json[r][1] || "").trim();
-                                if (val && val !== "-") {
-                                    restoredOwnerUid = val;
-                                }
-                            }
+                    // Check for saved Session ID
+                    let restoredSessionId = preferredSessionId || getMeta("relace");
+                    if (restoredSessionId) {
+                        restoredSessionId = String(restoredSessionId).trim().toUpperCase();
+                        if (restoredSessionId === "-" || restoredSessionId.length < 3) {
+                            restoredSessionId = null;
                         }
                     }
 
-                    const currentUid = auth.currentUser ? auth.currentUser.uid : null;
-                    const isSameOwner = (restoredOwnerUid && currentUid && restoredOwnerUid === currentUid);
-
-                    if (isSameOwner && restoredSessionId) {
-                        // Stejný uživatel na dalším PC: navážeme na identickou relaci
-                        state.sessionId = restoredSessionId;
-                        localStorage.setItem('oms_session_id', restoredSessionId);
-                        if (window.history && window.history.replaceState) {
-                            window.history.replaceState(null, '', window.location.pathname + '?session=' + restoredSessionId);
-                        }
-                        admin._lastRestoreSessionDesc = `Navázáno na původní relaci: ${restoredSessionId}`;
-                        console.log("%c[Restore] Obnoveno původní Session ID (stejný vlastník):", "color:#00a2ff; font-weight:bold;", restoredSessionId);
+                    if (!restoredSessionId) {
+                        restoredSessionId = Math.random().toString(36).substring(2, 7).toUpperCase();
+                        admin._lastRestoreSessionDesc = `Vytvořena nová relace: ${restoredSessionId}`;
+                        console.log("%c[Restore] Vytvořena nová relace:", "color:#4caf50; font-weight:bold;", restoredSessionId);
                     } else {
-                        // Cizí záloha / jiný účet / šablona turnaje: vytvoříme novou nezávislou relaci
-                        const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
-                        state.sessionId = newId;
-                        localStorage.setItem('oms_session_id', newId);
-                        if (window.history && window.history.replaceState) {
-                            window.history.replaceState(null, '', window.location.pathname + '?session=' + newId);
-                        }
-                        admin._lastRestoreSessionDesc = `Vytvořena nová vlastní relace: ${newId} (šablona turnaje)`;
-                        console.log("%c[Restore] Vytvořena nová vlastní relace pro importovanou šablonu:", "color:#4caf50; font-weight:bold;", newId);
+                        admin._lastRestoreSessionDesc = `Obnovena relace ze zálohy: ${restoredSessionId}`;
+                        console.log("%c[Restore] Obnovena relace:", "color:#00a2ff; font-weight:bold;", restoredSessionId);
+                    }
+
+                    state.sessionId = restoredSessionId;
+                    localStorage.setItem('oms_session_id', restoredSessionId);
+                    if (window.history && window.history.replaceState) {
+                        window.history.replaceState(null, '', window.location.pathname + '?session=' + restoredSessionId);
                     }
 
                     // Clear basics
@@ -7342,24 +7420,58 @@
                     const teamMap = new Map(); // name -> id
                     const refMap = new Map(); // name -> id
 
+                    // Map columns dynamically from header row
+                    const headerRow = json[headerRowIndex] || [];
+                    let colIdx = {
+                        order: 0,
+                        title: 1,
+                        home: 2,
+                        guest: 3,
+                        score: 4,
+                        referee: 5,
+                        duration: 6
+                    };
+
+                    headerRow.forEach((cell, idx) => {
+                        const val = String(cell || "").toLowerCase().trim();
+                        if (val.includes("pořadí") || val === "#") colIdx.order = idx;
+                        else if (val.includes("název") || val.includes("skupina")) colIdx.title = idx;
+                        else if (val.includes("domácí")) colIdx.home = idx;
+                        else if (val.includes("host")) colIdx.guest = idx;
+                        else if (val.includes("skóre") || val.includes("score")) colIdx.score = idx;
+                        else if (val.includes("rozhodčí") || val.includes("ref")) colIdx.referee = idx;
+                        else if (val.includes("délka") || val.includes("duration")) colIdx.duration = idx;
+                    });
+
                     let currentRowIndex = headerRowIndex + 1;
 
                     // Keep reading until we hit an empty row or a known section header
                     for (; currentRowIndex < json.length; currentRowIndex++) {
                         const row = json[currentRowIndex];
-                        if (!row || row.length < 2) break; // Break on empty/short row between sections
+                        if (!row || row.length < 2) {
+                            // Check if next row might be a section header
+                            const nextRow = json[currentRowIndex + 1];
+                            if (!nextRow || nextRow.length === 0) break;
+                            const nextCell0 = String(nextRow[0] || "").trim().toUpperCase();
+                            if (nextCell0.includes("TABULKA") || nextCell0.includes("SBOR") || nextCell0.includes("SOUPISKY") || nextCell0.includes("RŮZNÉ")) {
+                                break;
+                            }
+                            continue;
+                        }
 
                         const firstCell = String(row[0] || "").trim().toUpperCase();
-                        if (firstCell.includes("SBOR ROZHODČÍCH") || firstCell.includes("SOUPISKY DRUŽSTEV") || firstCell.includes("RŮZNÉ")) {
+                        if (firstCell.includes("TABULKA TURNAJE") || firstCell.includes("KONEČNÉ POŘADÍ") || 
+                            firstCell.includes("SBOR ROZHODČÍCH") || firstCell.includes("SOUPISKY DRUŽSTEV") || 
+                            firstCell.includes("RŮZNÉ")) {
                             break; // End of schedule, start of new section
                         }
 
-                        const title = String(row[1] || "").trim();
-                        const homeTeam = String(row[2] || "").trim();
-                        const guestTeam = String(row[3] || "").trim();
-                        const scoreStr = String(row[4] || "").trim();
-                        const refName = String(row[5] || "").trim();
-                        const duration = parseInt(row[6]) || 600;
+                        const title = String(row[colIdx.title] || "").trim();
+                        const homeTeam = String(row[colIdx.home] || "").trim();
+                        const guestTeam = String(row[colIdx.guest] || "").trim();
+                        const scoreStr = String(row[colIdx.score] || "").trim();
+                        const refName = String(row[colIdx.referee] || "").trim();
+                        const duration = parseInt(row[colIdx.duration]) || (state.times.play * 2 + state.times.break) || 600;
 
                         const isEvent = homeTeam === "-" || homeTeam === "" || title.includes("UDÁLOST");
 
@@ -7415,7 +7527,7 @@
 
                     // --- 2. Parse Other Sections ---
                     // Scan remaining rows for section headers
-                    let section = null; // 'refs', 'rosters', 'misc'
+                    let section = null; // 'standings', 'refs', 'rosters', 'misc'
 
                     for (; currentRowIndex < json.length; currentRowIndex++) {
                         const row = json[currentRowIndex];
@@ -7425,12 +7537,15 @@
                         const val1 = String(row[1] || "").trim().toUpperCase();
 
                         // Detect Section Headers
-                        if (val0 === "SBOR ROZHODČÍCH") { section = 'refs'; continue; }
-                        if (val0 === "SOUPISKY DRUŽSTEV" || (val0 === "DRUŽSTVO" && val1.includes("HRÁČ"))) { section = 'rosters'; continue; }
-                        if (val0 === "RŮZNÉ") { section = 'misc'; continue; }
+                        if (val0.includes("TABULKA TURNAJE") || val0.includes("KONEČNÉ POŘADÍ")) { section = 'standings'; continue; }
+                        if (val0.includes("SBOR ROZHODČÍCH")) { section = 'refs'; continue; }
+                        if (val0.includes("SOUPISKY DRUŽSTEV") || (val0 === "DRUŽSTVO" && val1.includes("HRÁČ"))) { section = 'rosters'; continue; }
+                        if (val0.includes("RŮZNÉ")) { section = 'misc'; continue; }
 
-                        // Parse Content based on current section
-                        if (section === 'refs') {
+                        if (section === 'standings') {
+                            continue;
+                        }
+                        else if (section === 'refs') {
                             const name = String(row[0] || "").trim();
                             if (name && !refMap.has(name)) {
                                 const id = "ref_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
@@ -7444,15 +7559,10 @@
                             }
                         }
                         else if (section === 'rosters') {
-                            // Column 0: Team Name
-                            // Column 1: Player 1 Name, Column 2: UCI-ID 1
-                            // Column 3: Player 2 Name, Column 4: UCI-ID 2
                             const tName = String(row[0] || "").trim();
-                            // Skip header row if repeated
                             if (tName === "SOUPISKY DRUŽSTEV" || tName === "DRUŽSTVO") continue;
 
                             if (tName) {
-                                // Find team
                                 let tId = teamMap.get(tName);
                                 if (!tId) {
                                     tId = "team_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
@@ -7461,15 +7571,12 @@
                                 }
                                 const teamObj = state.teams.find(t => t.id === tId);
 
-                                // Helper to process player
                                 const processPlayer = (name, uci) => {
                                     if (!name || name === "-") return null;
-                                    // Parse name
                                     const parts = name.split(" ");
                                     const surname = parts[0] || "";
                                     const firstname = parts.slice(1).join(" ") || "";
 
-                                    // Make new player (no complex lookup needed for backup restore, we trust the file)
                                     const pid = "player_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
                                     state.players.push({
                                         id: pid,
@@ -7518,9 +7625,15 @@
                     admin.updateSettingsUI(); // Update metadata inputs!
                     ui.renderStandings();
                     game.syncProjection(true);
+                    if (auth.currentUser) {
+                        admin.updateUserSessionMetadataThrottled(true);
+                        admin.updateCloudSaveStatusInfo();
+                    }
 
                     const sessionInfo = admin._lastRestoreSessionDesc || `Relace: ${state.sessionId}`;
-                    alert(`Obnovení turnaje dokončeno!\n\nTurnaj: ${state.tournamentName}\n${sessionInfo}\nDružstva: ${state.teams.length}\nZápasy: ${state.schedule.filter(m => m.type === 'match').length}\nRozhodčí: ${state.referees.length}`);
+                    const appVer = getMeta("verze", "version");
+                    const verInfo = appVer ? `\nVerze zálohy: ${appVer}` : "";
+                    alert(`Obnovení turnaje dokončeno!\n\nTurnaj: ${state.tournamentName}\n${sessionInfo}${verInfo}\nDružstva: ${state.teams.length}\nZápasy: ${state.schedule.filter(m => m.type === 'match').length}\nRozhodčí: ${state.referees.length}`);
                 } catch (e) {
                     console.error(e);
                     alert("Chyba při obnově ze zálohy: " + e.message);
@@ -9531,6 +9644,7 @@
                     ["Čas exportu (timestamp):", Date.now()],
                     ["Relace (Session ID):", state.sessionId || "-"],
                     ["Vlastník (Owner UID):", (auth.currentUser ? auth.currentUser.uid : "-")],
+                    ["Verze aplikace:", APP_VERSION],
                     [] // divider row
                 ];
 
@@ -9639,8 +9753,9 @@
                         <div><strong>Časy:</strong> Hra ${Math.floor(state.times.play / 60)}:${(state.times.play % 60).toString().padStart(2, '0')} | Přestávka ${Math.floor(state.times.break / 60)}:${(state.times.break % 60).toString().padStart(2, '0')}</div>
                     </div>
 
-                    <div style="grid-column: span 2; margin-top:5px; padding-top:5px; border-top:1px solid #ddd; font-size:0.8em; color:#888;">
-                        Exportováno: ${new Date().toLocaleString('cs-CZ')}
+                    <div style="grid-column: span 2; margin-top:5px; padding-top:5px; border-top:1px solid #ddd; font-size:0.8em; color:#888; display:flex; justify-content:space-between;">
+                        <span>Exportováno: ${new Date().toLocaleString('cs-CZ')}</span>
+                        <span>Verze aplikace: ${APP_VERSION}</span>
                     </div>
                 </div>`;
 

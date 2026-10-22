@@ -106,6 +106,14 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.23-beta` (Testovací větev)
+- **Robustní obnova turnaje ze zálohy Excel/CSV, verze aplikace v exportech a detekce kolizí relací:**
+  - **Dynamická detekce zálohy turnaje:** Skenování hlavičky tabulky rozpisu zápasů rozšířeno na prvních 40 řádků a doplněno o dynamické rozpoznání klíčových polí (`Kategorie:`, `Pořadatel:`, `Exportováno:`, `Relace:`, `Pravidla:`, `Verze:`). Starší i novější zálohy s libovolným počtem řádků metadat jsou spolehlivě identifikovány jako kompletní zálohy.
+  - **Plné zachování a obnova odehraných výsledků:** Sloupec *Skóre* je správně parsován a dosazen do zápasů (`homeScore`, `guestScore`) při obnově zálohy i při importu samotného harmonogramu (již nedochází k nechtěnému vynulování skóre na `null`).
+  - **Přenášení a ochrana Session ID ze zálohy:** Při obnově zálohy se přebírá původní `Session ID` a název turnaje. Pokud se kód relace shoduje se stávajícím turnajem v cloudu Firebase, systém porovná datum poslední změny a počet odehraných utkání a nabídne volbu: přepsat cloud ze zálohy, nebo zálohu nahrát jako novou kopii s novým ID.
+  - **Verze aplikace v hlavičce exportu:** Do generovaných XLSX i tiskových exportů přidán řádek `["Verze aplikace:", APP_VERSION]` pro přesnou identifikaci verze, zpětnou kompatibilitu a snadnou budoucí migraci.
+  - **Dynamické mapování sloupců a bezpečné ukončení sekcí:** Čtení rozpisu se dynamicky řídí názvy sloupců v hlavičce a spolehlivě se zastaví před sekcemi `TABULKA TURNAJE`, `SBOR ROZHODČÍCH`, `SOUPISKY DRUŽSTEV` a `RŮZNÉ`.
+
 ### Verze `v0.7.22-beta` (Testovací větev)
 - **Automatická registrace aktivního turnaje v cloudu:**
   - **Okamžitá přítomnost aktivního turnaje v seznamu:** Otevřený aktivní turnaj je nyní v dialogu cloudových turnajů automaticky zaevidován a zobrazen s označením `✓ AKTIVNÍ`. Již nedochází k situaci, kdy by dialog hlásil absenci uložených turnajů, pokud je v aplikaci aktivní turnaj rozpracován.
