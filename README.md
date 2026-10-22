@@ -106,6 +106,12 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.21-beta` (Testovací větev)
+- **Zabezpečení kořenového uzlu cloudu, samooprava seznamu a zjednodušení dialogu:**
+  - **Odstranění tlačítka „💾 Uložit aktuální turnaj“ z modálního okna:** Dialog správy cloudových turnajů nyní slouží jako přehledný manažer a rozcestník turnajů (seznam, Otevřít, Kopie, Smazat a + Nový turnaj). Pro explicitní ruční uložení slouží přímé tlačítko v akordeonu *Nastavení turnaje*.
+  - **Striktní ochrana kořene metadat (`isRoot`):** Zablokován jakýkoli zápis do kořenového uzlu `users/{uid}/sessions`, pokud chybí nebo je prázdné ID relace. Tím je trvale vyloučeno nechtěné přepsání či smazání seznamu uživatelských turnajů.
+  - **Automatická detekce a samooprava poškozených záznamů (`undefined`):** Funkce načítání seznamu turnajů filtruje pouze platné objekty s neprázdným `sessionId`. Jakékoli fragmenty či poškozené klíče v kořenu automaticky z cloudu odstraní, takže v tabulce se již nikdy nezobrazí poškozené položky `undefined`.
+
 ### Verze `v0.7.20-beta` (Testovací větev)
 - **Odstranění nechtěného zápisu do cloudu při smazání aktivní relace:**
   - **Eliminace předčasného vytvoření nového turnaje v cloudu:** Při smazání aktivního turnaje se dočasné prázdné ID již neodesílá do Firebase a nezapisuje se do seznamu relací uživatele.

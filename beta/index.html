@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.20-beta</title>
+    <title>OmniScore (OmS) v0.7.21-beta</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="shortcut icon" href="favicon.ico">
@@ -2601,7 +2601,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.20-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.21-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2751,7 +2751,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.20-beta";
+        const APP_VERSION = "0.7.21-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -8296,31 +8296,34 @@
             // Helper to get correct Firebase database path for sessions metadata
             // Returns: { ref: DatabaseReference, isTempVIP: boolean, token: string|null }
             getCloudSessionsDbRef: (subPath = "") => {
-                if (auth.currentUser) {
-                    const basePath = `users/${auth.currentUser.uid}/sessions`;
-                    const fullPath = subPath ? `${basePath}/${subPath}` : basePath;
-                    return { ref: firebase.database().ref(fullPath), isTempVIP: false, token: null };
+                if (!auth.currentUser && !auth.getTempVIPInfo()?.token) return null;
+                const basePath = auth.currentUser 
+                    ? `users/${auth.currentUser.uid}/sessions` 
+                    : `users/admin_vip_master/sessions`;
+                const isTempVIP = !auth.currentUser;
+                const token = isTempVIP ? auth.getTempVIPInfo().token : null;
+
+                const cleanSub = String(subPath || "").trim();
+                if (!cleanSub) {
+                    // Kořenová reference - POUZE pro čtení seznamu (once, on)
+                    return { ref: firebase.database().ref(basePath), isTempVIP, token, isRoot: true };
                 }
-                const tempVip = auth.getTempVIPInfo();
-                if (tempVip && tempVip.token) {
-                    const basePath = `users/admin_vip_master/sessions`;
-                    const fullPath = subPath ? `${basePath}/${subPath}` : basePath;
-                    return { ref: firebase.database().ref(fullPath), isTempVIP: true, token: tempVip.token };
-                }
-                return null;
+                return { ref: firebase.database().ref(`${basePath}/${cleanSub}`), isTempVIP, token, isRoot: false };
             },
 
             updateUserSessionMetadataThrottled: (force = false) => {
+                if (!state.sessionId || typeof state.sessionId !== 'string' || !state.sessionId.trim()) return;
                 if (typeof firebase === 'undefined' || !auth.isLicensed()) return;
-                const cloudTarget = admin.getCloudSessionsDbRef(state.sessionId);
-                if (!cloudTarget) return;
+                const cleanId = state.sessionId.trim();
+                const cloudTarget = admin.getCloudSessionsDbRef(cleanId);
+                if (!cloudTarget || cloudTarget.isRoot) return;
 
                 const now = Date.now();
                 if (!force && (now - (admin._lastMetaSync || 0) < 30000)) return; // Throttling: max jednou za 30 s
                 admin._lastMetaSync = now;
 
                 const meta = {
-                    sessionId: state.sessionId,
+                    sessionId: cleanId,
                     tournamentName: state.tournamentName || "Nepojmenovaný turnaj",
                     tournamentCategory: state.tournamentCategory || "-",
                     tournamentDate: state.tournamentDate || "-",
@@ -8530,16 +8533,42 @@
                     const sessionsMap = snap.val() || {};
                     const sessionKeys = Object.keys(sessionsMap);
 
+                    // Samooprava a filtrace: oddělit platné objekty turnajů od poškozených primitivních hodnot
+                    const validSessions = [];
+                    const corruptedKeys = [];
+
+                    for (const k of sessionKeys) {
+                        const val = sessionsMap[k];
+                        if (val && typeof val === 'object' && val.sessionId && typeof val.sessionId === 'string' && val.sessionId.trim().length > 0) {
+                            validSessions.push(val);
+                        } else {
+                            corruptedKeys.push(k);
+                        }
+                    }
+
+                    // Automaticky vyčistit poškozené kořenové klíče z Firebase (např. matchCount, teamCount, undefined záznamy)
+                    if (corruptedKeys.length > 0) {
+                        console.warn("[Cloud] Čištění neplatných/poškozených záznamů z cloudu:", corruptedKeys);
+                        for (const badKey of corruptedKeys) {
+                            cloudTarget.ref.child(badKey).remove().catch(() => {});
+                        }
+                    }
+
                     // Seřadit od nejnovějšího podle lastUpdate
-                    const list = sessionKeys.map(k => sessionsMap[k]).sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
+                    const list = validSessions.sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
 
                     if (infoEl) {
                         if (cloudTarget.isTempVIP) {
                             infoEl.innerHTML = `Režim: <b style="color:var(--accent-green);">🔑 Administrátorský VIP prostor</b> | Využito: <b style="color:${list.length >= 20 ? 'var(--accent-red)' : 'var(--accent-green)'};">${list.length} / 20 turnajů</b>`;
                         } else {
-                            const userEmail = auth.currentUser.email || auth.currentUser.displayName || "Uživatel";
+                            const userEmail = (auth.currentUser && (auth.currentUser.email || auth.currentUser.displayName)) ? (auth.currentUser.email || auth.currentUser.displayName) : "Uživatel";
                             infoEl.innerHTML = `Přihlášen: <b>${admin.escapeHtml(userEmail)}</b> | Využito: <b style="color:${list.length >= 20 ? 'var(--accent-red)' : 'var(--accent-green)'};">${list.length} / 20 turnajů</b>`;
                         }
+                    }
+
+                    const activeSpan = document.getElementById('cloud-active-session-id');
+                    if (activeSpan) {
+                        activeSpan.innerText = state.sessionId ? state.sessionId : "(žádný aktivní turnaj)";
                     }
 
                     if (list.length === 0) {
@@ -8547,7 +8576,7 @@
                             <div style="text-align:center; padding:40px 20px; color:#888;">
                                 <div style="font-size:2.5em; margin-bottom:10px;">☁️</div>
                                 <div style="font-size:1.1em; color:#ddd; font-weight:bold; margin-bottom:8px;">Zatím nemáte v cloudu uložený žádný turnaj.</div>
-                                <div>Klikněte na tlačítko <b>„💾 Uložit aktuální turnaj“</b> výše a uložte rozpracovaný turnaj do svého účtu.</div>
+                                <div>Klikněte na tlačítko <b>„+ Nový turnaj / relace“</b> výše pro vytvoření nového turnaje.</div>
                             </div>
                         `;
                         return;
@@ -8569,7 +8598,7 @@
                     `;
 
                     list.forEach(item => {
-                        const isCurrent = (item.sessionId === state.sessionId);
+                        const isCurrent = (state.sessionId && item.sessionId === state.sessionId);
                         const safeName = admin.escapeHtml(item.tournamentName || "Nepojmenovaný turnaj");
                         const safeCat = admin.escapeHtml(item.tournamentCategory || "-");
                         const safeDate = item.tournamentDate ? new Date(item.tournamentDate).toLocaleDateString('cs-CZ') : "-";
@@ -8600,9 +8629,9 @@
                                 </td>
                                 <td style="padding:8px 8px; text-align:center; vertical-align:middle;">
                                     <div style="display:flex; flex-direction:column; gap:4px; align-items:stretch; min-width:80px;">
-                                        ${isCurrent ? '<span style="display:flex; align-items:center; justify-content:center; background:var(--accent-green); color:#000; font-size:0.75em; padding:3px 4px; border-radius:3px; font-weight:bold;">✓ AKTIVNÍ</span>' : `<button class="small-btn btn-subtle" onclick="admin.loadCloudSession('${item.sessionId}')" style="display:flex; align-items:center; gap:5px; padding:3px 8px; font-size:0.78em; text-align:left; width:100%;" title="Otevřít a načíst tento turnaj"><span style="width:16px; text-align:center; display:inline-block; flex-shrink:0;">📂</span> <span>Otevřít</span></button>`}
-                                        <button class="small-btn btn-subtle" onclick="admin.duplicateCloudSession('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="display:flex; align-items:center; gap:5px; padding:3px 8px; font-size:0.78em; text-align:left; width:100%;" title="Vytvořit kopii tohoto turnaje"><span style="width:16px; text-align:center; display:inline-block; flex-shrink:0;">📋</span> <span>Kopie</span></button>
-                                        <button class="small-btn btn-subtle" onclick="admin.deleteCloudSession('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="display:flex; align-items:center; gap:5px; padding:3px 8px; font-size:0.78em; text-align:left; width:100%;" title="Smazat z cloudu"><span style="width:16px; text-align:center; display:inline-block; flex-shrink:0;">🗑️</span> <span>Smazat</span></button>
+                                        ${isCurrent ? '<span style="display:flex; align-items:center; justify-content:center; background:var(--accent-green); color:#000; font-size:0.75em; padding:3px 4px; border-radius:3px; font-weight:bold;">✓ AKTIVNÍ</span>' : `<button class="small-btn btn-subtle" onclick="admin.loadCloudSession('${item.sessionId}')" style="display:flex; align-items:center; gap:5px; padding:3px 8px; font-size:0.78em; text-align:left; width:100%; cursor:pointer;" title="Otevřít a načíst tento turnaj"><span style="width:16px; text-align:center; display:inline-block; flex-shrink:0;">📂</span> <span>Otevřít</span></button>`}
+                                        <button class="small-btn btn-subtle" onclick="admin.duplicateCloudSession('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="display:flex; align-items:center; gap:5px; padding:3px 8px; font-size:0.78em; text-align:left; width:100%; cursor:pointer;" title="Vytvořit kopii tohoto turnaje"><span style="width:16px; text-align:center; display:inline-block; flex-shrink:0;">📋</span> <span>Kopie</span></button>
+                                        <button class="small-btn btn-subtle" onclick="admin.deleteCloudSession('${item.sessionId}', '${safeName.replace(/'/g, "\\'")}')" style="display:flex; align-items:center; gap:5px; padding:3px 8px; font-size:0.78em; text-align:left; width:100%; cursor:pointer;" title="Smazat z cloudu"><span style="width:16px; text-align:center; display:inline-block; flex-shrink:0;">🗑️</span> <span>Smazat</span></button>
                                     </div>
                                 </td>
                             </tr>
@@ -11046,9 +11075,7 @@
                     Aktivní relace v tomto okně: <code id="cloud-active-session-id" style="color:var(--accent-green); background:#111; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:1.1em; word-break:break-all;">---</code>
                 </div>
                 <div style="display:flex; gap:10px;">
-                    <button class="small-btn btn-green" onclick="admin.saveCurrentSessionToCloud(true)" style="padding:6px 14px; font-weight:bold;" title="Uložit rozpracovaný turnaj do cloudu">
-                        💾 Uložit aktuální turnaj
-                    </button>
+                    
                     <button class="small-btn" onclick="admin.createNewCloudSession()" style="background:#00a2ff; color:#fff; padding:6px 14px; font-weight:bold;" title="Založit nový turnaj s novým kódem relace">
                         + Nový turnaj / relace
                     </button>
