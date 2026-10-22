@@ -106,6 +106,12 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.18-beta` (Testovací větev)
+- **Přechod na fyzické favicon soubory v `beta/`:**
+  - Z důvodu bezpečnostních omezení a chování prohlížeče Chrome (který data URI v záložce často ignoruje nebo přebíjí chybou 404) byl Base64 řetězec nahrazen přímými soubory `beta/favicon.png` a `beta/favicon.ico`.
+  - V hlavičce `beta/index.html` zavedeny standardní vazby `<link rel="icon">`, `<link rel="shortcut icon">` a `<link rel="apple-touch-icon">`.
+  - Ikona 0:0 je nyní 100% kompatibilní se všemi moderními prohlížeči, GitHub Pages i lokálním serverem.
+
 ### Verze `v0.7.17-beta` (Testovací větev)
 - **Nová favicon aplikace (Base64 data URI):**
   - Nahrazena původní dočasná emoji ikona novou grafickou faviconou se sportovním motivem digitálního skóre `0:0`.
