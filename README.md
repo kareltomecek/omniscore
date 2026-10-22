@@ -106,6 +106,12 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.22-beta` (Testovací větev)
+- **Automatická registrace aktivního turnaje v cloudu:**
+  - **Okamžitá přítomnost aktivního turnaje v seznamu:** Otevřený aktivní turnaj je nyní v dialogu cloudových turnajů automaticky zaevidován a zobrazen s označením `✓ AKTIVNÍ`. Již nedochází k situaci, kdy by dialog hlásil absenci uložených turnajů, pokud je v aplikaci aktivní turnaj rozpracován.
+  - **Garantované načtení při otevření správce:** Metoda `openCloudSessionsModal()` a `refreshCloudSessionsList()` automaticky synchronizují metadata aktivní relace a zařadí ji do tabulky.
+  - **Okamžitá registrace při vytvoření nového turnaje:** Funkce `createNewCloudSession()` ihned po vytvoření nového ID inicializuje záznam v cloudu i metadatech.
+
 ### Verze `v0.7.21-beta` (Testovací větev)
 - **Zabezpečení kořenového uzlu cloudu, samooprava seznamu a zjednodušení dialogu:**
   - **Odstranění tlačítka „💾 Uložit aktuální turnaj“ z modálního okna:** Dialog správy cloudových turnajů nyní slouží jako přehledný manažer a rozcestník turnajů (seznam, Otevřít, Kopie, Smazat a + Nový turnaj). Pro explicitní ruční uložení slouží přímé tlačítko v akordeonu *Nastavení turnaje*.

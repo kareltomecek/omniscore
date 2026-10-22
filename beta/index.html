@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.21-beta</title>
+    <title>OmniScore (OmS) v0.7.22-beta</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="shortcut icon" href="favicon.ico">
@@ -2601,7 +2601,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.21-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.22-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2751,7 +2751,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.21-beta";
+        const APP_VERSION = "0.7.22-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -8311,7 +8311,7 @@
                 return { ref: firebase.database().ref(`${basePath}/${cleanSub}`), isTempVIP, token, isRoot: false };
             },
 
-            updateUserSessionMetadataThrottled: (force = false) => {
+            updateUserSessionMetadataThrottled: async (force = false) => {
                 if (!state.sessionId || typeof state.sessionId !== 'string' || !state.sessionId.trim()) return;
                 if (typeof firebase === 'undefined' || !auth.isLicensed()) return;
                 const cleanId = state.sessionId.trim();
@@ -8337,7 +8337,7 @@
                     .catch(e => console.warn("[Cloud] Metadata sync failed:", e));
             },
 
-            openCloudSessionsModal: () => {
+            openCloudSessionsModal: async () => {
                 if (typeof firebase === 'undefined') {
                     alert("Firebase není k dispozici.");
                     return;
@@ -8350,6 +8350,11 @@
                 if (!auth.isLicensed()) {
                     alert("Cloudová správa turnajů a synchronizace je dostupná v placené verzi / VIP.");
                     return;
+                }
+
+                // Automaticky zajistit, že aktuální aktivní turnaj je zapsán v seznamu cloudových relací
+                if (state.sessionId && typeof state.sessionId === 'string' && state.sessionId.trim().length > 0) {
+                    await admin.updateUserSessionMetadataThrottled(true);
                 }
 
                 const modal = document.getElementById('modal-cloud-sessions');
@@ -8551,6 +8556,24 @@
                         console.warn("[Cloud] Čištění neplatných/poškozených záznamů z cloudu:", corruptedKeys);
                         for (const badKey of corruptedKeys) {
                             cloudTarget.ref.child(badKey).remove().catch(() => {});
+                        }
+                    }
+
+                    // Pokud máme v aplikaci aktivní relaci, zajistíme její přítomnost v seznamu
+                    if (state.sessionId && !validSessions.some(s => s.sessionId === state.sessionId)) {
+                        const activeMeta = {
+                            sessionId: state.sessionId,
+                            tournamentName: state.tournamentName || "Nepojmenovaný turnaj",
+                            tournamentCategory: state.tournamentCategory || "-",
+                            tournamentDate: state.tournamentDate || "-",
+                            matchCount: (state.schedule || []).filter(m => m && m.type === 'match').length,
+                            teamCount: (state.teams || []).length,
+                            lastUpdate: state.lastUpdate || Date.now()
+                        };
+                        validSessions.unshift(activeMeta);
+                        const cleanIdTarget = admin.getCloudSessionsDbRef(state.sessionId);
+                        if (cleanIdTarget && !cleanIdTarget.isRoot) {
+                            cleanIdTarget.ref.set(activeMeta).catch(() => {});
                         }
                     }
 
@@ -9396,6 +9419,36 @@
                     admin.saveToStorage();
 
                     // Přesměrování na novou relaci
+                    // Okamžitá registrace nové relace do cloudu Firebase
+                    try {
+                        const initialData = {
+                            sessionId: newId,
+                            tournamentName: "Nový turnaj",
+                            tournamentDate: state.tournamentDate,
+                            teams: [],
+                            schedule: [],
+                            lastUpdate: Date.now(),
+                            ownerUid: (auth.currentUser ? auth.currentUser.uid : null)
+                        };
+                        await firebase.database().ref('sessions/' + newId).set(initialData);
+
+                        const newTarget = admin.getCloudSessionsDbRef(newId);
+                        if (newTarget && !newTarget.isRoot) {
+                            await newTarget.ref.set({
+                                sessionId: newId,
+                                tournamentName: "Nový turnaj",
+                                tournamentCategory: "-",
+                                tournamentDate: state.tournamentDate,
+                                matchCount: 0,
+                                teamCount: 0,
+                                lastUpdate: Date.now(),
+                                ...(cloudTarget.isTempVIP ? { token: cloudTarget.token } : {})
+                            });
+                        }
+                    } catch (errReg) {
+                        console.warn("[Cloud] Registrace nové relace varování:", errReg);
+                    }
+
                     window.location.href = window.location.pathname + '?session=' + newId;
                 } catch (e) {
                     console.error("Chyba při zakládání turnaje:", e);
