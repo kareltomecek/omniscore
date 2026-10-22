@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.19-beta</title>
+    <title>OmniScore (OmS) v0.7.20-beta</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="shortcut icon" href="favicon.ico">
@@ -2601,7 +2601,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.19-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.20-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2751,7 +2751,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.19-beta";
+        const APP_VERSION = "0.7.20-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -9107,38 +9107,44 @@
                 }
 
                 try {
+                    // 1. Nejprve odstraníme turnaj z cloudu Firebase
                     await cloudTarget.ref.remove();
                     await firebase.database().ref(`sessions/${targetId}`).remove();
                     localStorage.removeItem('oms_logos_' + targetId);
 
-                    // Pokud byl smazán NEAKTIVNÍ turnaj ze seznamu, pouze obnovíme seznam
+                    // Pokud byl smazán NEAKTIVNÍ turnaj, pouze obnovíme seznam
                     if (!isCurrentSession) {
                         admin.refreshCloudSessionsList();
                         return;
                     }
 
                     // --- SMAZÁNÍ PRÁVĚ AKTIVNÍHO TURNAJE ---
-                    // 1. Kompletní reset stavu turnaje v paměti aplikace
+                    // 2. Odstraníme lokální uložený stav smazaného turnaje
+                    localStorage.removeItem('scoreboardState');
+                    localStorage.removeItem('oms_session_id');
+
+                    // 3. Kompletní vyčištění paměti v prohlížeči (rozpis, týmy, časomíra, formuláře)
                     admin.resetTournamentStateInMemory();
 
-                    // 2. Nastavení čistého ID relace a uložení čistého stavu
-                    const newTempId = Math.random().toString(36).substring(2, 7).toUpperCase();
-                    state.sessionId = newTempId;
-                    localStorage.setItem('oms_session_id', newTempId);
-                    admin.saveToStorage();
-                    game.syncProjection(true);
-
-                    if (window.history && window.history.replaceState) {
-                        window.history.replaceState(null, '', window.location.pathname + '?session=' + newTempId);
+                    // 4. Odpojíme relaci (žádné ID, žádný Master, ŽÁDNÝ ZÁPIS DO FIREBASE!)
+                    state.sessionId = "";
+                    state.isMaster = false;
+                    if (admin._masterHeartbeatInterval) {
+                        clearInterval(admin._masterHeartbeatInterval);
+                        admin._masterHeartbeatInterval = null;
                     }
 
                     const activeSpan = document.getElementById('cloud-active-session-id');
-                    if (activeSpan) activeSpan.innerText = newTempId;
+                    if (activeSpan) activeSpan.innerText = "(žádný aktivní turnaj)";
 
                     const footerSpan = document.getElementById('admin-footer-session');
-                    if (footerSpan) footerSpan.innerText = newTempId;
+                    if (footerSpan) footerSpan.innerText = "---";
 
-                    // 3. Zjistíme, zda v cloudu zbývají další turnaje uživatele
+                    if (window.history && window.history.replaceState) {
+                        window.history.replaceState(null, '', window.location.pathname);
+                    }
+
+                    // 5. Zjistíme SKUTEČNÉ zbývající turnaje uživatele v cloudu
                     const mainCloudTarget = admin.getCloudSessionsDbRef();
                     let remainingCount = 0;
                     if (mainCloudTarget) {
@@ -9147,13 +9153,15 @@
                         remainingCount = Object.keys(remainingSessions).length;
                     }
 
+                    // 6. Obnovíme seznam v okně cloudu (obsahuje nyní pouze skutečné zbývající turnaje)
+                    await admin.refreshCloudSessionsList();
+
+                    // 7. Zobrazíme volbu uživateli
                     if (remainingCount > 0) {
-                        // Nabídnout volbu uživateli
                         admin.showPostDeleteChoiceModal(safeName, remainingCount);
                     } else {
-                        // Žádný další turnaj v cloudu nezbyl
-                        alert(`Aktivní turnaj "${safeName}" byl trvale smazán z cloudu a data v aplikaci byla vyčištěna.\n\nV cloudu nemáte žádný další uložený turnaj – byla vytvořena nová prázdná relace (${newTempId}).`);
-                        admin.refreshCloudSessionsList();
+                        alert(`Aktivní turnaj "${safeName}" byl trvale smazán z cloudu a data byla vyčištěna.\n\nV cloudu nemáte žádný další turnaj.`);
+                        admin.createNewCloudSession();
                     }
                 } catch (e) {
                     console.error("Chyba při mazání turnaje:", e);
@@ -9165,7 +9173,7 @@
                 const modal = document.getElementById('modal-post-delete-choice');
                 const msg = document.getElementById('post-delete-choice-msg');
                 if (msg) {
-                    msg.innerHTML = `Aktivní turnaj <b>"${admin.escapeHtml(deletedName)}"</b> byl trvale smazán a data v aplikaci byla vyčištěna.<br><br>V cloudu máte k dispozici ještě <b>${remainingCount}</b> ${remainingCount === 1 ? 'turnaj' : (remainingCount < 5 ? 'turnaje' : 'turnajů')}.<br><br><b>Jak si přejete pokračovat?</b>`;
+                    msg.innerHTML = `Aktivní turnaj <b>"${admin.escapeHtml(deletedName)}"</b> byl trvale smazán.<br><br>V cloudu máte uloženo ještě <b>${remainingCount}</b> ${remainingCount === 1 ? 'turnaj' : (remainingCount < 5 ? 'turnaje' : 'turnajů')}.<br><br><b>Jak si přejete pokračovat?</b>`;
                 }
                 if (modal) {
                     modal.style.display = 'flex';
@@ -9182,7 +9190,7 @@
                 const choiceModal = document.getElementById('modal-post-delete-choice');
                 if (choiceModal) choiceModal.style.display = 'none';
 
-                // Ponecháme otevřený správce turnajů se zbývajícími relacemi
+                // Ponecháme otevřený správce turnajů se skutečnými zbývajícími relacemi
                 const listModal = document.getElementById('modal-cloud-sessions');
                 if (listModal) listModal.style.display = 'flex';
                 admin.refreshCloudSessionsList();

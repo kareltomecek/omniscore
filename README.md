@@ -106,6 +106,13 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.20-beta` (Testovací větev)
+- **Odstranění nechtěného zápisu do cloudu při smazání aktivní relace:**
+  - **Eliminace předčasného vytvoření nového turnaje v cloudu:** Při smazání aktivního turnaje se dočasné prázdné ID již neodesílá do Firebase a nezapisuje se do seznamu relací uživatele.
+  - **Čistý a přesný výběr:** V seznamu existujících turnajů uživatel vidí výhradně své skutečně uložené turnaje (žádný prázdný nově vytvořený turnaj se již v seznamu neobjevuje).
+  - **Založení nového turnaje pouze na výzvu:** Nová cloudová relace se založí teprve tehdy, když uživatel výslovně klikne na volbu *„➕ Založit nový čistý turnaj“*.
+  - **Hladké načtení bez potvrzovacího dotazu:** Pokud je paměť po smazání prázdná, otevření existujícího turnaje proběhne přímo bez zbytečného dotazu na přepsání lokálních dat.
+
 ### Verze `v0.7.19-beta` (Testovací větev)
 - **Korektní správa a volba po smazání aktivní cloudové relace:**
   - **Odstranění nechtěného znovuvytvoření smazaných dat:** Při smazání aktivního turnaje se již data turnaje nekopírují pod nové náhodné ID. Paměť aplikace (`state`), lokální úložiště i rozhraní se kompletně a bezpečně vyčistí (`resetTournamentStateInMemory`).
