@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.15-beta</title>
+    <title>OmniScore (OmS) v0.7.16-beta</title>
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -2597,7 +2597,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.15-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.16-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2747,7 +2747,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.15-beta";
+        const APP_VERSION = "0.7.16-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -8827,15 +8827,10 @@
                 if (state.activeMatchIndex > -1) {
                     admin.loadMatch(state.activeMatchIndex, false);
                 }
-                admin.renderSettings();
-                ui.renderSchedule();
                 ui.render();
-                ui.renderTeamsList();
-                ui.renderPlayersList();
-                ui.renderRefereesList();
+                ui.renderSchedule();
                 ui.renderStandings();
-                admin.renderAppSettingTimes();
-                game.syncProjection();
+                game.syncProjection(false, false);
                 admin.updateCloudSaveStatusInfo();
                 console.log("%c[Sync] Stav z cloudu úspěšně načten", "color:#4caf50; font-weight:bold;", { lastUpdate: state.lastUpdate });
             },

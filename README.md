@@ -106,6 +106,11 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.16-beta` (Testovací větev)
+- **Oprava překreslení po načtení dat z cloudu (Hotfix):**
+  - Opravena chyba `admin.renderSettings is not a function` v `applyCloudData`, kde se volaly neexistující metody namísto standardního interního cyklu `admin.loadFromStorage()`.
+  - Data z cloudu se po stisknutí tlačítka stáhnou, aplikují do úložiště a rozhraní se hladce překreslí bez jakékoli chybové hlášky.
+
 ### Verze `v0.7.15-beta` (Testovací větev)
 - **Oprava a rozšíření detekce konfliktu dat z cloudu Firebase:**
   - **Oprava přebíjení časového razítka při startu:** Odstraněna chyba, kdy počáteční volání `game.syncProjection()` přepsalo `state.lastUpdate` aktuálním časem ještě před dotazem na Firebase, což způsobilo, že cloudová data se vždy jevila jako starší a varovný dialog se nezobrazil.
