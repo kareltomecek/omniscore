@@ -106,6 +106,12 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.31-beta` (Testovací větev)
+- **Vyladění ztmavení a přirozených barev v režimu Divák:**
+  - **Nastavení krytí na 50 % (`opacity: 0.50`):** Úroveň viditelnosti prvků v ovládacím okně (OO) upravena na vyvážených 50 %, což poskytuje zřetelné ztmavení pro pocit uzamčeného rozhraní při zachování bezproblémové čitelnosti textů a časů.
+  - **Ponechání 100% přirozených barev (`grayscale: 0%`):** Zcela vypnut odbarvovací filtr do šedi. Tlačítka, štítky i grafické prvky si zachovávají své originální barevné tóny bez zašednutí.
+  - **Cache-busting:** Aktualizován parametr pro načítání favicony v hlavičce `beta/index.html` na `?v=0.7.31`.
+
 ### Verze `v0.7.30-beta` (Testovací větev)
 - **Zpřehlednění a zesvětlení ovládacího okna (OO) v režimu Divák:**
   - **Zesvětlení a odstranění kumulace opacity:** Odstraněno násobení vlastnosti `opacity` na vnořených prvcích (`*`), které způsobovalo extrémní ztmavnutí až nečitelnost konfigurace.
