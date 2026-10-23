@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.25-beta</title>
+    <title>OmniScore (OmS) v0.7.26-beta</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="shortcut icon" href="favicon.ico">
@@ -2601,7 +2601,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.25-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.26-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2751,7 +2751,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.25-beta";
+        const APP_VERSION = "0.7.26-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -9219,6 +9219,20 @@
             },
 
             cloneSessionAsOwn: async () => {
+                const matchCount = (state.schedule || []).filter(m => m && m.type === 'match').length;
+                if (!auth.isLicensed() && matchCount > 10) {
+                    let msg = `Tento turnaj obsahuje ${matchCount} zápasů.\n\nV bezplatném režimu TRIAL lze pracovat s maximálně 10 zápasy.\n\nPro vytvoření kopie a plnou správu tohoto turnaje se prosím přihlaste s platnou licencí.`;
+                    if (!auth.currentUser) {
+                        msg += `\n\nChcete se nyní přihlásit?`;
+                        if (confirm(msg)) {
+                            auth.login();
+                        }
+                    } else {
+                        alert(msg);
+                    }
+                    return;
+                }
+
                 const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
                 state.sessionId = newId;
                 state.sessionOwnerUid = (auth.currentUser ? auth.currentUser.uid : null);

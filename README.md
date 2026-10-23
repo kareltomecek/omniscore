@@ -106,6 +106,11 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.26-beta` (Testovací větev)
+- **Ochrana licenčního limitu při klonování turnaje:**
+  - **Kontrola trial limitu v `cloneSessionAsOwn`:** Nelicencovaný host ani uživatel v režimu TRIAL nemůže vytvořit kopii turnaje, který obsahuje více než 10 zápasů.
+  - **Informativní hlášení a přihlášení:** Při pokusu o duplikaci turnaje s více než 10 zápasy je uživatel informován o omezení bezplatného režimu TRIAL a je mu nabídnuta možnost přihlásit se k licencovanému účtu.
+
 ### Verze `v0.7.25-beta` (Testovací větev)
 - **Zabezpečení řízení turnaje a striktní vazba Master role na vlastníka relace (`ownerUid`):**
   - **Ochrana turnaje před neoprávněnými zásahy:** Pokud odkaz na turnaj otevře nepřihlášený host nebo uživatel s jiným účtem, aplikace jej automaticky a striktně uzamkne do režimu **DIVÁK (Spectator)**. Všechny ovládací prvky (góly, časomíra, nastavení, rozpis) jsou zašedlé a neklikatelné.
