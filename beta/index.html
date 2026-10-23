@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.24-beta</title>
+    <title>OmniScore (OmS) v0.7.25-beta</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="shortcut icon" href="favicon.ico">
@@ -2601,7 +2601,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.24-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.25-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2751,7 +2751,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.24-beta";
+        const APP_VERSION = "0.7.25-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -2817,6 +2817,7 @@
             lastUpdate: 0,
             isProjectionMode: false, // Will be set in KOMUNIKACE
             sessionId: "", // Will be set in KOMUNIKACE
+            sessionOwnerUid: null, // UID registrovaného vlastníka cloudové relace
             isMaster: true, // Default: true; ověřuje se při startu vůči cloudu
             clientTabId: 'client_' + Math.random().toString(36).substring(2, 9),
             cloudChecked: false, // Zabraňuje odeslání lokálních dat do cloudu před dokončením porovnání verzí
@@ -2935,8 +2936,33 @@
         // ===================================================================================
         const auth = {
             currentUser: null,
+            _authInitialized: false,
             isVIP: false,
             licenseData: null, // { isPaid: boolean, expiresAt: timestamp }
+
+            // Pomocná metoda pro garanci vyčkání na první ověření stavu přihlášení
+            waitForAuthInit: () => {
+                return new Promise((resolve) => {
+                    if (auth._authInitialized) {
+                        resolve(auth.currentUser);
+                        return;
+                    }
+                    if (typeof firebase === 'undefined' || !firebase.auth) {
+                        auth._authInitialized = true;
+                        resolve(null);
+                        return;
+                    }
+                    const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                        auth._authInitialized = true;
+                        unsubscribe();
+                        resolve(user);
+                    });
+                    setTimeout(() => {
+                        auth._authInitialized = true;
+                        resolve(auth.currentUser);
+                    }, 1500);
+                });
+            },
 
             // Helper to check valid temporary VIP access (168h with signed token)
             getTempVIPInfo: () => {
@@ -2970,6 +2996,7 @@
             init: () => {
                 firebase.auth().onAuthStateChanged((user) => {
                     auth.currentUser = user;
+                    auth._authInitialized = true;
                     auth.updateUI();
                     if (user) {
                         auth.checkLicense(user);
@@ -2977,6 +3004,24 @@
                         // ÚKLID STARÝCH RELACÍ (Pouze v režimu Admin)
                         if (!isPO && !viewMode && !isQR) {
                             setTimeout(() => admin.cleanupOldSessions(168), 3000); // Mírná prodleva po přihlášení
+                        }
+
+                        // Pokud se právě přihlásil vlastník relace, odemkneme řízení (Master)
+                        if (state.sessionOwnerUid && state.sessionOwnerUid === user.uid) {
+                            console.log("%c[Auth] Přihlášen vlastník relace -> aktivuji Master řízení", "color:#4caf50; font-weight:bold;");
+                            admin.claimMasterRole(false);
+                        } else {
+                            admin.updateMasterUI();
+                        }
+                    } else {
+                        // Odhlášení: pokud má relace vlastníka a my jsme odhlášeni, okamžitě uzamknout jako Divák
+                        if (state.sessionOwnerUid) {
+                            state.isMaster = false;
+                            if (admin._masterHeartbeatInterval) {
+                                clearInterval(admin._masterHeartbeatInterval);
+                                admin._masterHeartbeatInterval = null;
+                            }
+                            admin.updateMasterUI();
                         }
                     }
                 });
@@ -8217,6 +8262,8 @@
                     if (parsed.qrCyclingInterval) state.qrCyclingInterval = parsed.qrCyclingInterval;
                     if (parsed.qrTransitionDuration) state.qrTransitionDuration = parsed.qrTransitionDuration;
 
+                    if (parsed.sessionOwnerUid) state.sessionOwnerUid = parsed.sessionOwnerUid;
+
                     // Metadata
                     if (parsed.tournamentDate) state.tournamentDate = parsed.tournamentDate;
                     if (parsed.tournamentLocation) state.tournamentLocation = parsed.tournamentLocation;
@@ -8809,6 +8856,9 @@
                     return;
                 }
 
+                // Bezpečně počkáme na ověření přihlášení uživatele ve Firebase
+                await auth.waitForAuthInit();
+
                 try {
                     const sessRef = firebase.database().ref('sessions/' + state.sessionId);
                     const snap = await sessRef.once('value');
@@ -8817,13 +8867,30 @@
                     if (!cloudData) {
                         // Relace na cloudu ještě neexistuje -> toto zařízení je výchozí Master
                         state.cloudChecked = true;
+                        state.sessionOwnerUid = auth.currentUser ? auth.currentUser.uid : null;
                         state.isMaster = true;
                         admin.claimMasterRole(false);
                         admin.updateMasterUI();
                         return;
                     }
 
-                    // 1. KONTROLA ODLIŠNOSTÍ A ČASOVÉHO RAZÍTKA (Cloud vs. LocalStorage)
+                    // Zaznamenáme vlastníka relace
+                    state.sessionOwnerUid = cloudData.ownerUid || null;
+                    const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+                    const isOwner = !state.sessionOwnerUid || (currentUid && currentUid === state.sessionOwnerUid);
+
+                    // BEZPEČNOSTNÍ POJISTKA: Pokud uživatel NENÍ vlastník (např. režim hosta nebo cizí účet):
+                    if (state.sessionOwnerUid && !isOwner) {
+                        console.log("%c[Security] Otevřen turnaj jiného uživatele -> striktní režim DIVÁK", "color:#ff9800; font-weight:bold;");
+                        // Automaticky stáhneme data pro sledování turnaje, ale nezobrazujeme dialog s volbou "přepsat cloud"
+                        admin.applyCloudData(cloudData);
+                        state.cloudChecked = true;
+                        state.isMaster = false;
+                        admin.checkMasterRole(cloudData);
+                        return;
+                    }
+
+                    // 1. KONTROLA ODLIŠNOSTÍ A ČASOVÉHO RAZÍTKA (Cloud vs. LocalStorage pro VLASTNÍKA)
                     const cloudTime = cloudData.lastUpdate || 0;
                     const localTime = state.lastUpdate || 0;
 
@@ -8984,9 +9051,13 @@
             },
 
             applyCloudData: (cloudData) => {
+                if (cloudData && cloudData.ownerUid) {
+                    state.sessionOwnerUid = cloudData.ownerUid;
+                }
                 const mergedState = {
                     ...cloudData,
                     sessionId: state.sessionId,
+                    sessionOwnerUid: state.sessionOwnerUid,
                     teamAnthems: state.teamAnthems || {},
                     masterPlayers: (cloudData.masterPlayers && cloudData.masterPlayers.length > 0) ? cloudData.masterPlayers : (state.masterPlayers || []),
                     musicPlaylist: state.musicPlaylist || []
@@ -9005,6 +9076,23 @@
             },
 
             checkMasterRole: (cloudData) => {
+                const ownerUid = cloudData ? cloudData.ownerUid : state.sessionOwnerUid;
+                if (ownerUid) state.sessionOwnerUid = ownerUid;
+                const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+                const isOwner = !ownerUid || (currentUid && currentUid === ownerUid);
+
+                // Pokud uživatel není vlastník tohoto turnaje, NIKDY nesmí převzít Master roli
+                if (ownerUid && !isOwner) {
+                    state.isMaster = false;
+                    if (admin._masterHeartbeatInterval) {
+                        clearInterval(admin._masterHeartbeatInterval);
+                        admin._masterHeartbeatInterval = null;
+                    }
+                    admin.updateMasterUI();
+                    admin.listenToMasterChanges();
+                    return;
+                }
+
                 const activeMaster = cloudData ? cloudData.activeMaster : null;
                 const now = Date.now();
                 const isOtherMasterActive = activeMaster &&
@@ -9056,6 +9144,23 @@
                     const m = document.getElementById('master-conflict-modal');
                     if (m) m.remove();
                 }
+                const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+                const ownerUid = state.sessionOwnerUid;
+                const isOwner = !ownerUid || (currentUid && currentUid === ownerUid);
+
+                if (ownerUid && !isOwner) {
+                    if (!currentUid) {
+                        if (confirm("Tento turnaj patří registrovanému uživateli.\n\nPro převzetí řízení turnaje (Master) se musíte přihlásit k účtu vlastníka.\n\nChcete se nyní přihlásit?")) {
+                            auth.login();
+                        }
+                    } else {
+                        if (confirm("Tento turnaj patří jinému uživatelskému účtu.\n\nNemáte oprávnění k přímému řízení tohoto turnaje.\n\nChcete si vytvořit vlastní nezávislou kopii turnaje pod svým účtem?")) {
+                            admin.cloneSessionAsOwn();
+                        }
+                    }
+                    return;
+                }
+
                 state.isMaster = true;
                 admin.updateMasterUI();
                 admin.listenToMasterChanges();
@@ -9113,6 +9218,28 @@
                 });
             },
 
+            cloneSessionAsOwn: async () => {
+                const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
+                state.sessionId = newId;
+                state.sessionOwnerUid = (auth.currentUser ? auth.currentUser.uid : null);
+                localStorage.setItem('oms_session_id', newId);
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState(null, '', window.location.pathname + '?session=' + newId);
+                }
+                state.isMaster = true;
+                admin.saveToStorage();
+                admin.updateMasterUI();
+                admin.claimMasterRole(false);
+
+                if (auth.isLicensed()) {
+                    await admin.saveCurrentSessionToCloud(false);
+                }
+                ui.renderSchedule();
+                ui.renderStandings();
+                game.syncProjection(true);
+                alert(`Byla vytvořena vaše nová nezávislá kopie turnaje!\n\nNový kód relace: ${newId}\nTato kopie je nyní plně pod vaší správou.`);
+            },
+
             updateMasterUI: () => {
                 const isSpectator = !state.isMaster;
                 if (!state.isProjectionMode && !state.viewMode && !isQR) {
@@ -9120,6 +9247,52 @@
                     const banner = document.getElementById('spectator-banner');
                     if (banner) {
                         banner.style.display = isSpectator ? 'flex' : 'none';
+                        if (isSpectator) {
+                            const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+                            const ownerUid = state.sessionOwnerUid;
+                            const isOwner = !ownerUid || (currentUid && currentUid === ownerUid);
+
+                            if (ownerUid && !isOwner) {
+                                if (!currentUid) {
+                                    banner.innerHTML = `
+                                        <div style="display:flex; align-items:center; gap:10px;">
+                                            <span style="font-size:1.3em;">👁️</span>
+                                            <span><b>REŽIM DIVÁK:</b> Tento turnaj patří registrovanému uživateli. Pro převzetí řízení se musíte přihlásit k účtu vlastníka.</span>
+                                        </div>
+                                        <div style="display:flex; gap:8px; align-items:center;">
+                                            <button onclick="admin.cloneSessionAsOwn()" class="btn" style="background:#333; color:#eee; border:1px solid #555; padding:6px 14px; border-radius:5px; font-weight:bold; cursor:pointer; font-size:0.85em;">
+                                                📋 Vytvořit vlastní kopii
+                                            </button>
+                                            <button onclick="auth.login()" class="btn btn-blue" style="padding:6px 16px; border-radius:5px; font-weight:bold; cursor:pointer; font-size:0.85em;">
+                                                🔑 Přihlásit se
+                                            </button>
+                                        </div>
+                                    `;
+                                } else {
+                                    banner.innerHTML = `
+                                        <div style="display:flex; align-items:center; gap:10px;">
+                                            <span style="font-size:1.3em;">👁️</span>
+                                            <span><b>REŽIM DIVÁK:</b> Tento turnaj byl vytvořen jiným uživatelským účtem (můžete pouze číst).</span>
+                                        </div>
+                                        <div style="display:flex; gap:8px; align-items:center;">
+                                            <button onclick="admin.cloneSessionAsOwn()" class="btn btn-green" style="padding:6px 16px; border-radius:5px; font-weight:bold; cursor:pointer; font-size:0.85em;">
+                                                📋 Vytvořit vlastní kopii
+                                            </button>
+                                        </div>
+                                    `;
+                                }
+                            } else {
+                                banner.innerHTML = `
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <span style="font-size:1.3em;">👁️</span>
+                                        <span><b>REŽIM DIVÁK:</b> Turnaj aktivně řídí jiné zařízení. Ovládací prvky jsou uzamčeny (můžete pouze číst).</span>
+                                    </div>
+                                    <button onclick="admin.claimMasterRole(false)" style="background:#111; color:#fff; border:1px solid #333; padding:7px 16px; border-radius:5px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
+                                        👑 Převzít řízení (Master)
+                                    </button>
+                                `;
+                            }
+                        }
                     }
                     const mainTimer = document.getElementById('main-timer');
                     if (mainTimer) {
@@ -9954,6 +10127,10 @@
 
                 const role = document.getElementById('admin-footer-role');
                 if (role) {
+                    const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+                    const ownerUid = state.sessionOwnerUid;
+                    const isOwner = !ownerUid || (currentUid && currentUid === ownerUid);
+
                     if (state.isMaster) {
                         role.innerHTML = "👑 MASTER";
                         role.style.background = "rgba(76, 175, 80, 0.25)";
@@ -9966,8 +10143,23 @@
                         role.style.background = "rgba(255, 152, 0, 0.25)";
                         role.style.color = "#ff9800";
                         role.style.border = "1px solid #ff9800";
-                        role.title = "Režim Divák (pouze pro čtení – změny se do cloudu nezapisují). Klikněte pro převzetí řízení (stát se Masterem).";
-                        role.onclick = () => admin.claimMasterRole(false);
+                        if (ownerUid && !isOwner) {
+                            role.title = "Režim Divák (pouze pro čtení). Turnaj patří jinému účtu. Klikněte pro vytvoření kopie.";
+                            role.onclick = () => {
+                                if (!currentUid) {
+                                    if (confirm("Tento turnaj patří registrovanému uživateli.\n\nChcete se přihlásit k účtu vlastníka?")) {
+                                        auth.login();
+                                    }
+                                } else {
+                                    if (confirm("Tento turnaj patří jinému uživatelskému účtu.\n\nChcete si vytvořit vlastní kopii turnaje?")) {
+                                        admin.cloneSessionAsOwn();
+                                    }
+                                }
+                            };
+                        } else {
+                            role.title = "Režim Divák (pouze pro čtení – změny se do cloudu nezapisují). Klikněte pro převzetí řízení (stát se Masterem).";
+                            role.onclick = () => admin.claimMasterRole(false);
+                        }
                     }
                 }
 

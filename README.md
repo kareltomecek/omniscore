@@ -106,6 +106,14 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.25-beta` (Testovací větev)
+- **Zabezpečení řízení turnaje a striktní vazba Master role na vlastníka relace (`ownerUid`):**
+  - **Ochrana turnaje před neoprávněnými zásahy:** Pokud odkaz na turnaj otevře nepřihlášený host nebo uživatel s jiným účtem, aplikace jej automaticky a striktně uzamkne do režimu **DIVÁK (Spectator)**. Všechny ovládací prvky (góly, časomíra, nastavení, rozpis) jsou zašedlé a neklikatelné.
+  - **Blokace neoprávněného převzetí řízení:** Cizí uživatel ani host nemůže kliknout na převzetí Master role. V horní liště i v patičce je informován, že turnaj patří registrovanému uživateli, a má možnost se přihlásit k účtu vlastníka.
+  - **Možnost vytvoření vlastní nezávislé kopie:** Host i jiný uživatel má k dispozici přímé tlačítko *„📋 Vytvořit vlastní kopii turnaje“*, které data bezpečně naklonuje pod nový kód relace (`sessionId`), kde získá plná práva Mastera bez jakéhokoli ovlivnění původního turnaje.
+  - **Automatické odemčení po přihlášení vlastníka:** Jakmile se vlastník přihlásí přes Google účet (`onAuthStateChanged`), rozhraní okamžitě rozpozná shodu `ownerUid` a automaticky odemkne plné řízení.
+  - **Zamezení zobrazení falešného konfliktu pro cizí návštěvníky:** Cizí uživatelé a hosté nejsou při startu dotazováni na přepsání cloudu prázdnými lokálními daty – data turnaje se jim automaticky načtou pro bezpečné sledování.
+
 ### Verze `v0.7.24-beta` (Testovací větev)
 - **Nová favicona aplikace z grafického podkladu:**
   - Z nového grafického podkladu `OmS_blue_white_arial.png` (800×800 px) byly vygenerovány optimalizované favicon soubory `beta/favicon.png` (128×128 px) a `beta/favicon.ico` (32×32 px).
