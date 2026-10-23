@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.28-beta</title>
+    <title>OmniScore (OmS) v0.7.29-beta</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="favicon.png?v=0.7.28">
-    <link rel="shortcut icon" href="favicon.ico?v=0.7.28">
-    <link rel="apple-touch-icon" href="favicon.png?v=0.7.28">
+    <link rel="icon" type="image/png" href="favicon.png?v=0.7.29">
+    <link rel="shortcut icon" href="favicon.ico?v=0.7.29">
+    <link rel="apple-touch-icon" href="favicon.png?v=0.7.29">
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -2601,7 +2601,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.28-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.29-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2751,7 +2751,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.28-beta";
+        const APP_VERSION = "0.7.29-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -2819,7 +2819,18 @@
             sessionId: "", // Will be set in KOMUNIKACE
             sessionOwnerUid: null, // UID registrovaného vlastníka cloudové relace
             isMaster: true, // Default: true; ověřuje se při startu vůči cloudu
-            clientTabId: 'client_' + Math.random().toString(36).substring(2, 9),
+            clientTabId: (() => {
+                try {
+                    let tid = sessionStorage.getItem('oms_tab_id');
+                    if (!tid) {
+                        tid = 'client_' + Math.random().toString(36).substring(2, 9);
+                        sessionStorage.setItem('oms_tab_id', tid);
+                    }
+                    return tid;
+                } catch (e) {
+                    return 'client_' + Math.random().toString(36).substring(2, 9);
+                }
+            })(),
             cloudChecked: false, // Zabraňuje odeslání lokálních dat do cloudu před dokončením porovnání verzí
             isLoading: false,
             tournamentName: "",

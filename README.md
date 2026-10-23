@@ -106,6 +106,11 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.29-beta` (Testovací větev)
+- **Eliminace falešného konfliktu Master role po obnovení stránky (F5):**
+  - **Identifikace záložky přes `sessionStorage`:** Identifikátor relace záložky (`clientTabId`) se nově ukládá do `sessionStorage` prohlížeče. Díky tomu si záložka uchová stejné ID i po stisku klávesy F5 nebo opětovném načtení stránky.
+  - **Odstranění vyskakovacího okna po F5:** Aplikace po obnovení stránky okamžitě rozpozná, že jde o stejného Mastera, který měl turnaj pod kontrolou před F5. Neotvírá se falešné varování *„Turnaj je momentálně aktivně ovládán jiným počítačem“* a řízení turnaje pokračuje zcela plynule a bez přerušení.
+
 ### Verze `v0.7.28-beta` (Testovací větev)
 - **Oprava zeleného lemu favicony a implementace 32bitového TrueColor ICO:**
   - Odhalena a odstraněna příčina zeleného/tyrkysového okraje v Google Chrome na Windows: výchozí .NET metoda `GetHicon()` redukovala barvy do 16barevné VGA palety, kde modrou barvu nahradila odstíny Teal a Cyan.
