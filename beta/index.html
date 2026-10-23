@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.29-beta</title>
+    <title>OmniScore (OmS) v0.7.30-beta</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="favicon.png?v=0.7.29">
-    <link rel="shortcut icon" href="favicon.ico?v=0.7.29">
-    <link rel="apple-touch-icon" href="favicon.png?v=0.7.29">
+    <link rel="icon" type="image/png" href="favicon.png?v=0.7.30">
+    <link rel="shortcut icon" href="favicon.ico?v=0.7.30">
+    <link rel="apple-touch-icon" href="favicon.png?v=0.7.30">
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -1509,12 +1509,26 @@
         }
 
         /* === REŽIM DIVÁK (SPECTATOR MODE) === */
-        /* Zašednutí a zablokování ovládání zápasu a časomíry */
+        /* Jemné utlumení ovládání zápasu a sekcí turnajové správy pro zachování vysoké čitelnosti (bez násobení opacity) */
+        body.mode-spectator #game-controls .phase-nav,
+        body.mode-spectator #game-controls .scoreboard-interface,
+        body.mode-spectator #acc-settings,
+        body.mode-spectator #acc-players,
+        body.mode-spectator #acc-logos,
+        body.mode-spectator #acc-music,
+        body.mode-spectator #acc-app-settings,
+        body.mode-spectator #acc-schedule #sched-section-gen,
+        body.mode-spectator #acc-schedule #sched-form-container,
+        body.mode-spectator #acc-schedule .schedule-toolbar {
+            opacity: 0.82 !important;
+            filter: grayscale(20%) !important;
+        }
+
+        /* Kompletní zablokování interakce pro všechny prvky v režimu Divák (neklikací, needitovatelné) */
         body.mode-spectator #game-controls .phase-nav,
         body.mode-spectator #game-controls .phase-nav *,
         body.mode-spectator #game-controls .scoreboard-interface,
         body.mode-spectator #game-controls .scoreboard-interface *,
-        /* Kompletní zablokování editovatelných sekcí turnajové správy (obsah akordeonů) */
         body.mode-spectator #acc-settings,
         body.mode-spectator #acc-settings *,
         body.mode-spectator #acc-players,
@@ -1525,16 +1539,13 @@
         body.mode-spectator #acc-music *,
         body.mode-spectator #acc-app-settings,
         body.mode-spectator #acc-app-settings *,
-        /* Zablokování generátoru a editačních nástrojů rozpisu zápasů */
         body.mode-spectator #acc-schedule #sched-section-gen,
         body.mode-spectator #acc-schedule #sched-section-gen *,
         body.mode-spectator #acc-schedule #sched-form-container,
         body.mode-spectator #acc-schedule #sched-form-container *,
         body.mode-spectator #acc-schedule .schedule-toolbar,
         body.mode-spectator #acc-schedule .schedule-toolbar * {
-            opacity: 0.38 !important;
             pointer-events: none !important;
-            filter: grayscale(70%) !important;
             cursor: not-allowed !important;
             user-select: none !important;
         }
@@ -2601,7 +2612,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.29-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.30-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2751,7 +2762,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.29-beta";
+        const APP_VERSION = "0.7.30-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [

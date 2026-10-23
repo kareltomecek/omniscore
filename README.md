@@ -106,6 +106,13 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.30-beta` (Testovací větev)
+- **Zpřehlednění a zesvětlení ovládacího okna (OO) v režimu Divák:**
+  - **Zesvětlení a odstranění kumulace opacity:** Odstraněno násobení vlastnosti `opacity` na vnořených prvcích (`*`), které způsobovalo extrémní ztmavnutí až nečitelnost konfigurace.
+  - **Vysoká čitelnost parametrů:** Hodnota průhlednosti kontejnerů upravena na přehledných 0.82 s jemným 20% stupněm šedi, díky čemuž jsou veškerá nastavení, časy, rozpis i ovládací prvky turnaje skvěle čitelné a přehledné.
+  - **Striktní zachování neaktivity:** Všechny sekce nastavení, formuláře a ovládací prvky zápasu zůstávají 100% neklikací a chráněné proti nechtěným zásahům (`pointer-events: none`, `cursor: not-allowed`, `user-select: none`).
+  - **Cache-busting:** Aktualizován parametr pro načítání favicony v hlavičce `beta/index.html` na `?v=0.7.30`.
+
 ### Verze `v0.7.29-beta` (Testovací větev)
 - **Eliminace falešného konfliktu Master role po obnovení stránky (F5):**
   - **Identifikace záložky přes `sessionStorage`:** Identifikátor relace záložky (`clientTabId`) se nově ukládá do `sessionStorage` prohlížeče. Díky tomu si záložka uchová stejné ID i po stisku klávesy F5 nebo opětovném načtení stránky.
