@@ -106,6 +106,13 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.28-beta` (Testovací větev)
+- **Oprava zeleného lemu favicony a implementace 32bitového TrueColor ICO:**
+  - Odhalena a odstraněna příčina zeleného/tyrkysového okraje v Google Chrome na Windows: výchozí .NET metoda `GetHicon()` redukovala barvy do 16barevné VGA palety, kde modrou barvu nahradila odstíny Teal a Cyan.
+  - Implementován přímý binární enkodér nekomprimovaného 32bpp TrueColor BGRA ICO formátu (`beta/favicon.ico`). Všechny pixely jsou nyní 100% modré s plnou alfa průhledností bez zkreslení barev.
+  - V hlavičce `beta/index.html` aktualizován cache-busting parametr na `?v=0.7.28`.
+  - Zaevidován přesun spouštěcího souboru `_001 LocalHost.bat` přímo do složky `beta/`.
+
 ### Verze `v0.7.27-beta` (Testovací větev)
 - **Vektorově vykreslená čistá favicona (0:0) a vyřešení cache prohlížeče:**
   - Vytvořena křišťálově čistá vektorová favicona `0:0` bez jakýchkoli barevných lemů či kompresních artefaktů.
