@@ -106,6 +106,11 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.24-beta` (Testovací větev)
+- **Nová favicona aplikace z grafického podkladu:**
+  - Z nového grafického podkladu `OmS_blue_white_arial.png` (800×800 px) byly vygenerovány optimalizované favicon soubory `beta/favicon.png` (128×128 px) a `beta/favicon.ico` (32×32 px).
+  - Vylepšen vizuální styl a kontrast ikony aplikace v záložkách prohlížeče napříč všemi okny (OO, PO, OPG).
+
 ### Verze `v0.7.23-beta` (Testovací větev)
 - **Robustní obnova turnaje ze zálohy Excel/CSV, verze aplikace v exportech a detekce kolizí relací:**
   - **Dynamická detekce zálohy turnaje:** Skenování hlavičky tabulky rozpisu zápasů rozšířeno na prvních 40 řádků a doplněno o dynamické rozpoznání klíčových polí (`Kategorie:`, `Pořadatel:`, `Exportováno:`, `Relace:`, `Pravidla:`, `Verze:`). Starší i novější zálohy s libovolným počtem řádků metadat jsou spolehlivě identifikovány jako kompletní zálohy.
