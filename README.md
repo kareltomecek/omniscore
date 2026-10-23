@@ -106,6 +106,12 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.27-beta` (Testovací větev)
+- **Vektorově vykreslená čistá favicona (0:0) a vyřešení cache prohlížeče:**
+  - Vytvořena křišťálově čistá vektorová favicona `0:0` bez jakýchkoli barevných lemů či kompresních artefaktů.
+  - Vyladěny proporce: číslice 0 jemně rozšířena pro vysokou čitelnost i v miniaturním rozlišení (16×16 / 32×32 px), dvojtečka vystředěna v obou osách a vykreslena jako perfektní kruhové tečky.
+  - Implementován cache-busting parametr `?v=0.7.27` u všech odkazů na favicon v hlavičce, který garantuje okamžité načtení v prohlížeči Google Chrome bez zasekávání na staré mezipaměti.
+
 ### Verze `v0.7.26-beta` (Testovací větev)
 - **Ochrana licenčního limitu při klonování turnaje:**
   - **Kontrola trial limitu v `cloneSessionAsOwn`:** Nelicencovaný host ani uživatel v režimu TRIAL nemůže vytvořit kopii turnaje, který obsahuje více než 10 zápasů.
