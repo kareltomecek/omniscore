@@ -106,6 +106,14 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.33-beta` (Testovací větev)
+- **Zjemnění a kompaktní rozměry informačního pruhu režimu Divák:**
+  - **Snížení výšky pruhu na polovinu:** Padding informační lišty `#spectator-banner` byl zmenšen z `9px 18px` na `4px 14px`, čímž se vertikální výška snížila na cca 26 px a uvolnila prostor pro ovládací okno (OO).
+  - **Sladění velikosti písma (`0.85em`):** Velikost písma v pruhu byla sjednocena s velikostí tlačítka *„📽️ Otevřít Projekci Skóre“* při zachování tučného řezu (`font-weight: bold`).
+  - **Kompaktní ikona a tlačítka:** Ikona 👁️ a tlačítka (*Převzít řízení*, *Vytvořit vlastní kopii*, *Přihlásit se*) byly zmenšeny na kompaktní rozměr (padding `3px 10px`, písmo `0.85em`) jak v HTML šabloně, tak při dynamickém generování v JavaScriptu.
+  - **Zachování barvy:** Ponechána výchozí výrazná oranžová aplikace (`#ff9800`), která v tenkém pruhu působí decentně a neagresivně.
+  - **Cache-busting:** Aktualizován parametr pro načítání favicony v hlavičce `beta/index.html` na `?v=0.7.33`.
+
 ### Verze `v0.7.32-beta` (Testovací větev)
 - **Úprava ztmavení režimu Divák na 30 %:**
   - **Nastavení krytí na 30 % (`opacity: 0.30`):** Úroveň viditelnosti neaktivních ovládacích a konfiguračních sekcí v ovládacím okně (OO) upravena na 30 %. Díky dřívějšímu odstranění násobení opacity na selektoru `*` se nyní jedná o čistých 30 % jasu, což poskytuje znatelné ztmavení pro pocit uzamčení bez propadu do nečitelné tmy.

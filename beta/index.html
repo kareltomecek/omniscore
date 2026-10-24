@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniScore (OmS) v0.7.32-beta</title>
+    <title>OmniScore (OmS) v0.7.33-beta</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="favicon.png?v=0.7.32">
-    <link rel="shortcut icon" href="favicon.ico?v=0.7.32">
-    <link rel="apple-touch-icon" href="favicon.png?v=0.7.32">
+    <link rel="icon" type="image/png" href="favicon.png?v=0.7.33">
+    <link rel="shortcut icon" href="favicon.ico?v=0.7.33">
+    <link rel="apple-touch-icon" href="favicon.png?v=0.7.33">
     <!-- SheetJS for Excel/CSV import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- QRCode library for PO2 -->
@@ -1567,15 +1567,22 @@
             background: #ff9800;
             color: #000;
             font-weight: bold;
-            padding: 9px 18px;
+            font-size: 0.85em;
+            padding: 4px 14px;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 3px 12px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
             z-index: 10000;
             position: sticky;
             top: 0;
             width: 100%;
             box-sizing: border-box;
+        }
+
+        #spectator-banner button {
+            font-size: 0.85em !important;
+            padding: 3px 10px !important;
+            line-height: 1.2 !important;
         }
 
         body.mode-projection #spectator-banner,
@@ -1592,11 +1599,11 @@
 
     <!-- HORNÍ INFORMAČNÍ LIŠTA PRO REŽIM DIVÁK -->
     <div id="spectator-banner">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:1.3em;">👁️</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span>👁️</span>
             <span><b>REŽIM DIVÁK:</b> Turnaj aktivně řídí jiné zařízení. Ovládací prvky jsou uzamčeny (můžete pouze číst).</span>
         </div>
-        <button onclick="admin.claimMasterRole(false)" style="background:#111; color:#fff; border:1px solid #333; padding:7px 16px; border-radius:5px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
+        <button onclick="admin.claimMasterRole(false)" style="background:#111; color:#fff; border:1px solid #333; padding:3px 10px; border-radius:4px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 1px 3px rgba(0,0,0,0.3);">
             👑 Převzít řízení (Master)
         </button>
     </div>
@@ -2611,7 +2618,7 @@
             <span id="admin-footer-role" style="font-size:0.75em; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer; background:rgba(76,175,80,0.25); color:var(--accent-green); border:1px solid var(--accent-green);" title="Tento počítač aktivně řídí turnaj (Master). Kliknutím můžete přepnout do režimu Divák">👑 MASTER</span>
             <span id="admin-footer-progress" style="font-weight:bold; color:#888; margin-left:16px;">-</span>
         </div>
-        <div id="admin-footer-end">OmniScore (OmS) v0.7.32-beta</div>
+        <div id="admin-footer-end">OmniScore (OmS) v0.7.33-beta</div>
         <div id="admin-footer-time">-</div>
     </div>
 
@@ -2761,7 +2768,7 @@
         // ===================================================================================
         // CONFIG & KONSTANTY
         // ===================================================================================
-        const APP_VERSION = "0.7.32-beta";
+        const APP_VERSION = "0.7.33-beta";
 
         // --- DATA STRUCTURES ---
         const PHASES = [
@@ -9291,14 +9298,14 @@
                                 if (!currentUid) {
                                     banner.innerHTML = `
                                         <div style="display:flex; align-items:center; gap:10px;">
-                                            <span style="font-size:1.3em;">👁️</span>
+                                            <span>👁️</span>
                                             <span><b>REŽIM DIVÁK:</b> Tento turnaj patří registrovanému uživateli. Pro převzetí řízení se musíte přihlásit k účtu vlastníka.</span>
                                         </div>
                                         <div style="display:flex; gap:8px; align-items:center;">
-                                            <button onclick="admin.cloneSessionAsOwn()" class="btn" style="background:#333; color:#eee; border:1px solid #555; padding:6px 14px; border-radius:5px; font-weight:bold; cursor:pointer; font-size:0.85em;">
+                                            <button onclick="admin.cloneSessionAsOwn()" class="btn" style="background:#333; color:#eee; border:1px solid #555; padding:3px 10px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:0.85em;">
                                                 📋 Vytvořit vlastní kopii
                                             </button>
-                                            <button onclick="auth.login()" class="btn btn-blue" style="padding:6px 16px; border-radius:5px; font-weight:bold; cursor:pointer; font-size:0.85em;">
+                                            <button onclick="auth.login()" class="btn btn-blue" style="padding:3px 10px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:0.85em;">
                                                 🔑 Přihlásit se
                                             </button>
                                         </div>
@@ -9306,11 +9313,11 @@
                                 } else {
                                     banner.innerHTML = `
                                         <div style="display:flex; align-items:center; gap:10px;">
-                                            <span style="font-size:1.3em;">👁️</span>
+                                            <span>👁️</span>
                                             <span><b>REŽIM DIVÁK:</b> Tento turnaj byl vytvořen jiným uživatelským účtem (můžete pouze číst).</span>
                                         </div>
                                         <div style="display:flex; gap:8px; align-items:center;">
-                                            <button onclick="admin.cloneSessionAsOwn()" class="btn btn-green" style="padding:6px 16px; border-radius:5px; font-weight:bold; cursor:pointer; font-size:0.85em;">
+                                            <button onclick="admin.cloneSessionAsOwn()" class="btn btn-green" style="padding:3px 10px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:0.85em;">
                                                 📋 Vytvořit vlastní kopii
                                             </button>
                                         </div>
@@ -9319,10 +9326,10 @@
                             } else {
                                 banner.innerHTML = `
                                     <div style="display:flex; align-items:center; gap:10px;">
-                                        <span style="font-size:1.3em;">👁️</span>
+                                        <span>👁️</span>
                                         <span><b>REŽIM DIVÁK:</b> Turnaj aktivně řídí jiné zařízení. Ovládací prvky jsou uzamčeny (můžete pouze číst).</span>
                                     </div>
-                                    <button onclick="admin.claimMasterRole(false)" style="background:#111; color:#fff; border:1px solid #333; padding:7px 16px; border-radius:5px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
+                                    <button onclick="admin.claimMasterRole(false)" style="background:#111; color:#fff; border:1px solid #333; padding:3px 10px; border-radius:4px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 1px 3px rgba(0,0,0,0.3);">
                                         👑 Převzít řízení (Master)
                                     </button>
                                 `;
