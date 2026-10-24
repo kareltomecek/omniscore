@@ -106,6 +106,11 @@ Automatický deployment na web probíhá přes GitHub Actions ([.github/workflow
 
 ## 📝 Changelog
 
+### Verze `v0.7.32-beta` (Testovací větev)
+- **Úprava ztmavení režimu Divák na 30 %:**
+  - **Nastavení krytí na 30 % (`opacity: 0.30`):** Úroveň viditelnosti neaktivních ovládacích a konfiguračních sekcí v ovládacím okně (OO) upravena na 30 %. Díky dřívějšímu odstranění násobení opacity na selektoru `*` se nyní jedná o čistých 30 % jasu, což poskytuje znatelné ztmavení pro pocit uzamčení bez propadu do nečitelné tmy.
+  - **Cache-busting:** Aktualizován parametr pro načítání favicony v hlavičce `beta/index.html` na `?v=0.7.32`.
+
 ### Verze `v0.7.31-beta` (Testovací větev)
 - **Vyladění ztmavení a přirozených barev v režimu Divák:**
   - **Nastavení krytí na 50 % (`opacity: 0.50`):** Úroveň viditelnosti prvků v ovládacím okně (OO) upravena na vyvážených 50 %, což poskytuje zřetelné ztmavení pro pocit uzamčeného rozhraní při zachování bezproblémové čitelnosti textů a časů.
